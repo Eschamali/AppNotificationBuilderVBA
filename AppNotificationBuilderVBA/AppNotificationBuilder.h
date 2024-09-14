@@ -1,8 +1,10 @@
-#include <windows.h>  // Windows API‚ÌŠî–{“I‚ÈŒ^‚âŠÖ”‚ğŠÜ‚Ş
+ï»¿#include <windows.h>  // Windows APIã®åŸºæœ¬çš„ãªå‹ã‚„é–¢æ•°ã‚’å«ã‚€
 
 #include <winrt/Windows.UI.Notifications.h>
 #include <winrt/Windows.Data.Xml.Dom.h>
 #include <winrt/base.h>
+#include <string>
+#include <chrono>
 
 #ifdef AppNotificationBuilderVBA_EXPORTS
 #define AppNotificationBuilderVBA_API __declspec(dllexport)
@@ -10,10 +12,15 @@
 #define AppNotificationBuilderVBA_API __declspec(dllimport)
 #endif
 
-//ŠÖ”éŒ¾
-extern "C" AppNotificationBuilderVBA_API void __stdcall ShowToastNotification(
-    LPCWSTR appUserModelID,  // ƒAƒvƒŠƒP[ƒVƒ‡ƒ“ID
-    LPCWSTR xmlTemplate,     // XMLƒeƒ“ƒvƒŒ[ƒg
-    LPCWSTR group,           // ƒOƒ‹[ƒv
-    LPCWSTR tag              // ƒ^ƒO
-);
+// æ§‹é€ ä½“ã‚’å®šç¾©
+struct ToastNotificationParams {
+    const wchar_t* appUserModelID;
+    const wchar_t* xmlTemplate;
+    const wchar_t* group;
+    const wchar_t* tag;
+    double scheduleTime;
+};
+
+
+//é–¢æ•°å®£è¨€
+extern "C" AppNotificationBuilderVBA_API void ShowToastNotification(ToastNotificationParams* params);

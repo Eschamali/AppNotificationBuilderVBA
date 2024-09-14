@@ -1,52 +1,92 @@
-#include "AppNotificationBuilder.h"
+ï»¿#include "AppNotificationBuilder.h"
 
-#include <combaseapi.h>  // CoInitializeEx‚Ì‚½‚ß‚É•K—v
+#include <combaseapi.h>  // CoInitializeExã®ãŸã‚ã«å¿…è¦
 
 using namespace winrt;
 using namespace Windows::UI::Notifications;
 using namespace Windows::Data::Xml::Dom;
 
 
-void __stdcall ShowToastNotification(
-    LPCWSTR appUserModelID,  // ƒAƒvƒŠƒP[ƒVƒ‡ƒ“ID
-    LPCWSTR xmlTemplate,     // XMLƒeƒ“ƒvƒŒ[ƒg
-    LPCWSTR group,           // ƒOƒ‹[ƒv
-    LPCWSTR tag              // ƒ^ƒO
-) {
-    // COM‚Ì‰Šú‰»
+void ShowToastNotification(ToastNotificationParams* params){
+    // COMã®åˆæœŸåŒ–
     HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     if (hr == RPC_E_CHANGED_MODE) {
-        // Šù‚ÉˆÙ‚È‚éƒAƒp[ƒgƒƒ“ƒg ƒ‚[ƒh‚Å‰Šú‰»‚³‚ê‚Ä‚¢‚éê‡‚ÍA‚»‚Ì‚Ü‚Ü‘±s
+        // æ—¢ã«ç•°ãªã‚‹ã‚¢ãƒ‘ãƒ¼ãƒˆãƒ¡ãƒ³ãƒˆ ãƒ¢ãƒ¼ãƒ‰ã§åˆæœŸåŒ–ã•ã‚Œã¦ã„ã‚‹å ´åˆã¯ã€ãã®ã¾ã¾ç¶šè¡Œ
     }
     else if (FAILED(hr)) {
         wchar_t errorMsg[256];
-        swprintf_s(errorMsg, 256, L"COM‰Šú‰»‚É¸”s‚µ‚Ü‚µ‚½BHRESULT: 0x%08X", hr);
-        MessageBoxW(nullptr, errorMsg, L"ƒGƒ‰[", MB_OK);
+        swprintf_s(errorMsg, 256, L"COMåˆæœŸåŒ–ã«å¤±æ•—ã—ã¾ã—ãŸã€‚HRESULT: 0x%08X", hr);
+        MessageBoxW(nullptr, errorMsg, L"ã‚¨ãƒ©ãƒ¼", MB_OK);
         return;
     }
 
+    //å¿…è¦ãªè¨­å®šå€¤ãªã©ã‚’å¼•æ•°ã‹ã‚‰å–å¾—
+    const wchar_t* appUserModelID = params->appUserModelID;
+    const wchar_t* xmlTemplate = params->xmlTemplate;
+    const wchar_t* group = params->group;
+    const wchar_t* tag = params->tag;
+    double scheduleTime = params->scheduleTime;
+
     try {
-        // ƒg[ƒXƒg’Ê’m‚Ìì¬
+        // ãƒˆãƒ¼ã‚¹ãƒˆé€šçŸ¥ã®ä½œæˆ
         ToastNotifier toastNotifier = ToastNotificationManager::CreateToastNotifier(appUserModelID);
         XmlDocument toastXml;
-        toastXml.LoadXml(xmlTemplate);  // XMLƒeƒ“ƒvƒŒ[ƒg‚ğƒ[ƒh
+        toastXml.LoadXml(xmlTemplate);  // XMLãƒ†ãƒ³ãƒ—ãƒ¬ãƒ¼ãƒˆã‚’ãƒ­ãƒ¼ãƒ‰
 
-        // ƒg[ƒXƒg’Ê’mƒIƒuƒWƒFƒNƒg‚ğì¬
+        // ãƒˆãƒ¼ã‚¹ãƒˆé€šçŸ¥ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã‚’ä½œæˆ
         ToastNotification toast{ toastXml };
 
-        // ƒOƒ‹[ƒv‚Æƒ^ƒO‚ğİ’è
+        // ã‚°ãƒ«ãƒ¼ãƒ—ã¨ã‚¿ã‚°ã‚’è¨­å®š
         toast.Group(group);
         toast.Tag(tag);
 
-        // ƒg[ƒXƒg‚ğ•\¦
-        toastNotifier.Show(toast);
+        //MessageBoxW(nullptr, appUserModelID, L"AppUserModelID", MB_OK);
+        //MessageBoxW(nullptr, xmlTemplate, L"XML Template", MB_OK);
+        //MessageBoxW(nullptr, group, L"Group", MB_OK);
+        //MessageBoxW(nullptr, tag, L"Tag", MB_OK);
+        wchar_t buffer[256];
+        swprintf(buffer, 256, L"ScheduleTime: %f", scheduleTime);
+        MessageBoxW(nullptr, buffer, L"Schedule Time", MB_OK);
+
+        if (scheduleTime > 0) {
+            // ã‚¹ã‚±ã‚¸ãƒ¥ãƒ¼ãƒ«æ—¥æ™‚ãŒæŒ‡å®šã•ã‚Œã¦ã„ã‚‹å ´åˆ
+            // VBAã®æ—¥ä»˜å‹ã¯1970å¹´ã‹ã‚‰ã®ç§’æ•°ã§ä¸ãˆã‚‰ã‚Œã‚‹ã®ã§ã€ãã‚Œã‚’æ—¥æ™‚ã«å¤‰æ›ã™ã‚‹
+            FILETIME fileTime;
+            SYSTEMTIME systemTime;
+            LARGE_INTEGER largeInt;
+
+            // VBAã‹ã‚‰æ¸¡ã•ã‚Œã‚‹ã‚·ãƒªã‚¢ãƒ«å€¤ï¼ˆdays since 1899-12-30ï¼‰ã‚’Windows FILETIMEå½¢å¼ã«å¤‰æ›
+            double daysSinceEpoch = scheduleTime - 25569.0;  // 25569ã¯1970-01-01ã‹ã‚‰ã®ã‚·ãƒªã‚¢ãƒ«å€¤
+            long long total100Nanoseconds = static_cast<long long>(daysSinceEpoch * 864000000000.0);  // 1æ—¥=86400ç§’, 100ãƒŠãƒç§’=1ç§’/10^7
+
+            swprintf(buffer, 256, L"daysSinceEpoch: %f", daysSinceEpoch);
+            MessageBoxW(nullptr, buffer, L"Schedule Time", MB_OK);
+
+            largeInt.QuadPart = total100Nanoseconds;
+            fileTime.dwLowDateTime = largeInt.LowPart;
+            fileTime.dwHighDateTime = largeInt.HighPart;
+
+            // FILETIMEã‚’SYSTEMTIMEã«å¤‰æ›
+            FileTimeToSystemTime(&fileTime, &systemTime);
+
+            // SYSTEMTIMEã‚’DateTimeã«å¤‰æ›
+            Windows::Foundation::DateTime scheduleDateTime;
+            scheduleDateTime = winrt::clock::from_FILETIME(fileTime);  // FILETIMEã‚’ä½¿ã£ã¦DateTimeã«å¤‰æ›
+
+            // ScheduledToastNotification ã‚’ä½œæˆã—ã¦ã‚¹ã‚±ã‚¸ãƒ¥ãƒ¼ãƒ«è¨­å®š
+            ScheduledToastNotification scheduledToast{ toastXml, scheduleDateTime };
+            scheduledToast.Group(group);
+            scheduledToast.Tag(tag);
+
+            // é€šçŸ¥ã‚’ã‚¹ã‚±ã‚¸ãƒ¥ãƒ¼ãƒ«
+            toastNotifier.AddToSchedule(scheduledToast);
+        }
+        else {
+            // å³æ™‚é€šçŸ¥ã‚’è¡¨ç¤º
+            toastNotifier.Show(toast);
+        }
     }
     catch (const winrt::hresult_error& e) {
-        MessageBoxW(nullptr, e.message().c_str(), L"ƒGƒ‰[", MB_OK);
-    }
-
-    // CoUninitialize()‚ÍACoInitializeEx‚ª¬Œ÷‚µ‚½ê‡‚Ì‚İŒÄ‚Ño‚·
-    if (SUCCEEDED(hr)) {
-        CoUninitialize();
+        MessageBoxW(nullptr, e.message().c_str(), L"ã‚¨ãƒ©ãƒ¼", MB_OK);
     }
 }
