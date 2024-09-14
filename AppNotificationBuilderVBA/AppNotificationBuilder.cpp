@@ -23,7 +23,7 @@ Windows::Foundation::DateTime SystemTimeToDateTime(const SYSTEMTIME& st) {
     return dateTime;
 }
 
-void ShowToastNotification(ToastNotificationParams* params){
+void ShowToastNotification(ToastNotificationParams* ToastConfigData){
     // COMの初期化
     HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     if (hr == RPC_E_CHANGED_MODE) {
@@ -36,26 +36,18 @@ void ShowToastNotification(ToastNotificationParams* params){
         return;
     }
 
-    //必要な設定値などを引数から取得
-    const wchar_t* appUserModelID = params->AppUserModelID;
-    const wchar_t* xmlTemplate = params->XmlTemplate;
-    const wchar_t* group = params->Group;
-    const wchar_t* tag = params->Tag;
-    double scheduleTime = params->Schedule_DeliveryTime;
-    const wchar_t* schedule_ID = params->Schedule_ID;
-
     try {
         // トースト通知のXMLを構築
         XmlDocument toastXml;
-        toastXml.LoadXml(xmlTemplate);
+        toastXml.LoadXml(ToastConfigData->XmlTemplate);
 
 
         // 通常の通知か、スケジュール通知かを分岐
-        ToastNotifier toastNotifier = ToastNotificationManager::CreateToastNotifier(appUserModelID);
-        if (scheduleTime > 0) {
+        ToastNotifier toastNotifier = ToastNotificationManager::CreateToastNotifier(ToastConfigData->AppUserModelID);
+        if (ToastConfigData->Schedule_DeliveryTime > 0) {
             // スケジュール通知の場合
             SYSTEMTIME st;
-            VariantTimeToSystemTime(scheduleTime, &st);
+            VariantTimeToSystemTime(ToastConfigData->Schedule_DeliveryTime, &st);
 
             // SYSTEMTIMEをDateTimeに変換
             Windows::Foundation::DateTime scheduleDateTime = SystemTimeToDateTime(st);
@@ -68,9 +60,10 @@ void ShowToastNotification(ToastNotificationParams* params){
             ScheduledToastNotification scheduledToast(toastXml, scheduleDateTime);
 
             // 上記で作成されたオブジェクトに各種設定(GroupとTag等)を施す
-            scheduledToast.Group(group);
-            scheduledToast.Tag(tag);
-            scheduledToast.Id(schedule_ID);
+            scheduledToast.Id(ToastConfigData->Schedule_ID);
+            scheduledToast.Group(ToastConfigData->Group);
+            scheduledToast.Tag(ToastConfigData->Tag);
+            scheduledToast.SuppressPopup(ToastConfigData->SuppressPopup);
 
             // スケジュールトーストを追加
             toastNotifier.AddToSchedule(scheduledToast);
@@ -80,8 +73,9 @@ void ShowToastNotification(ToastNotificationParams* params){
             ToastNotification toast(toastXml);
 
             // 上記で作成されたオブジェクトに各種設定(GroupとTag等)を施す
-            toast.Group(group);
-            toast.Tag(tag);
+            toast.Group(ToastConfigData->Group);
+            toast.Tag(ToastConfigData->Tag);
+            toast.SuppressPopup(ToastConfigData->SuppressPopup);
 
             // 通常の即時通知を作動
             toastNotifier.Show(toast);

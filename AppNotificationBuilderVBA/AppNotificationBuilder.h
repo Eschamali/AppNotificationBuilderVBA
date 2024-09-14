@@ -20,6 +20,7 @@ struct ToastNotificationParams {
     const wchar_t* Tag;
     double Schedule_DeliveryTime;
     const wchar_t* Schedule_ID;
+    bool SuppressPopup;
 };
 
 
