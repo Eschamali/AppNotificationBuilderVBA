@@ -52,10 +52,6 @@ void ShowToastNotification(ToastNotificationParams* ToastConfigData){
             // SYSTEMTIMEをDateTimeに変換
             Windows::Foundation::DateTime scheduleDateTime = SystemTimeToDateTime(st);
 
-            // time_since_epoch() から100ナノ秒単位の値を取得
-            auto duration = scheduleDateTime.time_since_epoch();
-            int64_t count = std::chrono::duration_cast<std::chrono::duration<int64_t, std::ratio<1, 10000000>>>(duration).count();
-
             // スケジュールされたトースト通知を作成
             ScheduledToastNotification scheduledToast(toastXml, scheduleDateTime);
 
