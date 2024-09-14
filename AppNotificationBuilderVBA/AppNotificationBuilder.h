@@ -14,11 +14,12 @@
 
 // 構造体を定義
 struct ToastNotificationParams {
-    const wchar_t* appUserModelID;
-    const wchar_t* xmlTemplate;
-    const wchar_t* group;
-    const wchar_t* tag;
-    double scheduleTime;
+    const wchar_t* AppUserModelID;
+    const wchar_t* XmlTemplate;
+    const wchar_t* Group;
+    const wchar_t* Tag;
+    double Schedule_DeliveryTime;
+    const wchar_t* Schedule_ID;
 };
 
 

@@ -37,11 +37,12 @@ void ShowToastNotification(ToastNotificationParams* params){
     }
 
     //必要な設定値などを引数から取得
-    const wchar_t* appUserModelID = params->appUserModelID;
-    const wchar_t* xmlTemplate = params->xmlTemplate;
-    const wchar_t* group = params->group;
-    const wchar_t* tag = params->tag;
-    double scheduleTime = params->scheduleTime;
+    const wchar_t* appUserModelID = params->AppUserModelID;
+    const wchar_t* xmlTemplate = params->XmlTemplate;
+    const wchar_t* group = params->Group;
+    const wchar_t* tag = params->Tag;
+    double scheduleTime = params->Schedule_DeliveryTime;
+    const wchar_t* schedule_ID = params->Schedule_ID;
 
     try {
         // トースト通知のXMLを構築
@@ -69,6 +70,7 @@ void ShowToastNotification(ToastNotificationParams* params){
             // 上記で作成されたオブジェクトに各種設定(GroupとTag等)を施す
             scheduledToast.Group(group);
             scheduledToast.Tag(tag);
+            scheduledToast.Id(schedule_ID);
 
             // スケジュールトーストを追加
             toastNotifier.AddToSchedule(scheduledToast);
