@@ -69,6 +69,7 @@ void ShowToastNotification(ToastNotificationParams* ToastConfigData){
             ToastNotification toast(toastXml);
 
             // 上記で作成されたオブジェクトに各種設定(GroupとTag等)を施す
+            toast.ExpiresOnReboot(ToastConfigData->ExpiresOnReboot);
             toast.Group(ToastConfigData->Group);
             toast.Tag(ToastConfigData->Tag);
             toast.SuppressPopup(ToastConfigData->SuppressPopup);

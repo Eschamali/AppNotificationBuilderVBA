@@ -16,11 +16,12 @@
 struct ToastNotificationParams {
     const wchar_t* AppUserModelID;
     const wchar_t* XmlTemplate;
-    const wchar_t* Group;
     const wchar_t* Tag;
-    double Schedule_DeliveryTime;
-    const wchar_t* Schedule_ID;
+    const wchar_t* Group;
+    bool ExpiresOnReboot;
     bool SuppressPopup;
+    const wchar_t* Schedule_ID;
+    double Schedule_DeliveryTime;
 };
 
 
