@@ -24,10 +24,10 @@ struct ToastNotificationParams_String {
     const wchar_t* Schedule_ID;
 };
 
-// 2つ目の構造体を定義。ここでは、スイッチングに関するパラメーターです
+// 2つ目の構造体を定義。ここでは、スイッチングに関するパラメーターです。VBA側では、longで値渡ししないと上手くいきません。
 struct ToastNotificationParams_Boolean {
-    BOOLEAN ExpiresOnReboot;
-    BOOLEAN SuppressPopup;
+    BOOL ExpiresOnReboot;
+    BOOL SuppressPopup;
 };
 
 // 3つ目の構造体を定義。ここでは、日付に関するパラメーターです
