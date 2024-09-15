@@ -72,7 +72,7 @@ void __stdcall ShowToastNotification(ToastNotificationParams_String* ToastConfig
         //通知の有効期限が設定されてあったら、設定値を準備する
         SYSTEMTIME ex;
         Windows::Foundation::DateTime ExpirationTimeValue;
-        if (ToastConfigData_Date->ExpirationTime) {
+        if (ToastConfigData_Date->ExpirationTime > 0) {
             //変換処理
             VariantTimeToSystemTime(ToastConfigData_Date->ExpirationTime, &ex);
             ExpirationTimeValue = SystemTimeToDateTime(ex);
