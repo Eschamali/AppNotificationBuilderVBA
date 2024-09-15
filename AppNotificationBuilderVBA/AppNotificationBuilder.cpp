@@ -23,7 +23,7 @@ Windows::Foundation::DateTime SystemTimeToDateTime(const SYSTEMTIME& st) {
     return dateTime;
 }
 
-void __stdcall ShowToastNotification(ToastNotificationParams_String* ToastConfigData_String, ToastNotificationParams_Boolean* ToastConfigData_Boolean, ToastNotificationParams_Date* ToastConfigData_Date){
+void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData){
     // COMの初期化
     HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     if (hr == RPC_E_CHANGED_MODE) {
@@ -38,20 +38,20 @@ void __stdcall ShowToastNotification(ToastNotificationParams_String* ToastConfig
 
     try {
         //値Check用
-        MessageBoxW(nullptr, ToastConfigData_String->AppUserModelID, L"AppUserModelID", MB_OK);
-        MessageBoxW(nullptr, ToastConfigData_String->XmlTemplate, L"XmlTemplate", MB_OK);
-        MessageBoxW(nullptr, ToastConfigData_String->Tag, L"Tag", MB_OK);
-        MessageBoxW(nullptr, ToastConfigData_String->Group, L"Group", MB_OK);
-        MessageBoxW(nullptr, ToastConfigData_String->Schedule_ID, L"Schedule_ID", MB_OK);
+        MessageBoxW(nullptr, ToastConfigData->AppUserModelID, L"AppUserModelID", MB_OK);
+        MessageBoxW(nullptr, ToastConfigData->XmlTemplate, L"XmlTemplate", MB_OK);
+        MessageBoxW(nullptr, ToastConfigData->Tag, L"Tag", MB_OK);
+        MessageBoxW(nullptr, ToastConfigData->Group, L"Group", MB_OK);
+        MessageBoxW(nullptr, ToastConfigData->Schedule_ID, L"Schedule_ID", MB_OK);
 
-        if (ToastConfigData_Boolean->ExpiresOnReboot) {
+        if (ToastConfigData->ExpiresOnReboot) {
             MessageBoxW(nullptr, L"ExpiresOnReboot is TRUE", L"ExpiresOnReboot", MB_OK);
         }
         else {
             MessageBoxW(nullptr, L"ExpiresOnReboot is FALSE", L"ExpiresOnReboot", MB_OK);
         }
 
-        if (ToastConfigData_Boolean->SuppressPopup) {
+        if (ToastConfigData->SuppressPopup) {
             MessageBoxW(nullptr, L"SuppressPopup is TRUE", L"SuppressPopup", MB_OK);
         }
         else {
@@ -59,31 +59,31 @@ void __stdcall ShowToastNotification(ToastNotificationParams_String* ToastConfig
         }
 
         wchar_t buffer[256];
-        swprintf(buffer, 256, L"ScheduleTime: %f", ToastConfigData_Date->Schedule_DeliveryTime);
+        swprintf(buffer, 256, L"ScheduleTime: %f", ToastConfigData->Schedule_DeliveryTime);
         MessageBoxW(nullptr, buffer, L"Schedule Time", MB_OK);
 
-        swprintf(buffer, 256, L"ExpirationTime: %f", ToastConfigData_Date->ExpirationTime);
+        swprintf(buffer, 256, L"ExpirationTime: %f", ToastConfigData->ExpirationTime);
         MessageBoxW(nullptr, buffer, L"ExpirationTime", MB_OK);
 
         // トースト通知のXMLを構築
         XmlDocument toastXml;
-        toastXml.LoadXml(ToastConfigData_String->XmlTemplate);
+        toastXml.LoadXml(ToastConfigData->XmlTemplate);
 
         //通知の有効期限が設定されてあったら、設定値を準備する
         SYSTEMTIME ex;
         Windows::Foundation::DateTime ExpirationTimeValue;
-        if (ToastConfigData_Date->ExpirationTime > 0) {
+        if (ToastConfigData->ExpirationTime > 0) {
             //変換処理
-            VariantTimeToSystemTime(ToastConfigData_Date->ExpirationTime, &ex);
+            VariantTimeToSystemTime(ToastConfigData->ExpirationTime, &ex);
             ExpirationTimeValue = SystemTimeToDateTime(ex);
         }
 
         // 通常の通知か、スケジュール通知かを分岐
-        ToastNotifier toastNotifier = ToastNotificationManager::CreateToastNotifier(ToastConfigData_String->AppUserModelID);
-        if (ToastConfigData_Date->Schedule_DeliveryTime > 0) {
+        ToastNotifier toastNotifier = ToastNotificationManager::CreateToastNotifier(ToastConfigData->AppUserModelID);
+        if (ToastConfigData->Schedule_DeliveryTime > 0) {
             // スケジュール通知の場合
             SYSTEMTIME sc;
-            VariantTimeToSystemTime(ToastConfigData_Date->Schedule_DeliveryTime, &sc);
+            VariantTimeToSystemTime(ToastConfigData->Schedule_DeliveryTime, &sc);
 
             // SYSTEMTIMEをDateTimeに変換
             Windows::Foundation::DateTime scheduleDateTime = SystemTimeToDateTime(sc);
@@ -92,11 +92,11 @@ void __stdcall ShowToastNotification(ToastNotificationParams_String* ToastConfig
             ScheduledToastNotification scheduledToast(toastXml, scheduleDateTime);
 
             // 上記で作成されたオブジェクトに各種設定(GroupとTag等)を施す
-            scheduledToast.Id(ToastConfigData_String->Schedule_ID);
-            scheduledToast.Group(ToastConfigData_String->Group);
-            scheduledToast.Tag(ToastConfigData_String->Tag);
-            scheduledToast.SuppressPopup(ToastConfigData_Boolean->SuppressPopup);
-            if (ToastConfigData_Date->ExpirationTime > 0) scheduledToast.ExpirationTime(ExpirationTimeValue);
+            scheduledToast.Id(ToastConfigData->Schedule_ID);
+            scheduledToast.Group(ToastConfigData->Group);
+            scheduledToast.Tag(ToastConfigData->Tag);
+            scheduledToast.SuppressPopup(ToastConfigData->SuppressPopup);
+            if (ToastConfigData->ExpirationTime > 0) scheduledToast.ExpirationTime(ExpirationTimeValue);
 
             // スケジュールトーストを追加
             toastNotifier.AddToSchedule(scheduledToast);
@@ -106,11 +106,11 @@ void __stdcall ShowToastNotification(ToastNotificationParams_String* ToastConfig
             ToastNotification toast(toastXml);
 
             // 上記で作成されたオブジェクトに各種設定(GroupとTag等)を施す
-            toast.ExpiresOnReboot(ToastConfigData_Boolean->ExpiresOnReboot);
-            toast.Group(ToastConfigData_String->Group);
-            toast.Tag(ToastConfigData_String->Tag);
-            toast.SuppressPopup(ToastConfigData_Boolean->SuppressPopup);
-            if (ToastConfigData_Date->ExpirationTime > 0) toast.ExpirationTime(ExpirationTimeValue);
+            toast.ExpiresOnReboot(ToastConfigData->ExpiresOnReboot);
+            toast.Group(ToastConfigData->Group);
+            toast.Tag(ToastConfigData->Tag);
+            toast.SuppressPopup(ToastConfigData->SuppressPopup);
+            if (ToastConfigData->ExpirationTime > 0) toast.ExpirationTime(ExpirationTimeValue);
 
             // 通常の即時通知を作動
             toastNotifier.Show(toast);
