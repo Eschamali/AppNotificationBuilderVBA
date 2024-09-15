@@ -72,7 +72,7 @@ void __stdcall ShowToastNotification(ToastNotificationParams_String* ToastConfig
         //通知の有効期限が設定されてあったら、設定値を準備する
         SYSTEMTIME ex;
         Windows::Foundation::DateTime ExpirationTimeValue;
-        if (ToastConfigData_Date->ExpirationTime > 0) {
+        if (ToastConfigData_Date->ExpirationTime) {
             //変換処理
             VariantTimeToSystemTime(ToastConfigData_Date->ExpirationTime, &ex);
             ExpirationTimeValue = SystemTimeToDateTime(ex);
@@ -96,7 +96,7 @@ void __stdcall ShowToastNotification(ToastNotificationParams_String* ToastConfig
             scheduledToast.Group(ToastConfigData_String->Group);
             scheduledToast.Tag(ToastConfigData_String->Tag);
             scheduledToast.SuppressPopup(ToastConfigData_Boolean->SuppressPopup);
-            //if (ToastConfigData_Date->ExpirationTime > 0) scheduledToast.ExpirationTime(ExpirationTimeValue);
+            if (ToastConfigData_Date->ExpirationTime > 0) scheduledToast.ExpirationTime(ExpirationTimeValue);
 
             // スケジュールトーストを追加
             toastNotifier.AddToSchedule(scheduledToast);
@@ -110,7 +110,7 @@ void __stdcall ShowToastNotification(ToastNotificationParams_String* ToastConfig
             toast.Group(ToastConfigData_String->Group);
             toast.Tag(ToastConfigData_String->Tag);
             toast.SuppressPopup(ToastConfigData_Boolean->SuppressPopup);
-            //if (ToastConfigData_Date->ExpirationTime > 0) toast.ExpirationTime(ExpirationTimeValue);
+            if (ToastConfigData_Date->ExpirationTime > 0) toast.ExpirationTime(ExpirationTimeValue);
 
             // 通常の即時通知を作動
             toastNotifier.Show(toast);
