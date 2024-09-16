@@ -1,10 +1,11 @@
 ﻿#include <windows.h>  // Windows APIの基本的な型や関数を含む
 
-#include <winrt/Windows.UI.Notifications.h> //トースト関連モジュール全般
-#include <winrt/Windows.Data.Xml.Dom.h>     //XMLコンテンツ解析モジュール
-#include <winrt/Windows.Foundation.h>       //Nullable 系を扱うためのモジュール
-#include <winrt/base.h>                     //WinRT-APIの基本モジュール
-#include <string>
+#include <winrt/Windows.UI.Notifications.h>         //トースト関連モジュール全般
+#include <winrt/Windows.Data.Xml.Dom.h>             //XMLコンテンツ解析モジュール
+#include <winrt/Windows.Foundation.h>               //Nullable 系を扱うためのモジュール
+#include <winrt/Windows.Foundation.Collections.h>   //NotificationDataを扱うためのモジュール
+#include <winrt/base.h>                             //WinRT-APIの基本モジュール
+#include <string>                                   //文字列へ変換系モジュール
 #include <chrono>
 
 #ifdef AppNotificationBuilderVBA_EXPORTS
@@ -32,4 +33,4 @@ struct ToastNotificationParams {
 
 //関数宣言
 extern "C" AppNotificationBuilderVBA_API void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData);    //一般的な通知
-extern "C" AppNotificationBuilderVBA_API void __stdcall ShowToastNotificationWithProgressBar(ToastNotificationParams* ToastConfigData, const wchar_t* ProgressStatus, double ProgressValue, const wchar_t* ProgressTitle, const wchar_t* ProgressValueStringOverride);    //プログレスバー付き通知
+extern "C" AppNotificationBuilderVBA_API void __stdcall ShowToastNotificationWithProgressBar(ToastNotificationParams* ToastConfigData, const wchar_t* ProgressStatus, double ProgressValue, const wchar_t* ProgressTitle, const wchar_t* ProgressValueStringOverride);    //プログレスバー付き通知(初回用)

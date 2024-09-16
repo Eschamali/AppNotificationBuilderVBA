@@ -5,6 +5,7 @@
 using namespace winrt;
 using namespace Windows::UI::Notifications;
 using namespace Windows::Data::Xml::Dom;
+using namespace winrt::Windows::Foundation;
 
 
 // SYSTEMTIMEをDateTimeに変換する関数
@@ -23,6 +24,8 @@ Windows::Foundation::DateTime SystemTimeToDateTime(const SYSTEMTIME& st) {
     return dateTime;
 }
 
+
+//引数に渡された値で、単純なトースト通知を表示します。指定日時に通知するスケジュール機能も対応します
 void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData){
     // COMの初期化
     HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -78,8 +81,10 @@ void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData){
             ExpirationTimeValue = SystemTimeToDateTime(ex);
         }
 
-        // 通常の通知か、スケジュール通知かを分岐
+        //指定のAppUserModelIDで、トーストオブジェクトを生成
         ToastNotifier toastNotifier = ToastNotificationManager::CreateToastNotifier(ToastConfigData->AppUserModelID);
+        
+        // 日付が指定されているかで、通常の通知か、スケジュール通知かを分岐
         if (ToastConfigData->Schedule_DeliveryTime > 0) {
             // スケジュール通知の場合
             SYSTEMTIME sc;
@@ -142,31 +147,77 @@ void __stdcall ShowToastNotificationWithProgressBar(ToastNotificationParams* Toa
 
     try {
         //値Check用
-        MessageBoxW(nullptr, ToastConfigData->AppUserModelID, L"AppUserModelID", MB_OK);
-        MessageBoxW(nullptr, ToastConfigData->XmlTemplate, L"XmlTemplate", MB_OK);
-        MessageBoxW(nullptr, ToastConfigData->Tag, L"Tag", MB_OK);
-        MessageBoxW(nullptr, ToastConfigData->Group, L"Group", MB_OK);
+        //MessageBoxW(nullptr, ToastConfigData->AppUserModelID, L"AppUserModelID", MB_OK);
+        //MessageBoxW(nullptr, ToastConfigData->XmlTemplate, L"XmlTemplate", MB_OK);
+        //MessageBoxW(nullptr, ToastConfigData->Tag, L"Tag", MB_OK);
+        //MessageBoxW(nullptr, ToastConfigData->Group, L"Group", MB_OK);
 
-        if (ToastConfigData->SuppressPopup) {
-            MessageBoxW(nullptr, L"SuppressPopup is TRUE", L"SuppressPopup", MB_OK);
+        //if (ToastConfigData->SuppressPopup) {
+        //    MessageBoxW(nullptr, L"SuppressPopup is TRUE", L"SuppressPopup", MB_OK);
+        //}
+        //else {
+        //    MessageBoxW(nullptr, L"SuppressPopup is FALSE", L"SuppressPopup", MB_OK);
+        //}
+
+        //if (ToastConfigData->ExpiresOnReboot) {
+        //    MessageBoxW(nullptr, L"ExpiresOnReboot is TRUE", L"ExpiresOnReboot", MB_OK);
+        //}
+        //else {
+        //    MessageBoxW(nullptr, L"ExpiresOnReboot is FALSE", L"ExpiresOnReboot", MB_OK);
+        //}
+
+        //MessageBoxW(nullptr, ProgressStatus, L"ProgressStatus", MB_OK);
+
+        //wchar_t buffer[256];
+        //swprintf(buffer, 256, L"ProgressValue: %f", ProgressValue);
+        //MessageBoxW(nullptr, buffer, L"ProgressValue", MB_OK);
+
+        //MessageBoxW(nullptr, ProgressTitle, L"ProgressTitle", MB_OK);
+        //MessageBoxW(nullptr, ProgressValueStringOverride, L"ProgressValueStringOverride", MB_OK);
+
+        //指定のAppUserModelIDで、トーストオブジェクトを生成
+        ToastNotifier toastNotifierWithProgressBar = ToastNotificationManager::CreateToastNotifier(ToastConfigData->AppUserModelID);
+
+        // プログレスバー付きトースト通知のXMLを構築
+        XmlDocument toastXmlWithProgress;
+        toastXmlWithProgress.LoadXml(ToastConfigData->XmlTemplate);
+
+        // プログレスバー付きのトースト通知を作成
+        ToastNotification toastWithProgress(toastXmlWithProgress);
+
+        //初期のNotificationData値を割り当てる
+        //※予め、xmlに仕込む変数名({XXX})をここと統一する必要があります
+        NotificationData ProgressParams;
+        auto ProgressParamsValues = ProgressParams.Values();         // 戻り値の型を明示的に指定
+
+        ProgressParamsValues.Insert(L"progressTitle", ProgressTitle);                               //タイトル
+        ProgressParamsValues.Insert(L"progressStatus", ProgressStatus);                             //左下の進行状況バーの下に表示される状態文字列
+        
+        //進捗値の場合、負になってたら、ドットアニメーションの不確定式にします。
+        if (ProgressValue < 0) {
+            ProgressParamsValues.Insert(L"progressValue", L"Indeterminate");                        //進行状況バーの状態を「不確定」として、設定
         }
         else {
-            MessageBoxW(nullptr, L"SuppressPopup is FALSE", L"SuppressPopup", MB_OK);
+            ProgressParamsValues.Insert(L"progressValue", std::to_wstring(ProgressValue).c_str());  //進行状況バーの状態を設定
         }
 
-        MessageBoxW(nullptr, ProgressStatus, L"ProgressStatus", MB_OK);
+        //文字列がない場合は、バインディング処理しません
+        if (ProgressValueStringOverride) ProgressParamsValues.Insert(L"progressValueString", ProgressValueStringOverride);           //既定のパーセンテージ文字列の代わりに表示される省略可能な文字列を取得または設定します。 これが指定されていない場合は、"70%" のようなものが表示されます。
 
-        wchar_t buffer[256];
-        swprintf(buffer, 256, L"ProgressValue: %f", ProgressValue);
-        MessageBoxW(nullptr, buffer, L"ProgressValue", MB_OK);
+        //上記のパラメーターをトーストに設定
+        toastWithProgress.Data(ProgressParams);
 
-        MessageBoxW(nullptr, ProgressTitle, L"ProgressTitle", MB_OK);
-        MessageBoxW(nullptr, ProgressValueStringOverride, L"ProgressValueStringOverride", MB_OK);
+        // 上記で作成されたトーストオブジェクトに各種設定(GroupとTag等)を施す
+        toastWithProgress.ExpiresOnReboot(ToastConfigData->ExpiresOnReboot);
+        toastWithProgress.Group(ToastConfigData->Group);
+        toastWithProgress.Tag(ToastConfigData->Tag);
+        toastWithProgress.SuppressPopup(ToastConfigData->SuppressPopup);
 
+        //順序外の更新を防ぐため、シーケンス番号を指定します。初回なので1にします。
+        ProgressParams.SequenceNumber(1);
 
-
-
-
+        // プログレスバー通知を作動
+        toastNotifierWithProgressBar.Show(toastWithProgress);
     }
     
     catch (const winrt::hresult_error& e) {
