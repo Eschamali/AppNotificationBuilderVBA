@@ -38,32 +38,32 @@ void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData){
 
     try {
         //値Check用
-        MessageBoxW(nullptr, ToastConfigData->AppUserModelID, L"AppUserModelID", MB_OK);
-        MessageBoxW(nullptr, ToastConfigData->XmlTemplate, L"XmlTemplate", MB_OK);
-        MessageBoxW(nullptr, ToastConfigData->Tag, L"Tag", MB_OK);
-        MessageBoxW(nullptr, ToastConfigData->Group, L"Group", MB_OK);
-        MessageBoxW(nullptr, ToastConfigData->Schedule_ID, L"Schedule_ID", MB_OK);
+        //MessageBoxW(nullptr, ToastConfigData->AppUserModelID, L"AppUserModelID", MB_OK);
+        //MessageBoxW(nullptr, ToastConfigData->XmlTemplate, L"XmlTemplate", MB_OK);
+        //MessageBoxW(nullptr, ToastConfigData->Tag, L"Tag", MB_OK);
+        //MessageBoxW(nullptr, ToastConfigData->Group, L"Group", MB_OK);
+        //MessageBoxW(nullptr, ToastConfigData->Schedule_ID, L"Schedule_ID", MB_OK);
 
-        if (ToastConfigData->ExpiresOnReboot) {
-            MessageBoxW(nullptr, L"ExpiresOnReboot is TRUE", L"ExpiresOnReboot", MB_OK);
-        }
-        else {
-            MessageBoxW(nullptr, L"ExpiresOnReboot is FALSE", L"ExpiresOnReboot", MB_OK);
-        }
+        //if (ToastConfigData->ExpiresOnReboot) {
+        //    MessageBoxW(nullptr, L"ExpiresOnReboot is TRUE", L"ExpiresOnReboot", MB_OK);
+        //}
+        //else {
+        //    MessageBoxW(nullptr, L"ExpiresOnReboot is FALSE", L"ExpiresOnReboot", MB_OK);
+        //}
 
-        if (ToastConfigData->SuppressPopup) {
-            MessageBoxW(nullptr, L"SuppressPopup is TRUE", L"SuppressPopup", MB_OK);
-        }
-        else {
-            MessageBoxW(nullptr, L"SuppressPopup is FALSE", L"SuppressPopup", MB_OK);
-        }
+        //if (ToastConfigData->SuppressPopup) {
+        //    MessageBoxW(nullptr, L"SuppressPopup is TRUE", L"SuppressPopup", MB_OK);
+        //}
+        //else {
+        //    MessageBoxW(nullptr, L"SuppressPopup is FALSE", L"SuppressPopup", MB_OK);
+        //}
 
-        wchar_t buffer[256];
-        swprintf(buffer, 256, L"ScheduleTime: %f", ToastConfigData->Schedule_DeliveryTime);
-        MessageBoxW(nullptr, buffer, L"Schedule Time", MB_OK);
+        //wchar_t buffer[256];
+        //swprintf(buffer, 256, L"ScheduleTime: %f", ToastConfigData->Schedule_DeliveryTime);
+        //MessageBoxW(nullptr, buffer, L"Schedule Time", MB_OK);
 
-        swprintf(buffer, 256, L"ExpirationTime: %f", ToastConfigData->ExpirationTime);
-        MessageBoxW(nullptr, buffer, L"ExpirationTime", MB_OK);
+        //swprintf(buffer, 256, L"ExpirationTime: %f", ToastConfigData->ExpirationTime);
+        //MessageBoxW(nullptr, buffer, L"ExpirationTime", MB_OK);
 
         // トースト通知のXMLを構築
         XmlDocument toastXml;
@@ -118,6 +118,59 @@ void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData){
     }
     catch (const winrt::hresult_error& e) {
         MessageBoxW(nullptr, e.message().c_str(), L"エラー", MB_OK);
+    }
+
+    // CoUninitialize()は、CoInitializeExが成功した場合のみ呼び出す
+    if (SUCCEEDED(hr)) {
+        CoUninitialize();
+    }
+}
+
+
+void __stdcall ShowToastNotificationWithProgressBar(ToastNotificationParams* ToastConfigData, const wchar_t* ProgressStatus, double ProgressValue, const wchar_t* ProgressTitle, const wchar_t* ProgressValueStringOverride) {
+    // COMの初期化
+    HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    if (hr == RPC_E_CHANGED_MODE) {
+        // 既に異なるアパートメント モードで初期化されている場合は、そのまま続行
+    }
+    else if (FAILED(hr)) {
+        wchar_t errorMsg[256];
+        swprintf_s(errorMsg, 256, L"COM初期化に失敗しました。HRESULT: 0x%08X", hr);
+        MessageBoxW(nullptr, errorMsg, L"エラー", MB_OK);
+        return;
+    }
+
+    try {
+        //値Check用
+        MessageBoxW(nullptr, ToastConfigData->AppUserModelID, L"AppUserModelID", MB_OK);
+        MessageBoxW(nullptr, ToastConfigData->XmlTemplate, L"XmlTemplate", MB_OK);
+        MessageBoxW(nullptr, ToastConfigData->Tag, L"Tag", MB_OK);
+        MessageBoxW(nullptr, ToastConfigData->Group, L"Group", MB_OK);
+
+        if (ToastConfigData->SuppressPopup) {
+            MessageBoxW(nullptr, L"SuppressPopup is TRUE", L"SuppressPopup", MB_OK);
+        }
+        else {
+            MessageBoxW(nullptr, L"SuppressPopup is FALSE", L"SuppressPopup", MB_OK);
+        }
+
+        MessageBoxW(nullptr, ProgressStatus, L"ProgressStatus", MB_OK);
+
+        wchar_t buffer[256];
+        swprintf(buffer, 256, L"ProgressValue: %f", ProgressValue);
+        MessageBoxW(nullptr, buffer, L"ProgressValue", MB_OK);
+
+        MessageBoxW(nullptr, ProgressTitle, L"ProgressTitle", MB_OK);
+        MessageBoxW(nullptr, ProgressValueStringOverride, L"ProgressValueStringOverride", MB_OK);
+
+
+
+
+
+    }
+    
+    catch (const winrt::hresult_error& e) {
+            MessageBoxW(nullptr, e.message().c_str(), L"エラー", MB_OK);
     }
 
     // CoUninitialize()は、CoInitializeExが成功した場合のみ呼び出す
