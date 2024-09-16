@@ -131,7 +131,7 @@ void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData){
     }
 }
 
-
+//引数に渡された値で、最初のトーストの進行状況バーを表示します
 void __stdcall ShowToastNotificationWithProgressBar(ToastNotificationParams* ToastConfigData, const wchar_t* ProgressStatus, double ProgressValue, const wchar_t* ProgressTitle, const wchar_t* ProgressValueStringOverride) {
     // COMの初期化
     HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -228,4 +228,79 @@ void __stdcall ShowToastNotificationWithProgressBar(ToastNotificationParams* Toa
     if (SUCCEEDED(hr)) {
         CoUninitialize();
     }
+}
+
+
+//引数に渡された値で、トーストの進行状況バーを更新します。
+long __stdcall UpdateToastNotificationWithProgressBar(ToastNotificationParams* ToastConfigData, const wchar_t* ProgressStatus, double ProgressValue, const wchar_t* ProgressTitle, const wchar_t* ProgressValueStringOverride, long SequenceNumber) {
+    // COMの初期化
+    HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    if (hr == RPC_E_CHANGED_MODE) {
+        // 既に異なるアパートメント モードで初期化されている場合は、そのまま続行
+    }
+    else if (FAILED(hr)) {
+        wchar_t errorMsg[256];
+        swprintf_s(errorMsg, 256, L"COM初期化に失敗しました。HRESULT: 0x%08X", hr);
+        MessageBoxW(nullptr, errorMsg, L"エラー", MB_OK);
+        return -1;
+    }
+
+    //更新結果用の変数を定義
+    NotificationUpdateResult result;
+    try {
+        //値Check用
+        //MessageBoxW(nullptr, ToastConfigData->AppUserModelID, L"AppUserModelID", MB_OK);
+        //MessageBoxW(nullptr, ToastConfigData->Tag, L"Tag", MB_OK);
+        //MessageBoxW(nullptr, ToastConfigData->Group, L"Group", MB_OK);
+
+
+        //MessageBoxW(nullptr, ProgressStatus, L"ProgressStatus", MB_OK);
+
+        //wchar_t buffer[256];
+        //swprintf(buffer, 256, L"ProgressValue: %f", ProgressValue);
+        //MessageBoxW(nullptr, buffer, L"ProgressValue", MB_OK);
+
+        //MessageBoxW(nullptr, ProgressTitle, L"ProgressTitle", MB_OK);
+        //MessageBoxW(nullptr, ProgressValueStringOverride, L"ProgressValueStringOverride", MB_OK);
+
+        //指定のAppUserModelIDで、トーストオブジェクトを生成
+        ToastNotifier toastNotifierWithProgressBar = ToastNotificationManager::CreateToastNotifier(ToastConfigData->AppUserModelID);
+
+        //更新のNotificationData値を割り当てる
+        //※予め、xmlに仕込む変数名({XXX})をここと統一する必要があります
+        NotificationData ProgressParams;
+        auto ProgressParamsValues = ProgressParams.Values();         // 戻り値の型を明示的に指定
+
+        ProgressParamsValues.Insert(L"progressTitle", ProgressTitle);                               //タイトル
+        ProgressParamsValues.Insert(L"progressStatus", ProgressStatus);                             //左下の進行状況バーの下に表示される状態文字列
+
+        //進捗値の場合、負になってたら、ドットアニメーションの不確定式にします。
+        if (ProgressValue < 0) {
+            ProgressParamsValues.Insert(L"progressValue", L"Indeterminate");                        //進行状況バーの状態を「不確定」として、設定
+        }
+        else {
+            ProgressParamsValues.Insert(L"progressValue", std::to_wstring(ProgressValue).c_str());  //進行状況バーの状態を設定
+        }
+
+        //文字列がない場合は、バインディング処理しません
+        if (ProgressValueStringOverride) ProgressParamsValues.Insert(L"progressValueString", ProgressValueStringOverride);           //既定のパーセンテージ文字列の代わりに表示される省略可能な文字列を取得または設定します。 これが指定されていない場合は、"70%" のようなものが表示されます。
+
+        //順序外の更新を防ぐため、シーケンス番号を指定します。
+        ProgressParams.SequenceNumber(SequenceNumber);
+
+        // トースト通知を更新
+        result = toastNotifierWithProgressBar.Update(ProgressParams, ToastConfigData->Tag, ToastConfigData->Group);
+    }
+
+    catch (const winrt::hresult_error& e) {
+        MessageBoxW(nullptr, e.message().c_str(), L"エラー", MB_OK);
+    }
+
+    // CoUninitialize()は、CoInitializeExが成功した場合のみ呼び出す
+    if (SUCCEEDED(hr)) {
+        CoUninitialize();
+    }
+
+    //結果値を返す
+    return static_cast<long>(result);
 }

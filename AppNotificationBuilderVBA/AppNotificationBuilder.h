@@ -34,3 +34,4 @@ struct ToastNotificationParams {
 //関数宣言
 extern "C" AppNotificationBuilderVBA_API void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData);    //一般的な通知
 extern "C" AppNotificationBuilderVBA_API void __stdcall ShowToastNotificationWithProgressBar(ToastNotificationParams* ToastConfigData, const wchar_t* ProgressStatus, double ProgressValue, const wchar_t* ProgressTitle, const wchar_t* ProgressValueStringOverride);    //プログレスバー付き通知(初回用)
+extern "C" AppNotificationBuilderVBA_API long __stdcall UpdateToastNotificationWithProgressBar(ToastNotificationParams* ToastConfigData, const wchar_t* ProgressStatus, double ProgressValue, const wchar_t* ProgressTitle, const wchar_t* ProgressValueStringOverride,long SequenceNumber);    //プログレスバー付き通知(更新用)
