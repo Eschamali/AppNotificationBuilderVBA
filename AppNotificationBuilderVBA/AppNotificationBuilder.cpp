@@ -24,6 +24,37 @@ Windows::Foundation::DateTime SystemTimeToDateTime(const SYSTEMTIME& st) {
     return dateTime;
 }
 
+// 非同期処理をラップするヘルパー関数。コレクションを使用したトースト通知のグループ化に使用します。
+winrt::fire_and_forget SendToastWithCollectionAsyncHelper(ToastNotificationParams* ToastConfigData)
+{
+    try
+    {
+        // トースト通知のXMLを構築
+        XmlDocument toastXml;
+        toastXml.LoadXml(ToastConfigData->XmlTemplate);
+
+        // トースト通知を作成
+        ToastNotification toast(toastXml);
+
+        // 上記で作成されたオブジェクトに各種設定(GroupとTag等)を施す
+        toast.ExpiresOnReboot(ToastConfigData->ExpiresOnReboot);
+        toast.Group(ToastConfigData->Group);
+        toast.Tag(ToastConfigData->Tag);
+        toast.SuppressPopup(ToastConfigData->SuppressPopup);
+        //if (ToastConfigData->ExpirationTime > 0) toast.ExpirationTime(ExpirationTimeValue);
+
+        // ToastNotifierForToastCollectionIdAsyncを使って特定のコレクションのNotifierを非同期で取得
+        ToastNotifier notifier = co_await ToastNotificationManager::GetDefault().GetToastNotifierForToastCollectionIdAsync(ToastConfigData->CollectionID);
+
+        // Collection経由によるトーストを表示
+        notifier.Show(toast);
+    }
+    catch (const hresult_error& e)
+    {
+        // エラーハンドリング
+        MessageBoxW(nullptr, e.message().c_str(), L"エラー", MB_OK);
+    }
+}
 
 //引数に渡された値で、単純なトースト通知を表示します。指定日時に通知するスケジュール機能も対応します
 void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData){
@@ -46,6 +77,7 @@ void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData){
         //MessageBoxW(nullptr, ToastConfigData->Tag, L"Tag", MB_OK);
         //MessageBoxW(nullptr, ToastConfigData->Group, L"Group", MB_OK);
         //MessageBoxW(nullptr, ToastConfigData->Schedule_ID, L"Schedule_ID", MB_OK);
+        //MessageBoxW(nullptr, ToastConfigData->CollectionID, L"CollectionID", MB_OK);
 
         //if (ToastConfigData->ExpiresOnReboot) {
         //    MessageBoxW(nullptr, L"ExpiresOnReboot is TRUE", L"ExpiresOnReboot", MB_OK);
@@ -83,9 +115,15 @@ void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData){
 
         //指定のAppUserModelIDで、トーストオブジェクトを生成
         ToastNotifier toastNotifier = ToastNotificationManager::CreateToastNotifier(ToastConfigData->AppUserModelID);
+       
+        //1. CollectionIDが指定されてあったら、専用の処理に移る
+        if (ToastConfigData->CollectionID) {
+            // 非同期処理の呼び出し
+            SendToastWithCollectionAsyncHelper(ToastConfigData);
+        }
         
-        // 日付が指定されているかで、通常の通知か、スケジュール通知かを分岐
-        if (ToastConfigData->Schedule_DeliveryTime > 0) {
+        //2. スケジュール通知、指定時
+        else if (ToastConfigData->Schedule_DeliveryTime > 0) {
             // スケジュール通知の場合
             SYSTEMTIME sc;
             VariantTimeToSystemTime(ToastConfigData->Schedule_DeliveryTime, &sc);
@@ -106,6 +144,7 @@ void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData){
             // スケジュールトーストを追加
             toastNotifier.AddToSchedule(scheduledToast);
         }
+
         else {
             // 通常のトースト通知を作成
             ToastNotification toast(toastXml);
