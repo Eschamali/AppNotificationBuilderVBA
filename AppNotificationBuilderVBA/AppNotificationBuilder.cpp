@@ -73,10 +73,10 @@ void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData){
         toastXml.LoadXml(ToastConfigData->XmlTemplate);
 
         //通知の有効期限が設定されてあったら、設定値を準備する
-        SYSTEMTIME ex;
         Windows::Foundation::DateTime ExpirationTimeValue;
         if (ToastConfigData->ExpirationTime > 0) {
             //変換処理
+            SYSTEMTIME ex;
             VariantTimeToSystemTime(ToastConfigData->ExpirationTime, &ex);
             ExpirationTimeValue = SystemTimeToDateTime(ex);
         }
@@ -221,7 +221,7 @@ void __stdcall ShowToastNotificationWithProgressBar(ToastNotificationParams* Toa
     }
     
     catch (const winrt::hresult_error& e) {
-            MessageBoxW(nullptr, e.message().c_str(), L"エラー", MB_OK);
+        MessageBoxW(nullptr, e.message().c_str(), L"エラー", MB_OK);
     }
 
     // CoUninitialize()は、CoInitializeExが成功した場合のみ呼び出す
