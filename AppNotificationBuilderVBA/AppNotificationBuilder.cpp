@@ -304,3 +304,36 @@ long __stdcall UpdateToastNotificationWithProgressBar(ToastNotificationParams* T
     //結果値を返す
     return static_cast<long>(result);
 }
+
+
+//引数で渡された値で、コレクションを使用したトースト通知のグループ化を作成します。エラーコード返却に対応します
+long __stdcall CreateToastCollection(ToastNotificationParams* ToastConfigData, const wchar_t* displayName, const wchar_t* launchArgs, const wchar_t* iconUri) {
+    //値Check用
+    //MessageBoxW(nullptr, ToastConfigData->AppUserModelID, L"AppUserModelID", MB_OK);
+    //MessageBoxW(nullptr, ToastConfigData->CollectionID, L"collectionId", MB_OK);
+    //MessageBoxW(nullptr, displayName, L"displayName", MB_OK);
+    //MessageBoxW(nullptr, launchArgs, L"launchArgs", MB_OK);
+    //MessageBoxW(nullptr, iconUri, L"iconUri", MB_OK);
+
+    try {
+        // トースト通知のマネージャーを取得
+        ToastNotificationManagerForUser userManager = ToastNotificationManager::GetDefault();
+        ToastCollectionManager collectionManager = userManager.GetToastCollectionManager(ToastConfigData->AppUserModelID);
+
+        //iconUriから、Uri クラスのインスタンスを作成します
+        Uri siteUri = Uri(iconUri);
+
+        // コレクションを作成
+        ToastCollection collection = ToastCollection(ToastConfigData->CollectionID, displayName, launchArgs, siteUri);
+        collectionManager.SaveToastCollectionAsync(collection);
+
+        // 成功したら0を返す
+        return 0;
+    }
+    catch (const hresult_error& e)
+    {
+        // エラーハンドリング (エラーコードを返す)
+        MessageBoxW(nullptr, e.message().c_str(), L"エラー", MB_OK);
+        return e.code();
+    }
+}
