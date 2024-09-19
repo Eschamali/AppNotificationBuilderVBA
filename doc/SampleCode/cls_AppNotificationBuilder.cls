@@ -388,7 +388,7 @@ End Property
 '* 機能説明：設定すると、「AllowUse_InternetImageFlag」よりも優先して設定されます。batファイル等、VBAと直接関係なくなり、アイコンが噛み合わない時に使います。
 '* 注意事項：存在しない(未インストール)AppID、無効な文字列を指定すると、Toastが発行されないのでご注意ください。
 '---------------------------------------------------------------------------------------------------
-Public Property Let SetToastContent_ApplicationId(ByVal ArgAppID As String)
+Public Property Let SetToastContent_AppUserModelID(ByVal ArgAppID As String)
     AppID_Any = ArgAppID
 End Property
 
@@ -1235,7 +1235,7 @@ End Function
 '* 機能説明：ネット上の画像も使用して通知を表示するかを設定します
 '* 注意事項：厳密には、Settingがc:internetを含むAppIDでないとインターネット上の画像が使えない
 '**************************************************************************************************
-Private Function SetValueApplicationId(Optional UseDll As Boolean) As String
+Private Function SetValueAppUserModelID(Optional UseDll As Boolean) As String
     '任意のAppIDの設定があったら、そちらを優先します。
     If StrPtr(AppID_Any) Then
         ToastConfig.AppUserModelID = AppID_Any
@@ -1251,9 +1251,9 @@ Private Function SetValueApplicationId(Optional UseDll As Boolean) As String
 
     'AppIDを決めるコマンド文字列を返す
     If UseDll Then
-        SetValueApplicationId = ToastConfig.AppUserModelID
+        SetValueAppUserModelID = ToastConfig.AppUserModelID
     Else
-        SetValueApplicationId = "$AppId = '" & ToastConfig.AppUserModelID & Chr(39)
+        SetValueAppUserModelID = "$AppId = '" & ToastConfig.AppUserModelID & Chr(39)
     End If
 
 End Function
@@ -1511,7 +1511,7 @@ End Property
 Public Property Get GenerateCmd_ToastNotifierShow(ByVal ToastTag As String, Optional ByVal CollectionID As String, Optional ByVal ScheduleDate As Date, Optional ByVal ExpirationDate As Date, Optional ByVal Suppress As Boolean) As String
     With ToastConfig
         '設定値をまとめる
-        '.AppUserModelID = SetValueApplicationId(False)  '後続で、代入
+        '.AppUserModelID = SetValueAppUserModelID(False)  '後続で、代入
         'AllowUse_InternetImageFlag                     '事前に、設定済み
         .XmlSchema = MakeXmlToastContentBuilder(False)
         
@@ -1549,7 +1549,7 @@ Public Property Get GenerateCmd_ToastNotifierShow(ByVal ToastTag As String, Opti
             '6.AppIDを設定
             '7.Toast通知実行
             GenerateCmd_ToastNotifierShow = WorksheetFunction.TextJoin(";", False, GenerateCmd_ToastNotifierShow, _
-                SetValueApplicationId, _
+                SetValueAppUserModelID, _
                 Run__Windows_UI_Notifications__ToastNotifier(.Schedule_DeliveryTime)) & Chr(34)
         End If
     End With
@@ -1575,7 +1575,7 @@ Public Property Get GenerateCmd_ToastNotifierShow_Progress(ByVal ToastTag As Str
 
     With ToastConfig
         '設定値をまとめる
-        '.AppUserModelID = SetValueApplicationId(False)  '後続で、代入
+        '.AppUserModelID = SetValueAppUserModelID(False)  '後続で、代入
         'AllowUse_InternetImageFlag                     '事前に、設定済み
         .XmlSchema = MakeXmlToastContentBuilder(True)
 
@@ -1607,7 +1607,7 @@ Public Property Get GenerateCmd_ToastNotifierShow_Progress(ByVal ToastTag As Str
             Set__Windows_UI_Notifications__ToastNotificationGroup(.Group), Set__Windows_UI_Notifications__ToastNotificationTag(.Tag), _
             Set__Windows_UI_Notifications__ToastNotificationSuppressPopup(.SuppressPopup), _
             Binding_AdaptiveProgressBar(False), _
-            SetValueApplicationId, _
+            SetValueAppUserModelID, _
             Run__Windows_UI_Notifications__ToastNotifier(False)) & Chr(34)
     
     End With
@@ -1633,7 +1633,7 @@ Public Property Get GenerateCmd_ToastNotifierUpdate_Progress(ByVal ToastTag As S
 
     With ToastConfig
         '設定値をまとめる
-        '.AppUserModelID = SetValueApplicationId(False)  '後続で、代入
+        '.AppUserModelID = SetValueAppUserModelID(False)  '後続で、代入
         'AllowUse_InternetImageFlag                     '事前に、設定済み
         .XmlSchema = vbNullString
 
@@ -1656,7 +1656,7 @@ Public Property Get GenerateCmd_ToastNotifierUpdate_Progress(ByVal ToastTag As S
         ' 3.更新用Toast通知実行
         GenerateCmd_ToastNotifierUpdate_Progress = ActionPS & WorksheetFunction.TextJoin(";", True, _
             Binding_AdaptiveProgressBar(True), _
-            SetValueApplicationId, _
+            SetValueAppUserModelID, _
             Run__Windows_UI_Notifications__ToastNotifierUpdate(.Tag, .Group)) & Chr(34)
     
     End With
@@ -1680,7 +1680,7 @@ End Property
 Public Property Get GenerateCmd_ToastCollectionManagerSaveToastCollectionAsync(CollectionID As String, DisplayName As String, LaunchArgs As String, IconUri As String, Optional FixMode As Boolean) As String
     With ToastConfig
         '設定値をまとめる
-        '.AppUserModelID = SetValueApplicationId(False)  '後続で、代入
+        '.AppUserModelID = SetValueAppUserModelID(False)  '後続で、代入
         'AllowUse_InternetImageFlag                     '事前に、設定済み
         .XmlSchema = MakeXmlToastContentBuilder(False)
 
@@ -1713,7 +1713,7 @@ Public Property Get GenerateCmd_ToastCollectionManagerSaveToastCollectionAsync(C
         ' 3.指定したトースト通知グループを作成
         GenerateCmd_ToastCollectionManagerSaveToastCollectionAsync = ActionPS & WorksheetFunction.TextJoin(";", True, _
             New__Windows_UI_Notifications__ToastCollection, _
-            SetValueApplicationId, _
+            SetValueAppUserModelID, _
             Run__Windows_UI_Notifications__ToastCollectionManager_SaveToastCollectionAsync)
 
         'true  で不具合対応板として、動作させます。
@@ -1760,7 +1760,7 @@ Public Property Get GenerateCmd_ToastCollectionManagerRemoveToastCollectionAsync
 
     '削除コマンド文字列を生成します
     GenerateCmd_ToastCollectionManagerRemoveToastCollectionAsync = ActionPS & WorksheetFunction.TextJoin(";", False, _
-        SetValueApplicationId, _
+        SetValueAppUserModelID, _
         RemoveMode) & Chr(34)
 End Property
 
@@ -1821,7 +1821,7 @@ End Sub
 Public Sub RunDll_ToastNotifierShow(ByVal ToastTag As String, Optional ByVal CollectionID As String, Optional ByVal ScheduleDate As Date, Optional ByVal ExpirationDate As Date, Optional ByVal Suppress As Boolean)
     '設定値をまとめる
     With ToastConfig
-        .AppUserModelID = SetValueApplicationId(True)
+        .AppUserModelID = SetValueAppUserModelID(True)
         'AllowUse_InternetImageFlag                     '事前に、設定済み
         .XmlSchema = MakeXmlToastContentBuilder(False)
         
@@ -1863,7 +1863,7 @@ Sub RunDll_ToastNotifierShow_Progress(ByVal ToastTag As String, ByVal Arg_Status
 
     '設定値をまとめる
     With ToastConfig
-        .AppUserModelID = SetValueApplicationId(True)
+        .AppUserModelID = SetValueAppUserModelID(True)
         'AllowUse_InternetImageFlag                     '事前に、設定済み
         .XmlSchema = MakeXmlToastContentBuilder(True)
 
@@ -1910,7 +1910,7 @@ Public Property Get RunDll_ToastNotifierUpdate_Progress(ByVal ToastTag As String
 
     '設定値をまとめる
     With ToastConfig
-        .AppUserModelID = SetValueApplicationId(True)
+        .AppUserModelID = SetValueAppUserModelID(True)
         'AllowUse_InternetImageFlag                     '事前に、設定済み
         .XmlSchema = vbNullString
 
@@ -1947,7 +1947,7 @@ End Property
 Public Property Get RunDll_ToastCollectionManagerSaveToastCollectionAsync(ByVal CollectionID As String, ByVal DisplayName As String, ByVal LaunchArgs As String, IconUri As String) As Long
     '設定値をまとめる
     With ToastConfig
-        .AppUserModelID = SetValueApplicationId(True)
+        .AppUserModelID = SetValueAppUserModelID(True)
         'AllowUse_InternetImageFlag                     '事前に、設定済み
         .XmlSchema = MakeXmlToastContentBuilder(False)
 
