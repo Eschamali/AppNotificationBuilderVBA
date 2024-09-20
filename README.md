@@ -280,7 +280,7 @@ End Sub
 
 ### AllowToastContent_UseButtonStyle
 toast要素の[useButtonStyle](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-toast#:~:text=%E3%81%AA%E3%81%97-,useButtonStyle,-%E3%82%B9%E3%82%BF%E3%82%A4%E3%83%AB%E4%BB%98%E3%81%8D%E3%83%9C%E3%82%BF%E3%83%B3)属性の設定を行います。<br>
-Trueで、スタイル付きボタンを使用します。後述のaction 要素の 「hint-buttonStyle」 属性に影響します。<br>
+Trueで、スタイル付きボタンを使用します。後述の[action 要素](#SetIToastActions)の 「hint-buttonStyle」 属性に影響します。<br>
 ```bas
 Sub UseButtonStyle()
     Dim AppNotification As New cls_AppNotificationBuilder
@@ -308,7 +308,7 @@ End Sub
 ```
 ![alt text](doc/Ex_Element-Toast5.png)
 
-## [image要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-toast)
+## [image要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-image)
 ### SetToastContent_ImageAppLogo
 image要素のうち、AppLogo(appLogoOverride)に設定する画像のパスと、丸いロゴフラグの設定を行います。<br>
 ロゴ画像のパス指定は、ローカルパス(C:\\)、HTTPソースに対応してます
@@ -455,7 +455,7 @@ Sub 最大行数テキスト()
 | ------------------------------------------------- | --------------------------------------- |
 | ![alt text](doc/Ex_Element-text1-1.png)           | ![alt text](doc/Ex_Element-text1-2.png) |
 
-## [audio要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-text)
+## [audio要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-audio)
 ### SetToastAudio
 アプリ通知を表示するときに再生するサウンドを指定します。 ミュートも対応してます。<br>
 ただし、ファイルシステム上の音声ファイルのパスや URLの指定は使えません。システムで決められた通知音のみ設定可能です。
@@ -476,6 +476,7 @@ Sub 通知音変更テスト()
         
         
         
+        ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
         .SetToastContent_TextTitle = "通知音変更"
         'Shell ActionCmd, vbHide
         .RunDll_ToastNotifierShow "sample"
@@ -484,6 +485,57 @@ End Sub
 ```
 設定可能な通知音は、[こちら](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-audio#:~:text=false-,src,-%E6%97%A2%E5%AE%9A%E3%81%AE%E3%82%B5%E3%82%A6%E3%83%B3%E3%83%89)をどうぞ。<br>
 また、False で指定すると、ミュート扱いになります。
+
+## [action要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-action)
+### SetIToastActions
+トーストに表示されるボタンを指定します。
+| 引数名             | 説明                                                                                                                                                                                                                                                                                                                                                             | 既定値                       | 
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | 
+| ArgContent         | ボタンに表示されるコンテンツ                                                                                                                                                                                                                                                                                                                                     | ※必須項目                   | 
+| ArgArguments       | ユーザーがこのボタンをクリックした場合にアプリが後から受け取る、アプリで定義された引数の文字列です。                                                                                                                                                                                                                                                             | ※必須項目だが、空文字でもOK | 
+| ArgActivationType  | ユーザーが特定の操作を行った際に使用されるアクティブ化の種類を決定します。<br>・"foreground"：既定値。 フォアグラウンド アプリが起動します。<br>・"background"：対応するバックグラウンド タスクがトリガーされ、ユーザーを中断することなくバックグラウンドでコードを実行できます。<br>・"protocol"：プロトコルのアクティブ化を使用して別のアプリを起動します。 <br>・"system"：ArgArgumentsに特定の文字列を入れると、リマインダー機能が使えます。(後述)| protocol                     | 
+| ArgPendingUpdate   | ・TRUE：ユーザーがトースト上のボタンをクリックすると、通知は "保留中の更新" 表示状態のままです。 この "更新の保留中" の表示状態が長時間続くことを避けるため、バックグラウンド タスクから即座にトーストを更新する必要があります。<br>・FALSE：ユーザーがトーストに対して操作を行うと、トーストが無視されます。                                                    | FALSE                        | 
+| ArgContextMenu     | ・TRUE：トースト ボタンではなく、トースト通知のコンテキスト メニューに追加されたコンテキスト メニュー アクションになります。<br>・FALSE：従来通り、トースト ボタンに配置                                                                                                                                                                                         | FALSE                        | 
+| ArgIcon            | トースト ボタン アイコンのイメージ ソースの URI。<br>ローカルパス、HTTPソースに対応します。                                                                                                                                                                                                                                                                      | vbnullstring                 | 
+| ArgHintInputId     | 入力の横にある [位置への 入力 ] ボタンの ID に設定します。                                                                                                                                                                                                                                                                                                       | vbnullstring                 | 
+| ArgHintButtonStyle | ボタンのスタイル。<br>事前に[toast要素のuseButtonStyle属性](#AllowToastContent_UseButtonStyle)にtrue を設定する必要があります。<br><br>・Success：緑<br>・Critical：赤<br>・NoStyle：無色                                                                                                                                                                                                             | NoStyle                      | 
+| ArgHintToolTip     | ボタンに空のコンテンツ文字列がある場合のボタンのヒント。                                                                                                                                                                                                                                                                                                         | vbnullstring                 | 
+```bas
+Sub MakeActionTest()
+    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim ActionCmd As String
+
+    With AppNotification
+        'ボタン作成
+        .SetIToastActions("Green", "", , , , , , Success) = 1
+        
+        'コンテキストメニュー側に移す
+        .SetIToastActions("コンテキストメニューにあります", "", , , True) = 2
+        
+        'ボタンにカーソルをあてるとToolTip表示し、アイコンセット
+        .SetIToastActions("", "ms-search://Search", , , , "C:\Windows\IdentityCRL\WLive48x48.png", , , "クリックで、検索を開く") = 3
+        
+        'このボタンを押下すると、Youtubeにアクセスします
+        .SetIToastActions("YouTube開く", "https://www.youtube.com/", , , , , , Critical, "ツールチップ") = 4
+
+
+        
+        
+
+        .AllowToastContent_UseButtonStyle = True
+        .SetToastContent_TextTitle = "ActionTest"
+        'wsh.Run ActionCmd, False, False
+        .RunDll_ToastNotifierShow "sample"
+    End With
+End Sub
+```
+
+最後の数字は、ボタンの配置順を表します。<br>
+![alt text](doc/Ex_Element-Action1-1.png) ![alt text](doc/Ex_Element-Action1-2.png)
+
+## [subgroup要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-subgroup)
+現時点では、作成アシストには非対応です。
+
 
 
 # メソッド説明
