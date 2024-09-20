@@ -614,7 +614,7 @@ Sub MakeActionTest()
         .SetIToastActions("", "ms-search://Search", , , , "C:\Windows\IdentityCRL\WLive48x48.png", , , "クリックで、検索を開く") = 3
         
         'このボタンを押下すると、Youtubeにアクセスします
-        .SetIToastActions("YouTube開く", "https://www.youtube.com/", , , , , , Critical, "ツールチップ") = 4
+        .SetIToastActions("YouTube開く", "https://www.youtube.com/", , , , , , Critical) = 4
 
 
 
