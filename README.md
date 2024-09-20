@@ -674,8 +674,77 @@ End Sub
 ```
 ![alt text](doc/Ex_Element-Selection1-1.png) ![alt text](doc/Ex_Element-Selection1-2.png)
 
+## その他
+### SetTimeZone
+タイムゾーンを変更します。<br>
+後述の、通知の有効期限、通知スケジュールなどの日付関係の処理を行う際、UTC基準になるため、そのズレを補正します。<br>
+なお、Classファイルを定義する際(Class_Initialize)、予め日本時間としてセッティングするため、日本在宅者は呼び出す必要はありません。<br>
+国をまたがない使用の場合は、Class_Initialize の所で、予め自国として設定し直すことを推奨します。
+
+| 引数名        | 説明                                                          | 
+| ------------- | ------------------------------------------------------------- | 
+| ArgUTC_Hour   | UTCからの時差のうち、時の部分を指定します。<br>正負対応です。 | 
+| ArgUTC_Minute | UTCからの時差のうち、分の部分を指定します。                   | 
+
+日本の場合、「JST / UTC+0900」なので、上記に当てはめると、下記になります
+```bas
+    SetTimeZone 9, 0
+```
+
+米国東部の場合、「EST / UTC-0500」なので、下記になります。
+```bas
+    SetTimeZone -5, 0
+```
+
+インドの場合、「IST / UTC+0530」なので、下記になります。
+```bas
+    SetTimeZone 5, 30
+```
+
+### PresetReminder
+この1行を記述することで、簡単にリマインド機能を作成できます。1箇所のみです。<br>
+このプロパティを呼び出す前に定義した下記の要素は、上書きされますのでご注意ください。
+- 1,2つ目のaction要素
+- 1つ目のinput要素
+
+| 引数名          | 説明                                                                     | 
+| --------------- | ------------------------------------------------------------------------ | 
+| RemindMinute1~5 | 何分後に再通知するか数値で指定。最大5つ分<br>1つ目のみ必須。他は省略可。 | 
+| Message         | 入力のラベルとして表示されるテキスト。                                   | 
+制限事項として、選択肢の表記は全て"分"です。
+
+```bas
+Sub 簡易リマインドテスト()
+    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim ActionCmd As String
+    
+    With AppNotification
+        '記述
+        .PresetReminder 1, 5, 10, 30, 120, "選択肢から､リマインドする時間を選択"
+
+
+
+        'テキスト要素を用意(任意)
+        .SetToastContent_TextTitle = "簡易リマインダーテスト"
+        .SetToastContent_TextBody = "「再通知」で、選択した時間で、再通知" & vbCrLf & "解除で、何もしない"
+
+        'リマインドモード
+        .SetToastScenario = Reminder
+
+        'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
+        ActionCmd = .GenerateCmd_ToastNotifierShow("簡易リマインド")
+
+        'コマンド実行
+        .RunDll_ToastNotifierShow "簡易リマインド"
+        'Shell ActionCmd,vbHide
+    End With
+End Sub
+```
+![alt text](doc/PresetReminder1-1.png) ![alt text](doc/PresetReminder1-2.png)
+
+
 # メソッド説明
-## GenerateCmd_ToastNotifierShow(ToastTag , Optional CollectionID , Optional ScheduleDate , Optional ExpirationDate , Optional Suppress)
+## GenerateCmd_ToastNotifierShow
 引数に渡された値で、単純なトースト通知を表示するコマンド文字列を返します。指定日時に通知するスケジュール機能も対応します<br>
 Shell関数と併用して使用して下さい。Windows PowerShell環境があれば、どのWindows マシンでも動作が可能です。
 
