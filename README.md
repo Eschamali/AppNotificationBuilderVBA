@@ -625,7 +625,7 @@ Sub MakeActionTest()
         .SetToastContent_TextTitle = "ActionTest"
 
         'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
-        ActionCmd = .GenerateCmd_ToastNotifierShow("簡易リマインド")
+        ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
 
         '通知表示
         'Shell ActionCmd, vbHide
