@@ -526,7 +526,7 @@ Sub MakeActionTest()
 
         .AllowToastContent_UseButtonStyle = True
         .SetToastContent_TextTitle = "ActionTest"
-        'wsh.Run ActionCmd, False, False
+        'Shell ActionCmd, vbHide
         .RunDll_ToastNotifierShow "sample"
     End With
 End Sub
@@ -572,9 +572,11 @@ End Sub
 
 
 ## [input要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-input)
+### SetIToastInput
 トースト通知に表示される入力 (テキスト ボックスまたは選択メニュー) を指定します。<br>
 VBAでは、リマインダー用途でしか使い所がないと思います。
 
+#### 設定可能な引数
 | 引数名                | 説明                                                                    | 既定値       | 
 | --------------------- | ----------------------------------------------------------------------- | ------------ | 
 | ArgID                 | 入力に関連付けられている ID                                             | ※必須項目     | 
@@ -606,18 +608,71 @@ Sub メッセージ()
 
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
 
-        'wsh.Run ActionCmd, 0, False
+        'Shell ActionCmd, vbHide
         .RunDll_ToastNotifierShow "sample"
         
         Debug.Print ActionCmd
     End With
 End Sub
 ```
-
-![alt text](doc/Ex_Element-Input1-1.png) ![alt text](doc/Ex_Element-Input1-2.png)<br>
 最後の数字は、Input要素の配置順を表します。1~5まで有効です。<br>
+![alt text](doc/Ex_Element-Input1-1.png) ![alt text](doc/Ex_Element-Input1-2.png)<br>
 
 
+## [selection要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-selection)
+### SetToastSelectionBox
+選択項目の id とテキストを指定します。全て必須項目です。
+基本、リマインダー用途のみとなります。
+
+#### 設定可能な引数
+| 引数名         | 説明                                               | 備考                       | 
+| -------------- | -------------------------------------------------- | -------------------------- | 
+| ReminderMinute | 何分後にリマインダー通知させるか、値で指定します。 | 現状、数値以外は扱いません。<br>0で、未定義扱いとします。 | 
+| ArgChoseName   | 選択項目の内容                                     |                            | 
+
+#### [リマインダーの設定方法](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/adaptive-interactive-toasts?tabs=xml#snoozedismiss)
+Input要素と、selection要素を使ったリマインダー方法を紹介します。<br>
+コード内コメントにある手順を参考にどうぞ。
+```bas
+Sub リマインドテスト()
+    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim ActionCmd As String
+    
+    With AppNotification
+        '1. トーストシナリオをリマインダーか、アラームにする
+        .SetToastScenario = Reminder
+
+        '2. 紐付け用識別子を設定
+        Const ReminderID As String = "リマインダー"
+
+        '3. select要素を準備し、リマインドする"分"と名称をセット(最大、5つ)
+        .SetToastSelectionBox(1, "1 分後") = 1
+        .SetToastSelectionBox(5, "5 分後") = 2
+        .SetToastSelectionBox(10, "10 分後") = 3
+        .SetToastSelectionBox(30, "30 分後") = 4
+        .SetToastSelectionBox(60, "1 時間後") = 5
+
+        '4. input要素を作成し、上記で準備したselect要素を挿入し、先ほど作成した紐付け用識別子をInput-IDにセット
+        .SetIToastInput(ReminderID, True, , "選択肢から、リマインドする時間を選択", 10) = 1
+
+        '5. 再通知用と、解除用を用意("snooze", "system",ReminderID にセットされてる引数位置は、必ずこの値にする)
+        .SetIToastActions("", "snooze", "system", , , , ReminderID) = 1
+        .SetIToastActions("", "dismiss", "system") = 2
+
+        '6. テキスト要素を用意(任意)
+        .SetToastContent_TextTitle = "リマインダーテスト"
+        .SetToastContent_TextBody = "「再通知」で、選択した時間で、再通知" & vbcrlf & "解除で、何もしない"
+
+        '7. コマンド文字列を生成(Windows PowerShell経由で実行する場合)
+        ActionCmd = .GenerateCmd_ToastNotifierShow("リマインド")
+
+        '8. コマンド実行
+        .RunDll_ToastNotifierShow "リマインド"
+        'Shell ActionCmd,vbHide
+    End With
+End Sub
+```
+![alt text](doc/Ex_Element-Selection1-1.png) ![alt text](doc/Ex_Element-Selection1-2.png)
 
 # メソッド説明
 ## GenerateCmd_ToastNotifierShow(ToastTag , Optional CollectionID , Optional ScheduleDate , Optional ExpirationDate , Optional Suppress)
