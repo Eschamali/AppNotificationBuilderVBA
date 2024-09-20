@@ -421,7 +421,7 @@ End Sub
 | SetToastContent_TextBody      | 内容     | 4行      | 
 | SetToastContent_TextAttribute | 下部     | 2行      | 
 
-#### 設定可能な引数
+### 設定可能な引数
 | 引数名             | 説明                                                                                                           | 既定値       | 
 | ------------------ | -------------------------------------------------------------------------------------------------------------- | ------------ | 
 | HintCallScenarioCenterAlign | 横中央揃えの配置にする設定です。trueにしつつ、シナリオモードを「IncomingCall」にしないと効果ありません。 | False        | 
@@ -454,6 +454,37 @@ Sub 最大行数テキスト()
 | HintCallScenarioCenterAlign = False             | HintCallScenarioCenterAlign = True かつ、SetToastScenario = IncomingCall |
 | ------------------------------------------------- | --------------------------------------- |
 | ![alt text](doc/Ex_Element-text1-1.png)           | ![alt text](doc/Ex_Element-text1-2.png) |
+
+## [audio要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-text)
+### SetToastAudio
+アプリ通知を表示するときに再生するサウンドを指定します。 ミュートも対応してます。<br>
+ただし、ファイルシステム上の音声ファイルのパスや URLの指定は使えません。システムで決められた通知音のみ設定可能です。
+
+#### 設定可能な引数
+| 引数名             | 説明                                                                                                           | 既定値       | 
+| ------------------ | -------------------------------------------------------------------------------------------------------------- | ------------ | 
+| ArgLoop            | トーストが表示されている限り、サウンドを繰り返す場合は true に設定します。<br> 1 回だけ再生する場合は false。  | False        | 
+
+```bas
+Sub 通知音変更テスト()
+    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim ActionCmd As String
+
+    With AppNotification
+        '通知音設定(ctrl + Space　で候補が出ます)
+        .SetToastAudio = NotificationLoopingAlarm01
+        
+        
+        
+        .SetToastContent_TextTitle = "通知音変更"
+        'Shell ActionCmd, vbHide
+        .RunDll_ToastNotifierShow "sample"
+    End With
+End Sub
+```
+設定可能な通知音は、[こちら](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-audio#:~:text=false-,src,-%E6%97%A2%E5%AE%9A%E3%81%AE%E3%82%B5%E3%82%A6%E3%83%B3%E3%83%89)をどうぞ。<br>
+また、False で指定すると、ミュート扱いになります。
+
 
 # メソッド説明
 ## GenerateCmd_ToastNotifierShow(ToastTag , Optional CollectionID , Optional ScheduleDate , Optional ExpirationDate , Optional Suppress)

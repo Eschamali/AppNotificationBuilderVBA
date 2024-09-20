@@ -12,19 +12,19 @@ Attribute VB_Exposed = False
 '   また、DLLファイルを経由した通知手段も提供します。
 
 ' MIT License
-' 
+'
 ' Copyright (c) 2024 eschamali
-' 
+'
 ' Permission is hereby granted, free of charge, to any person obtaining a copy
 ' of this software and associated documentation files (the "Software"), to deal
 ' in the Software without restriction, including without limitation the rights
 ' to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 ' copies of the Software, and to permit persons to whom the Software is
 ' furnished to do so, subject to the following conditions:
-' 
+'
 ' The above copyright notice and this permission notice shall be included in all
 ' copies or substantial portions of the Software.
-' 
+'
 ' THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 ' IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 ' FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -78,7 +78,7 @@ End Enum
 'トースト通知を表示するときに再生するサウンドを指定します。数字の代わりにこの名称でも機能します。
 '---------------------------------------------------------------------------------------------------
 Public Enum MsWinSoundEvent
-    NotificationDefault
+    NotificationDefault = 1
     NotificationIM
     NotificationMail
     NotificationReminder
@@ -686,7 +686,7 @@ Public Property Let SetToastAudio(Optional ByVal ArgLoop As Boolean, ArgSrcID As
         .loop = ArgLoop
 
         'ArgSrcID に応じて、ミュート判定を決める
-        If 0 <= ArgSrcID And ArgSrcID < DefNoticeNum Then
+        If 0 < ArgSrcID And ArgSrcID <= DefNoticeNum Then
             '存在する番号ならミュートしない
             .silent = False
         Else
@@ -700,79 +700,79 @@ Public Property Let SetToastAudio(Optional ByVal ArgLoop As Boolean, ArgSrcID As
             
         'ただし、toast要素のsynalio属性値によっては、この設定が効かないことがあります
         Select Case ArgSrcID
-            Case 0
+            Case 1
                 .src = "ms-winsoundevent:Notification.Default"
 
-            Case 1
+            Case 2
                 .src = "ms-winsoundevent:Notification.IM"
                 
-            Case 2
+            Case 3
                 .src = "ms-winsoundevent:Notification.Mail"
 
-            Case 3
+            Case 4
                 .src = "ms-winsoundevent:Notification.Reminder"
 
-            Case 4
+            Case 5
                 .src = "ms-winsoundevent:Notification.SMS"
 
-            Case 5
+            Case 6
                 .src = "ms-winsoundevent:Notification.Looping.Alarm"
 
-            Case 6
+            Case 7
                 .src = "ms-winsoundevent:Notification.Looping.Alarm2"
 
-            Case 7
+            Case 8
                 .src = "ms-winsoundevent:Notification.Looping.Alarm3"
 
-            Case 8
+            Case 9
                 .src = "ms-winsoundevent:Notification.Looping.Alarm4"
 
-            Case 9
+            Case 10
                 .src = "ms-winsoundevent:Notification.Looping.Alarm5"
 
-            Case 10
+            Case 11
                 .src = "ms-winsoundevent:Notification.Looping.Alarm6"
 
-            Case 11
+            Case 12
                 .src = "ms-winsoundevent:Notification.Looping.Alarm7"
 
-            Case 12
+            Case 13
                 .src = "ms-winsoundevent:Notification.Looping.Alarm8"
 
-            Case 13
+            Case 14
                 .src = "ms-winsoundevent:Notification.Looping.Alarm9"
 
-            Case 14
+            Case 15
                 .src = "ms-winsoundevent:Notification.Looping.Alarm10"
 
-            Case 15
+            Case 16
                 .src = "ms-winsoundevent:Notification.Looping.Call"
 
-            Case 16
+            Case 17
                 .src = "ms-winsoundevent:Notification.Looping.Call2"
 
-            Case 17
+            Case 18
                 .src = "ms-winsoundevent:Notification.Looping.Call3"
 
-            Case 18
+            Case 19
                 .src = "ms-winsoundevent:Notification.Looping.Call4"
 
-            Case 19
+            Case 20
                 .src = "ms-winsoundevent:Notification.Looping.Call5"
 
-            Case 20
+            Case 21
                 .src = "ms-winsoundevent:Notification.Looping.Call6"
 
-            Case 21
+            Case 22
                 .src = "ms-winsoundevent:Notification.Looping.Call7"
 
-            Case 22
+            Case 23
                 .src = "ms-winsoundevent:Notification.Looping.Call8"
 
-            Case 23
+            Case 24
                 .src = "ms-winsoundevent:Notification.Looping.Call9"
 
-            Case 24
+            Case 25
                 .src = "ms-winsoundevent:Notification.Looping.Call10"
 
             Case Else
