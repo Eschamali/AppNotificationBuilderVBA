@@ -570,6 +570,13 @@ End Sub
 ```
 ![alt text](doc/Ex_Element-header.png)<br>
 
+ヘッダーをクリアしたい場合は下記のようにします
+```bas
+With New cls_AppNotificationBuilder
+    .SetToastHeader(vbnullstring) = ""
+End With
+```
+
 
 ## [input要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-input)
 ### SetIToastInput
@@ -711,6 +718,7 @@ End Sub
 | --------------- | ------------------------------------------------------------------------ | 
 | RemindMinute1~5 | 何分後に再通知するか数値で指定。最大5つ分<br>1つ目のみ必須。他は省略可。 | 
 | Message         | 入力のラベルとして表示されるテキスト。                                   | 
+
 制限事項として、選択肢の表記は全て"分"です。
 
 ```bas
