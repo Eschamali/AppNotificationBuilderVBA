@@ -113,9 +113,15 @@ Sub ShowToastTest()
         .AllowUse_InternetImage = True
 
 
-
+        'タイトル設定
         .SetToastContent_TextTitle = "Microsoft 365から"
-        Shell .GenerateCmd_ToastNotifierShow("Run"), vbHide
+
+        'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
+        ActionCmd = .GenerateCmd_ToastNotifierShow("InternetImage")
+
+        '通知表示
+        .RunDll_ToastNotifierShow "InternetImage"
+        'Shell ActionCmd,vbHide
     End With
 End Sub
 ```
@@ -137,8 +143,15 @@ Sub ShowToastTest()
 
 
 
+        'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
+        ActionCmd = .GenerateCmd_ToastNotifierShow("By Terminal")
+
+        'タイトル設定
         .SetToastContent_TextTitle = "By Terminal"
-        Shell .GenerateCmd_ToastNotifierShow("Run"), vbHide
+
+        '通知表示
+        .RunDll_ToastNotifierShow "By Terminal"
+        'Shell ActionCmd,vbHide
     End With
 End Sub
 ```
@@ -168,10 +181,13 @@ Sub 長く表示される通知()
 
 
 
+        'タイトル設定
         .SetToastContent_TextTitle = "25秒間、表示"
 
+        'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
 
+        '通知表示
         'Shell ActionCmd, vbHide
         .RunDll_ToastNotifierShow "sample"
     End With
@@ -206,10 +222,13 @@ Sub リンクを開く()
 
 
 
+        'タイトル設定
         .SetToastContent_TextTitle = "このトーストをクリックすると、指定リンクに対応するアプリが起動"
-        
+
+        'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
 
+        '通知表示
         'Shell ActionCmd, vbHide
         .RunDll_ToastNotifierShow "sample"
     End With
@@ -239,8 +258,10 @@ Sub アプリ通知のカスタムタイムスタンプ()
         .SetToastContent_TextBody = "このメッセージは、以前から通知されてました。"
         .SetToastContent_TextAttribute = "カスタムタイムスタンプテスト"
 
+        'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
 
+        '通知表示
         'Shell ActionCmd, vbHide
         .RunDll_ToastNotifierShow "sample"
     End With
@@ -292,9 +313,10 @@ Sub シナリオテスト()
         'テキスト要素を用意
         .SetToastContent_TextTitle = "Hello World"
 
-
+        'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
-        
+
+        '通知表示
         .RunDll_ToastNotifierShow "sample"
         'Shell ActionCmd, vbHide
 
@@ -323,15 +345,17 @@ Sub UseButtonStyle()
 
 
 
+        'タイトル設定
         .SetToastContent_TextTitle = "緑と赤のボタン"
-        
+
         '設定方法は後述
         .SetIToastActions("Green", "", , , , , , Success) = 1
         .SetIToastActions("Red", "", , , , , , Critical) = 2
-        
-        
+
+        'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
 
+        '通知表示
         'Shell ActionCmd, vbHide
         .RunDll_ToastNotifierShow "sample"
     End With
@@ -370,10 +394,14 @@ Sub 丸いロゴ画像()
 
 
 
+        'タイトル設定
         .SetToastContent_TextTitle = "ロゴ画像テスト"
-        ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
-        .RunDll_ToastNotifierShow "sample"
 
+        'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
+        ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
+
+        '通知表示
+        .RunDll_ToastNotifierShow "sample"
         'Shell ActionCmd, vbHide
     End With
 End Sub
@@ -402,10 +430,13 @@ Sub インライン画像()
 
 
 
+        'タイトル設定
         .SetToastContent_TextTitle = "インライン画像テスト"
 
+        'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
 
+        '通知表示
         'Shell ActionCmd, vbHide
         .RunDll_ToastNotifierShow "sample"
     End With
@@ -442,9 +473,13 @@ Sub 上部に画像()
 
 
 
+        'タイトル設定
         .SetToastContent_TextTitle = "上部に画像を配置"
+
+        'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
 
+        '通知表示
         'Shell ActionCmd, vbHide
         .RunDll_ToastNotifierShow "sample"
     End With
@@ -485,9 +520,11 @@ Sub 最大行数テキスト()
 
         '中央揃えにするとき
         '.SetToastScenario = IncomingCall
-        
+
+        'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
 
+        '通知表示
         'Shell ActionCmd, vbHide
         .RunDll_ToastNotifierShow "sample"
     End With
@@ -520,11 +557,16 @@ Sub 通知音変更テスト()
     With AppNotification
         '通知音設定(ctrl + Space　で候補が出ます)
         .SetToastAudio = NotificationLoopingAlarm01
-        
-        
-        
-        ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
+
+
+
+        'タイトル設定
         .SetToastContent_TextTitle = "通知音変更"
+
+        'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
+        ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
+
+        '通知表示
         'Shell ActionCmd, vbHide
         .RunDll_ToastNotifierShow "sample"
     End With
@@ -570,11 +612,17 @@ Sub MakeActionTest()
         .SetIToastActions("YouTube開く", "https://www.youtube.com/", , , , , , Critical, "ツールチップ") = 4
 
 
-        
-        
 
+        'スタイル付きボタンの有効化
         .AllowToastContent_UseButtonStyle = True
+
+        'タイトル設定
         .SetToastContent_TextTitle = "ActionTest"
+
+        'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
+        ActionCmd = .GenerateCmd_ToastNotifierShow("簡易リマインド")
+
+        '通知表示
         'Shell ActionCmd, vbHide
         .RunDll_ToastNotifierShow "sample"
     End With
@@ -614,7 +662,10 @@ Sub ヘッダーテスト()
 
 
 
+        'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
+
+        '通知表示
         'Shell ActionCmd, vbHide
         .RunDll_ToastNotifierShow "sample"
     End With
@@ -669,8 +720,10 @@ Sub メッセージ()
 
         .SetToastContent_TextTitle = "メッセージ返信デザイン"
 
+        'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
 
+        '通知表示
         'Shell ActionCmd, vbHide
         .RunDll_ToastNotifierShow "sample"
     End With
@@ -731,7 +784,7 @@ Sub リマインドテスト()
         '7. コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("リマインド")
 
-        '8. コマンド実行
+        '8. 通知表示
         .RunDll_ToastNotifierShow "リマインド"
         'Shell ActionCmd,vbHide
     End With
@@ -803,7 +856,7 @@ Sub 簡易リマインドテスト()
         'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("簡易リマインド")
 
-        'コマンド実行
+        '通知表示
         .RunDll_ToastNotifierShow "簡易リマインド"
         'Shell ActionCmd,vbHide
     End With
