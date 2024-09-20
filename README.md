@@ -489,6 +489,8 @@ End Sub
 ## [action要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-action)
 ### SetIToastActions
 トーストに表示されるボタンを指定します。
+
+#### 設定可能な引数
 | 引数名             | 説明                                                                                                                                                                                                                                                                                                                                                             | 既定値                       | 
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | 
 | ArgContent         | ボタンに表示されるコンテンツ                                                                                                                                                                                                                                                                                                                                     | ※必須項目                   | 
@@ -535,6 +537,38 @@ End Sub
 
 ## [subgroup要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-subgroup)
 現時点では、作成アシストには非対応です。
+
+## [header要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-header)
+### SetToastHeader
+アクション センター内で複数の通知をグループにまとめるカスタム ヘッダーを指定します。<br>
+なお、Classファイルを定義する際(Class_Initialize)、予め既定値を入れるように仕込んでいるため基本、呼び出す必要はありません。
+また、ヘッダー名に表示される既定値名称は、ThisWorkbook.Nameですが、拡張子は省略します。
+
+#### 設定可能な引数
+| 引数名            | 説明                                                                                                                           | 既定値            | 
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------- | 
+| ArgID             | このヘッダーを一意に識別します。 2 つの通知が同じヘッダー ID を持つ場合、アクション センターで同じヘッダーの下に表示されます。 | ThisWorkbook.Name | 
+| ArgArguments      | ユーザーがこのヘッダーをクリックするとアプリに返されます。 null にすることはできません。                                       | ThisWorkbook.Path | 
+| ArgActivationType | このヘッダーがクリックされた場合に使用するアクティブ化の種類。                                                                 | protocol          | 
+
+```bas
+Sub ヘッダーテスト()
+    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim ActionCmd As String
+
+    With AppNotification
+        'ヘッダー名を変更
+        .SetToastHeader = "えくせる"
+
+
+
+        ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
+        'Shell ActionCmd, vbHide
+        .RunDll_ToastNotifierShow "sample"
+    End With
+End Sub
+```
+![alt text](doc/Ex_Element-header.png)<br>
 
 
 

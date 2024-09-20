@@ -876,19 +876,33 @@ End Property
 '***************************************************************************************************
 '* 機能　　：header要素の各属性にセットしたものをtoast要素に挿入します
 '---------------------------------------------------------------------------------------------------
-'* 引数　　：ArgID            ：このヘッダーを一意に識別します。 2 つの通知が同じヘッダー ID を持つ場合、アクション センターで同じヘッダーの下に表示されます。
-'            ArgTitle         ：ヘッダーのタイトルです。
-'            ArgArguments     ：起動スキーマ。URLやファイルパスなど
+'* 引数　　：ArgID            ：このヘッダーを一意に識別します。 2 つの通知が同じヘッダー ID を持つ場合、アクション センターで同じヘッダーの下に表示されます。(省略時：このExcelのファイル名)
+'            ArgTitle         ：ヘッダーのタイトルです。(省略時：このExcelのBook名)
+'            ArgArguments     ：起動スキーマ。URLやファイルパスなど(省略時：このExcelの保存フォルダパス)
 '            ArgActivationType：このヘッダーがクリックされた場合に使用するアクティブ化の種類
 '---------------------------------------------------------------------------------------------------
 '* 注意事項：VBAでは、ArgActivationType:"protocol"以外では意味をなしません
 '***************************************************************************************************
-Public Property Let SetToastHeader(ByVal ArgID As String, ByVal ArgArguments As String, Optional ByVal ArgActivationType As String = "protocol", ByVal ArgTitle As String)
+Public Property Let SetToastHeader(Optional ByVal ArgID As String, Optional ByVal ArgArguments As String, Optional ByVal ArgActivationType As String = "protocol", ByVal ArgTitle As String)
     With ElementHeader
-        .ID = ArgID
-        .Title = ArgTitle
-        .Arguments = ArgArguments
+        '省略時：このExcelのファイル名
+        If StrPtr(ArgID) Then
+            .ID = ArgID
+        Else
+            .ID = ThisWorkbook.Name
+        End If
+
+        '省略時：このExcelの保存フォルダパス
+        If StrPtr(ArgArguments) Then
+            .Arguments = ArgArguments
+        Else
+            .Arguments = ThisWorkbook.Path
+        End If
+
+        '省略時：protocol
         .ActivationType = ArgActivationType
+
+        .Title = ArgTitle
     End With
 End Property
 
@@ -1989,9 +2003,9 @@ Private Sub Class_Initialize()
         Dim SetHeaderName As String: If FileTypePos Then SetHeaderName = Left(.Name, FileTypePos - 1) Else SetHeaderName = .Name
 
         'ヘッダー情報をセット
-        SetToastHeader(.Name, .Path) = SetHeaderName
+        SetToastHeader = SetHeaderName
     End With
-    
+
     'タイムゾーンを日本基準にします
     SetTimeZone 9, 0
 End Sub
