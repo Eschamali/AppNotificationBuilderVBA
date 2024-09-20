@@ -107,10 +107,13 @@ True の方を使用する場合は、[こちらから](https://www.microsoft.co
 
 #### サンプルコード
 ```bas
-Sub ShowToastTest()
+Sub TestAllowUse_InternetImage()
+    Dim ActionCmd as String
+
     With New cls_AppNotificationBuilder
         '切り替え
         .AllowUse_InternetImage = True
+
 
 
         'タイトル設定
@@ -136,7 +139,9 @@ Windows にインストールされているAppUserModelID
 
 #### サンプルコード
 ```bas
-Sub ShowToastTest()
+Sub TestSetAppUserModelID()
+    Dim ActionCmd as String
+
     With New cls_AppNotificationBuilder
         '任意のAppUserModelID
         .SetToastContent_AppUserModelID = "Microsoft.WindowsTerminal_8wekyb3d8bbwe!App"
