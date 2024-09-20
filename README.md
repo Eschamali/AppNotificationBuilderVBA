@@ -219,7 +219,7 @@ Sub アプリ通知のカスタムタイムスタンプ()
 
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
 
-        'wsh.Run ActionCmd, 0, False
+        'Shell ActionCmd, vbHide
         .RunDll_ToastNotifierShow "sample"
         Debug.Print ActionCmd
     End With
@@ -272,7 +272,7 @@ Sub シナリオテスト()
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
         
         .RunDll_ToastNotifierShow "sample025"
-        'wsh.Run ActionCmd, 0, False
+        'Shell ActionCmd, vbHide
 
     End With
 End Sub
@@ -339,7 +339,7 @@ Sub 丸いロゴ画像()
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
         .RunDll_ToastNotifierShow "sample"
 
-        'wsh.Run ActionCmd, 0, False
+        'Shell ActionCmd, vbHide
     End With
 End Sub
 ```
@@ -370,7 +370,7 @@ Sub インライン画像()
 
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
 
-        'wsh.Run ActionCmd, 0, False
+        'Shell ActionCmd, vbHide
         .RunDll_ToastNotifierShow "sample"
     End With
 End Sub
@@ -404,7 +404,7 @@ Sub 上部に画像()
         .SetToastContent_TextTitle = "上部に画像を配置"
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
 
-        'wsh.Run ActionCmd, 0, False
+        'Shell ActionCmd, vbHide
         .RunDll_ToastNotifierShow "sample"
     End With
 End Sub
@@ -440,11 +440,11 @@ Sub 最大行数テキスト()
 
 
         '中央揃えにするとき
-        .SetToastScenario = IncomingCall
+        '.SetToastScenario = IncomingCall
         
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
 
-        'wsh.Run ActionCmd, False, False
+        'Shell ActionCmd, vbHide
         .RunDll_ToastNotifierShow "sample"
 
         Debug.Print ActionCmd
