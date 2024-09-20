@@ -96,6 +96,7 @@ HTTP上の画像ソースを使うか決めます。<br>
 実際は、プリセットのOffice系AppUserModelIDを切り替えます。<br>
 これは、[マニフェストにインターネット機能があるパッケージ アプリ](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/send-local-toast?tabs=uwp#:~:text=%E3%81%A8%E3%81%97%E3%81%BE%E3%81%99%E3%80%82-,%E9%87%8D%E8%A6%81,-HTTP%20%E3%82%A4%E3%83%A1%E3%83%BC%E3%82%B8%E3%81%AF)(主にStore アプリ)でないと、HTTP上の画像ソースが使えない制限があるためです。
 
+#### 設定値
 | 値            | 設定するAppUserModelID                                                                          | 
 | ------------- | ------------------------------------------------------------------------------- | 
 | True          | ![alt text](doc/Ex_AppUserModelID1-1.png)<br>Microsoft.MicrosoftOfficeHub_8wekyb3d8bbwe!Microsoft.MicrosoftOfficeHub | 
@@ -103,6 +104,8 @@ HTTP上の画像ソースを使うか決めます。<br>
 
 True の方を使用する場合は、[こちらから](https://www.microsoft.com/store/productId/9WZDNCRD29V9?ocid=pdpshare)インストールを行って下さい。<br>
 既定値、記述なしは、Falseです。
+
+#### サンプルコード
 ```bas
 Sub ShowToastTest()
     With New cls_AppNotificationBuilder
@@ -121,6 +124,11 @@ End Sub
 この通知をどのAppUserModelIDで出すかを設定します。<br>
 存在しない(未インストール)AppUserModelID、無効な文字列を指定すると、Toastが発行されないのでご注意ください。<br>
 このプロパティが設定されてると、AllowUse_InternetImageの設定より優先されます。
+
+#### 設定値
+Windows にインストールされているAppUserModelID
+
+#### サンプルコード
 ```bas
 Sub ShowToastTest()
     With New cls_AppNotificationBuilder
@@ -141,11 +149,14 @@ End Sub
 ## [toast要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-toast)
 ### SetToastContent_Duration
 トーストが[表示される時間](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-toast#:~:text=%E6%97%A2%E5%AE%9A%E5%80%A4-,duration,-%E3%83%88%E3%83%BC%E3%82%B9%E3%83%88%E3%81%8C%E8%A1%A8%E7%A4%BA)を設定します。
+
+#### 設定値
 | 値            | 説明                            | 
 | ------------- | ------------------------------- | 
 | False(既定値) | shortと同等                     | 
 | True          | longと同等<br>25s、表示できます | 
 
+#### サンプルコード
 ```bas
 Sub 長く表示される通知()
     Dim AppNotification As New cls_AppNotificationBuilder
@@ -171,12 +182,19 @@ End Sub
 ### SetToastContent_Launch
 [トースト通知自体のクリック](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-toast#:~:text=%E3%81%AA%E3%81%97-,launch,-%E3%83%88%E3%83%BC%E3%82%B9%E3%83%88%E9%80%9A%E7%9F%A5%E3%81%AB%E3%82%88%E3%81%A3%E3%81%A6)によって、アプリケーションがアクティブ化されるときにアプリケーションに渡される文字列です。
 VBAでは、起動スキーマ(https:// , ms-excel:// など)を設定するぐらいの役目です。
+#### 設定値
+起動スキーマ
+- https://
+- ms-excel://
 
-#### 設定可能な引数
+など
+
+#### 利用可能な引数
 | 引数名            | 解説                                                                                                                                                                                                                                                                                                                                                             | 既定値   | 
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | 
 | ArgActivationType | ユーザーが特定の操作を行った際に使用されるアクティブ化の種類を決定します。<br>・"foreground" - 既定値。 フォアグラウンド アプリが起動します。<br>・"background" - 対応するバックグラウンド タスクがトリガーされ、ユーザーを中断することなくバックグラウンドでコードを実行できます。<br>・"protocol" - プロトコルのアクティブ化を使用して別のアプリを起動します。 | protocol | 
 
+#### サンプルコード
 ```bas
 Sub リンクを開く()
     Dim AppNotification As New cls_AppNotificationBuilder
@@ -202,6 +220,10 @@ End Sub
 ### SetToastContent_DisplayTimestamp
 Windows プラットフォームによって通知が受信された時刻ではなく、通知コンテンツが実際に配信された日時を表すカスタム タイムスタンプで既定の[タイムスタンプをオーバーライド](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/custom-timestamps-on-toasts?tabs=xml)します。
 
+#### 設定値
+Excelのシリアル値
+
+#### サンプルコード
 ```bas
 Sub アプリ通知のカスタムタイムスタンプ()
     Dim AppNotification As New cls_AppNotificationBuilder
@@ -221,7 +243,6 @@ Sub アプリ通知のカスタムタイムスタンプ()
 
         'Shell ActionCmd, vbHide
         .RunDll_ToastNotifierShow "sample"
-        Debug.Print ActionCmd
     End With
 End Sub
 ```
@@ -230,6 +251,7 @@ End Sub
 ### SetToastScenario
 トーストが使用される[シナリオ](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/adaptive-interactive-toasts?tabs=xml#scenarios)を設定します。列挙型に対応します。
 
+#### 設定値
 | シナリオ名   | 主な特徴                                                                                                                                                                                  | 
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | 
 | Default(既定値)      | 一般的な挙動通知                                                                                                                                                                      | 
@@ -237,6 +259,8 @@ End Sub
 | [Alarm](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/adaptive-interactive-toasts?tabs=xml#alarms)        | ・通知を永遠に表示する。<br>・action要素がないと効果は発動しない<br>・通知音は、アラーム系(Alarm)のみ<br>・応答不可モードでも必ず表示<br>![reminder,alarm](doc/Ex_Element-Toast4-2.png)                                                 | 
 | [IncomingCall](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/adaptive-interactive-toasts?tabs=xml#incoming-calls) | ・通知を永遠に表示する。<br>・action要素がなくても効果発動<br>・通知音は呼び出し系(Call)のみ<br>・最後のボタン位置のみ、Windowsのテーマ色に基づく着色が施され、位置が必ず下側になる。<br>![reminder,alarm](doc/Ex_Element-Toast4-3.png) | 
 | [Urgent](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/adaptive-interactive-toasts?tabs=xml#important-notifications)       | ・通知に感嘆符が付与<br>・応答不可モードでの表示/非表示の、切り替え可能<br>・Build 22546 以降のOS で有効<br>![reminder,alarm](doc/Ex_Element-Toast4-4.png)                                                                                                               | 
+
+#### サンプルコード
 ```bas
 Sub シナリオテスト()
     Dim AppNotification As New cls_AppNotificationBuilder
@@ -271,7 +295,7 @@ Sub シナリオテスト()
 
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
         
-        .RunDll_ToastNotifierShow "sample025"
+        .RunDll_ToastNotifierShow "sample"
         'Shell ActionCmd, vbHide
 
     End With
@@ -280,7 +304,14 @@ End Sub
 
 ### AllowToastContent_UseButtonStyle
 toast要素の[useButtonStyle](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-toast#:~:text=%E3%81%AA%E3%81%97-,useButtonStyle,-%E3%82%B9%E3%82%BF%E3%82%A4%E3%83%AB%E4%BB%98%E3%81%8D%E3%83%9C%E3%82%BF%E3%83%B3)属性の設定を行います。<br>
-Trueで、スタイル付きボタンを使用します。後述の[action 要素](#SetIToastActions)の 「hint-buttonStyle」 属性に影響します。<br>
+
+#### 設定値
+| 値            | 説明                            | 
+| ------------- | ------------------------------- | 
+| False(既定値) | スタイル付きボタンを使用できないようにします。後述の[action 要素](#SetIToastActions)の 「hint-buttonStyle」 属性に影響しません。 | 
+| True          | スタイル付きボタンを使用できるようにします。後述の[action 要素](#SetIToastActions)の 「hint-buttonStyle」 属性に影響します。 | 
+
+#### サンプルコード
 ```bas
 Sub UseButtonStyle()
     Dim AppNotification As New cls_AppNotificationBuilder
@@ -311,16 +342,20 @@ End Sub
 ## [image要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-image)
 ### SetToastContent_ImageAppLogo
 image要素のうち、AppLogo(appLogoOverride)に設定する画像のパスと、丸いロゴフラグの設定を行います。<br>
-ロゴ画像のパス指定は、ローカルパス(C:\\)、HTTPソースに対応してます
 
+#### 設定値
+ロゴ画像のパス指定
+- ローカルパス(C:\\)
+- HTTPソース(https://)
 
-#### 設定可能な引数
+#### 利用可能な引数
 | 引数名             | 説明                                                                                                           | 既定値       | 
 | ------------------ | -------------------------------------------------------------------------------------------------------------- | ------------ | 
 | Arg_LogoCircle     | True：画像は円にトリミングされます。<br>False：画像はトリミングされず、正方形として表示されます。              | False        | 
 | Flag_addImageQuery | Windows がトースト通知で指定されたイメージ URI にクエリ文字列を追加できるようにするには、"true" に設定します。 | False        | 
 | Arg_Alt            | 支援技術のユーザー向けの画像の説明。                                                                      | vbnullstring | 
 
+#### サンプルコード
 ```bas
 Sub 丸いロゴ画像()
     Dim AppNotification As New cls_AppNotificationBuilder
@@ -349,10 +384,11 @@ End Sub
 | ![正方形](doc/Ex_Element-Image1-1.png)                   | ![円にトリミング](doc/Ex_Element-Image1-2.png)                  | 
 
 ### SetToastContent_ImageInline
-image要素のうち、テキスト要素の後に表示する画像パスと、丸いロゴフラグの設定を行います。br>
+image要素のうち、テキスト要素の後に表示する画像パスと、丸いロゴフラグの設定を行います。<br>
 先ほどと同様、インライン画像のパス指定も、ローカルパス(C:\\)、HTTPソースに対応してます。<br>
-引数の内容も同様です。
+引数の内容も同様のため、省略します。
 
+#### サンプルコード
 ```bas
 Sub インライン画像()
     Dim AppNotification As New cls_AppNotificationBuilder
@@ -382,14 +418,19 @@ End Sub
 
 ### SetToastContent_ImageHero
 ヒーローイメージとして表示させる画像を設定します。<br>
-先ほどと同様、ヒーロー画像のパス指定も、ローカルパス(C:\\)、HTTPソースに対応してます。
 
-#### 設定可能な引数
+#### 設定値
+ヒーロー画像のパス指定
+- ローカルパス(C:\\)
+- HTTPソース(https://)
+
+#### 利用可能な引数
 | 引数名             | 説明                                                                                                           | 既定値       | 
 | ------------------ | -------------------------------------------------------------------------------------------------------------- | ------------ | 
 | Flag_addImageQuery | Windows がトースト通知で指定されたイメージ URI にクエリ文字列を追加できるようにするには、"true" に設定します。 | False        | 
 | Arg_Alt            | 支援技術のユーザー向けの画像の説明。                                                                      | vbnullstring | 
 
+#### サンプルコード
 ```bas
 Sub 上部に画像()
     Dim AppNotification As New cls_AppNotificationBuilder
@@ -415,17 +456,20 @@ End Sub
 ## [text要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-text)
 アプリ通知で使用されるテキストを指定します。
 
-| プロパティ名                  | 配置位置 | 最大行数 | 
+#### 設定値
+任意の文字列。
+| プロパティ名                   | 配置位置 | 最大行数 | 
 | ----------------------------- | -------- | -------- | 
 | SetToastContent_TextTitle     | タイトル | 2行      | 
 | SetToastContent_TextBody      | 内容     | 4行      | 
 | SetToastContent_TextAttribute | 下部     | 2行      | 
 
-### 設定可能な引数
+### 利用可能な引数
 | 引数名             | 説明                                                                                                           | 既定値       | 
 | ------------------ | -------------------------------------------------------------------------------------------------------------- | ------------ | 
 | HintCallScenarioCenterAlign | 横中央揃えの配置にする設定です。trueにしつつ、シナリオモードを「IncomingCall」にしないと効果ありません。 | False        | 
 
+#### サンプルコード
 ```bas
 Sub 最大行数テキスト()
     Dim AppNotification As New cls_AppNotificationBuilder
@@ -446,8 +490,6 @@ Sub 最大行数テキスト()
 
         'Shell ActionCmd, vbHide
         .RunDll_ToastNotifierShow "sample"
-
-        Debug.Print ActionCmd
     End With
 ```
 
@@ -460,11 +502,16 @@ Sub 最大行数テキスト()
 アプリ通知を表示するときに再生するサウンドを指定します。 ミュートも対応してます。<br>
 ただし、ファイルシステム上の音声ファイルのパスや URLの指定は使えません。システムで決められた通知音のみ設定可能です。
 
-#### 設定可能な引数
+#### 設定値
+設定可能な通知音は、[こちら](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-audio#:~:text=false-,src,-%E6%97%A2%E5%AE%9A%E3%81%AE%E3%82%B5%E3%82%A6%E3%83%B3%E3%83%89)をどうぞ。<br>
+また、False で指定すると、ミュート扱いになります。
+
+#### 利用可能な引数
 | 引数名             | 説明                                                                                                           | 既定値       | 
 | ------------------ | -------------------------------------------------------------------------------------------------------------- | ------------ | 
 | ArgLoop            | トーストが表示されている限り、サウンドを繰り返す場合は true に設定します。<br> 1 回だけ再生する場合は false。  | False        | 
 
+#### サンプルコード
 ```bas
 Sub 通知音変更テスト()
     Dim AppNotification As New cls_AppNotificationBuilder
@@ -483,14 +530,14 @@ Sub 通知音変更テスト()
     End With
 End Sub
 ```
-設定可能な通知音は、[こちら](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-audio#:~:text=false-,src,-%E6%97%A2%E5%AE%9A%E3%81%AE%E3%82%B5%E3%82%A6%E3%83%B3%E3%83%89)をどうぞ。<br>
-また、False で指定すると、ミュート扱いになります。
 
 ## [action要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-action)
 ### SetIToastActions
 トーストに表示されるボタンを指定します。
+#### 設定値
+ボタンの配置順。1~5まで有効です。
 
-#### 設定可能な引数
+#### 利用可能な引数
 | 引数名             | 説明                                                                                                                                                                                                                                                                                                                                                             | 既定値                       | 
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | 
 | ArgContent         | ボタンに表示されるコンテンツ                                                                                                                                                                                                                                                                                                                                     | ※必須項目                   | 
@@ -502,6 +549,8 @@ End Sub
 | ArgHintInputId     | 入力の横にある [位置への 入力 ] ボタンの ID に設定します。                                                                                                                                                                                                                                                                                                       | vbnullstring                 | 
 | ArgHintButtonStyle | ボタンのスタイル。<br>事前に[toast要素のuseButtonStyle属性](#AllowToastContent_UseButtonStyle)にtrue を設定する必要があります。<br><br>・Success：緑<br>・Critical：赤<br>・NoStyle：無色                                                                                                                                                                                                             | NoStyle                      | 
 | ArgHintToolTip     | ボタンに空のコンテンツ文字列がある場合のボタンのヒント。                                                                                                                                                                                                                                                                                                         | vbnullstring                 | 
+
+#### サンプルコード
 ```bas
 Sub MakeActionTest()
     Dim AppNotification As New cls_AppNotificationBuilder
@@ -532,7 +581,6 @@ Sub MakeActionTest()
 End Sub
 ```
 
-最後の数字は、ボタンの配置順を表します。1~5まで有効です。<br>
 ![alt text](doc/Ex_Element-Action1-1.png) ![alt text](doc/Ex_Element-Action1-2.png)
 
 ## [subgroup要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-subgroup)
@@ -542,15 +590,19 @@ End Sub
 ### SetToastHeader
 アクション センター内で複数の通知をグループにまとめるカスタム ヘッダーを指定します。<br>
 なお、Classファイルを定義する際(Class_Initialize)、予め既定値を入れるように仕込んでいるため基本、呼び出す必要はありません。
-また、ヘッダー名に表示される既定値名称は、ThisWorkbook.Nameですが、拡張子は省略します。
 
-#### 設定可能な引数
+#### 設定値
+任意の文字列<br>
+既定値は、ThisWorkbook.Nameですが、拡張子がある場合は、省略します。
+
+#### 利用可能な引数
 | 引数名            | 説明                                                                                                                           | 既定値            | 
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------- | 
 | ArgID             | このヘッダーを一意に識別します。 2 つの通知が同じヘッダー ID を持つ場合、アクション センターで同じヘッダーの下に表示されます。 | ThisWorkbook.Name | 
 | ArgArguments      | ユーザーがこのヘッダーをクリックするとアプリに返されます。 null にすることはできません。                                       | ThisWorkbook.Path | 
 | ArgActivationType | このヘッダーがクリックされた場合に使用するアクティブ化の種類。                                                                 | protocol          | 
 
+#### サンプルコード
 ```bas
 Sub ヘッダーテスト()
     Dim AppNotification As New cls_AppNotificationBuilder
@@ -583,7 +635,10 @@ End With
 トースト通知に表示される入力 (テキスト ボックスまたは選択メニュー) を指定します。<br>
 VBAでは、リマインダー用途でしか使い所がないと思います。
 
-#### 設定可能な引数
+#### 設定値
+Input要素の配置順。1~5まで有効です。
+
+#### 利用可能な引数
 | 引数名                | 説明                                                                    | 既定値       | 
 | --------------------- | ----------------------------------------------------------------------- | ------------ | 
 | ArgID                 | 入力に関連付けられている ID                                             | ※必須項目     | 
@@ -592,6 +647,7 @@ VBAでは、リマインダー用途でしか使い所がないと思います�
 | ArgTitle              | 入力のラベルとして表示されるテキスト                                    | vbnullstring | 
 | ArgDefaultInput       | デフォルトの入力値                                                      | vbnullstring | 
 
+#### サンプルコード
 ```bas
 Sub メッセージ()
     Dim AppNotification As New cls_AppNotificationBuilder
@@ -617,12 +673,9 @@ Sub メッセージ()
 
         'Shell ActionCmd, vbHide
         .RunDll_ToastNotifierShow "sample"
-        
-        Debug.Print ActionCmd
     End With
 End Sub
 ```
-最後の数字は、Input要素の配置順を表します。1~5まで有効です。<br>
 ![alt text](doc/Ex_Element-Input1-1.png) ![alt text](doc/Ex_Element-Input1-2.png)<br>
 
 
@@ -631,7 +684,10 @@ End Sub
 選択項目の id とテキストを指定します。全て必須項目です。
 基本、リマインダー用途のみとなります。
 
-#### 設定可能な引数
+#### 設定値
+selection要素の配置順。1~5まで有効です。
+
+#### 利用可能な引数
 | 引数名         | 説明                                               | 備考                       | 
 | -------------- | -------------------------------------------------- | -------------------------- | 
 | ReminderMinute | 何分後にリマインダー通知させるか、値で指定します。 | 現状、数値以外は扱いません。<br>0で、未定義扱いとします。 | 
@@ -640,6 +696,8 @@ End Sub
 #### [リマインダーの設定方法](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/adaptive-interactive-toasts?tabs=xml#snoozedismiss)
 Input要素と、selection要素を使ったリマインダー方法を紹介します。<br>
 コード内コメントにある手順を参考にどうぞ。
+
+#### サンプルコード
 ```bas
 Sub リマインドテスト()
     Dim AppNotification As New cls_AppNotificationBuilder
@@ -688,6 +746,7 @@ End Sub
 なお、Classファイルを定義する際(Class_Initialize)、予め日本時間としてセッティングするため、日本在宅者は呼び出す必要はありません。<br>
 国をまたがない使用の場合は、Class_Initialize の所で、予め自国として設定し直すことを推奨します。
 
+#### 利用可能な引数
 | 引数名        | 説明                                                          | 
 | ------------- | ------------------------------------------------------------- | 
 | ArgUTC_Hour   | UTCからの時差のうち、時の部分を指定します。<br>正負対応です。 | 
@@ -714,6 +773,7 @@ End Sub
 - 1,2つ目のaction要素
 - 1つ目のinput要素
 
+#### 利用可能な引数
 | 引数名          | 説明                                                                     | 
 | --------------- | ------------------------------------------------------------------------ | 
 | RemindMinute1~5 | 何分後に再通知するか数値で指定。最大5つ分<br>1つ目のみ必須。他は省略可。 | 
@@ -721,6 +781,7 @@ End Sub
 
 制限事項として、選択肢の表記は全て"分"です。
 
+#### サンプルコード
 ```bas
 Sub 簡易リマインドテスト()
     Dim AppNotification As New cls_AppNotificationBuilder
