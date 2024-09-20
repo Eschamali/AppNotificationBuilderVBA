@@ -76,11 +76,11 @@ hDll の中身が、0 以外であれば読み込み、成功です。
 ```bas
 Sub ShowToastTest()
     With New cls_AppNotificationBuilder
-		'1. プロパティ設定
+        '1. プロパティ設定
        .SetToastContent_TextTitle = "Hello World"
        .SetToastContent_TextBody = "Test message"
 
-		'2. メソッド実行
+        '2. メソッド実行
        .RunDll_ToastNotifierShow "Hello World"
     End With
 End Sub
@@ -171,10 +171,10 @@ Sub リンクを開く()
     Dim ActionCmd As String
     
     With AppNotification
-		'URL等を指定
+        'URL等を指定
         .SetToastContent_Launch = "https://www.google.com/"
         
-		.SetToastContent_TextTitle = "このトーストをクリックすると、指定リンクに対応するアプリが起動"
+        .SetToastContent_TextTitle = "このトーストをクリックすると、指定リンクに対応するアプリが起動"
         
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
 
@@ -194,7 +194,7 @@ Sub アプリ通知のカスタムタイムスタンプ()
     Dim ActionCmd As String
     
     With AppNotification
-		'シリアル値で設定。基本は過去に設定
+        'シリアル値で設定。基本は過去に設定
         .SetToastContent_DisplayTimestamp = Now() - 0.1
 
         .SetToastContent_TextTitle = "Hello World"
@@ -222,7 +222,7 @@ End Sub
 | [IncomingCall](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/adaptive-interactive-toasts?tabs=xml#incoming-calls) | ・通知を永遠に表示する。<br>・action要素がなくても効果発動<br>・通知音は呼び出し系(Call)のみ<br>・最後のボタン位置のみ、Windowsのテーマ色に基づく着色が施され、位置が必ず下側になる。<br>![reminder,alarm](doc/Ex_Element-Toast4-3.png) | 
 | [Urgent](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/adaptive-interactive-toasts?tabs=xml#important-notifications)       | ・通知に感嘆符が付与<br>・応答不可モードでの表示/非表示の、切り替え可能<br>・Build 22546 以降のOS で有効<br>![reminder,alarm](doc/Ex_Element-Toast4-4.png)                                                                                                               | 
 ```bas
-Sub synalioTest()
+Sub シナリオテスト()
     Dim AppNotification As New cls_AppNotificationBuilder
     Dim ActionCmd As String
     
@@ -288,6 +288,109 @@ End Sub
 ```
 ![alt text](doc/Ex_Element-Toast5.png)
 
+## [image要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-toast)
+### SetToastContent_ImageAppLogo
+image要素のうち、AppLogo(appLogoOverride)に設定する画像のパスと、丸いロゴフラグの設定を行います。<br>
+ロゴ画像のパス指定は、ローカルパス(C:\\)、HTTPソースに対応してます
+
+
+#### 設定可能な引数
+| 引数名             | 説明                                                                                                           | 既定値       | 
+| ------------------ | -------------------------------------------------------------------------------------------------------------- | ------------ | 
+| Arg_LogoCircle     | True：画像は円にトリミングされます。<br>False：画像はトリミングされず、正方形として表示されます。              | False        | 
+| Flag_addImageQuery | Windows がトースト通知で指定されたイメージ URI にクエリ文字列を追加できるようにするには、"true" に設定します。 | False        | 
+| Arg_Alt            | 支援技術のユーザー向けの画像の説明。                                                                      | vbnullstring | 
+
+```bas
+Sub 丸いロゴ画像()
+    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim ActionCmd As String
+    
+    With AppNotification
+        'ロゴ画像のパスを指定します。(Arg_LogoCircle=False)
+        .SetToastContent_ImageAppLogo = "C:\Windows\SystemApps\Microsoft.XboxGameCallableUI_cw5n1h2txyewy\Assets\Logo.scale-100.png"
+
+        'ロゴ画像のパスを指定し、円にトリミング。(Arg_LogoCircle=True)
+        '.SetToastContent_ImageAppLogo(True) = "C:\Windows\SystemApps\Microsoft.XboxGameCallableUI_cw5n1h2txyewy\Assets\Logo.scale-100.png"
+
+
+
+        .SetToastContent_TextTitle = "ロゴ画像テスト"
+        ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
+        .RunDll_ToastNotifierShow "sample"
+
+        'wsh.Run ActionCmd, 0, False
+    End With
+End Sub
+```
+
+| Arg_LogoCircle=False | Arg_LogoCircle=True | 
+| -------------------- | ------------------- | 
+| ![正方形](doc/Ex_Element-Image1-1.png)                   | ![円にトリミング](doc/Ex_Element-Image1-2.png)                  | 
+
+### SetToastContent_ImageInline
+image要素のうち、テキスト要素の後に表示する画像パスと、丸いロゴフラグの設定を行います。br>
+先ほどと同様、ロゴ画像のパス指定は、ローカルパス(C:\\)、HTTPソースに対応してます。<br>
+引数の内容も同様です。
+
+```bas
+Sub インライン画像()
+    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim ActionCmd As String
+    
+    With AppNotification
+        '通常
+        .SetToastContent_ImageInline(False, , "win の壁紙") = "C:\Windows\Web\Screen\img100.jpg"
+        '円にトリミング
+        ''.SetToastContent_ImageInline(True, , "win の壁紙") = "C:\Windows\Web\Screen\img100.jpg"
+
+
+
+        .SetToastContent_TextTitle = "インライン画像テスト"
+
+        ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
+
+        'wsh.Run ActionCmd, 0, False
+        .RunDll_ToastNotifierShow "sample"
+    End With
+End Sub
+```
+
+| Arg_LogoCircle=False | Arg_LogoCircle=True | 
+| -------------------- | ------------------- | 
+| ![正方形](doc/Ex_Element-Image2-1.png)                   | ![円にトリミング](doc/Ex_Element-Image2-2.png)                  | 
+
+### SetToastContent_ImageHero
+ヒーローイメージとして表示させる画像を設定します。<br>
+先ほどと同様、ロゴ画像のパス指定は、ローカルパス(C:\\)、HTTPソースに対応してます。
+
+#### 設定可能な引数
+| 引数名             | 説明                                                                                                           | 既定値       | 
+| ------------------ | -------------------------------------------------------------------------------------------------------------- | ------------ | 
+| Flag_addImageQuery | Windows がトースト通知で指定されたイメージ URI にクエリ文字列を追加できるようにするには、"true" に設定します。 | False        | 
+| Arg_Alt            | 支援技術のユーザー向けの画像の説明。                                                                      | vbnullstring | 
+
+```bas
+Sub 上部に画像()
+    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim ActionCmd As String
+    
+    With AppNotification
+        '上部に画像を配置します
+        .SetToastContent_ImageHero(, "win11壁紙") = "C:\Windows\Web\Screen\img100.jpg"
+
+
+
+        .SetToastContent_TextTitle = "上部に画像を配置"
+        ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
+
+        'wsh.Run ActionCmd, 0, False
+        .RunDll_ToastNotifierShow "sample"
+    End With
+End Sub
+```
+
+![alt text](doc/Ex_Element-Image3.png)
 
 
 # メソッド説明
@@ -306,7 +409,7 @@ Shell関数と併用して使用して下さい。Windows PowerShell環境があ
 
 ```bas
 With New cls_AppNotificationBuilder
-	Shell .GenerateCmd_ToastNotifierShow("NoSetting"), vbHide
+    Shell .GenerateCmd_ToastNotifierShow("NoSetting"), vbHide
 End With
 ```
 なお、上記のように特に事前設定なくとも動作は可能です。この場合は次のように表示されます<br>
