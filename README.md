@@ -532,7 +532,7 @@ Sub MakeActionTest()
 End Sub
 ```
 
-最後の数字は、ボタンの配置順を表します。<br>
+最後の数字は、ボタンの配置順を表します。1~5まで有効です。<br>
 ![alt text](doc/Ex_Element-Action1-1.png) ![alt text](doc/Ex_Element-Action1-2.png)
 
 ## [subgroup要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-subgroup)
@@ -569,6 +569,53 @@ Sub ヘッダーテスト()
 End Sub
 ```
 ![alt text](doc/Ex_Element-header.png)<br>
+
+
+## [input要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-input)
+トースト通知に表示される入力 (テキスト ボックスまたは選択メニュー) を指定します。<br>
+VBAでは、リマインダー用途でしか使い所がないと思います。
+
+| 引数名                | 説明                                                                    | 既定値       | 
+| --------------------- | ----------------------------------------------------------------------- | ------------ | 
+| ArgID                 | 入力に関連付けられている ID                                             | ※必須項目     | 
+| ChoseFlag             | ・True："selection"<br>・False："text"                                  | False        | 
+| ArgPlaceHolderContent | テキスト入力用に表示されるプレースホルダー。<br>ChoseFlag=False時、有効 | vbnullstring | 
+| ArgTitle              | 入力のラベルとして表示されるテキスト                                    | vbnullstring | 
+| ArgDefaultInput       | デフォルトの入力値                                                      | vbnullstring | 
+
+```bas
+Sub メッセージ()
+    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim ActionCmd As String
+    
+    With AppNotification
+        'テキスト入力要素を作成
+        .SetIToastInput("textBox",, "reply","はみがきなう！") = 1
+
+
+
+        'InputのIDと、Actionのhint-inputIdを同じ値にして、同じIndex値に対応するInput要素の横にボタンを配置できます
+        .SetIToastActions("Send", "", , , , , "textBox") = 1
+
+        'ネット上の画像を使用する
+        .AllowUse_InternetImage = True
+        .SetToastContent_ImageAppLogo(True) = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhkdhNl7CCgOAZmjObZRRINCu9udW_Mum-_FSCEvLFULZRP_wEuO_Y1grKy28zSCw2fyBN5jM2RS1PYmE9prAk5uSI8ImDn1wcyZPy8ctGJ-vFaY36ULy_rjvrilHjXjuN0_O-p6sQi3Hc3/s857/ha_hamigaki_suit_woman.png"
+        .SetToastContent_ImageHero = "https://unsplash.it/360/180?image=1043"
+
+        .SetToastContent_TextTitle = "メッセージ返信デザイン"
+
+        ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
+
+        'wsh.Run ActionCmd, 0, False
+        .RunDll_ToastNotifierShow "sample"
+        
+        Debug.Print ActionCmd
+    End With
+End Sub
+```
+
+![alt text](doc/Ex_Element-Input1-1.png) ![alt text](doc/Ex_Element-Input1-2.png)<br>
+最後の数字は、Input要素の配置順を表します。1~5まで有効です。<br>
 
 
 
