@@ -350,7 +350,7 @@ End Sub
 
 ### SetToastContent_ImageInline
 image要素のうち、テキスト要素の後に表示する画像パスと、丸いロゴフラグの設定を行います。br>
-先ほどと同様、ロゴ画像のパス指定は、ローカルパス(C:\\)、HTTPソースに対応してます。<br>
+先ほどと同様、インライン画像のパス指定も、ローカルパス(C:\\)、HTTPソースに対応してます。<br>
 引数の内容も同様です。
 
 ```bas
@@ -382,7 +382,7 @@ End Sub
 
 ### SetToastContent_ImageHero
 ヒーローイメージとして表示させる画像を設定します。<br>
-先ほどと同様、ロゴ画像のパス指定は、ローカルパス(C:\\)、HTTPソースに対応してます。
+先ほどと同様、ヒーロー画像のパス指定も、ローカルパス(C:\\)、HTTPソースに対応してます。
 
 #### 設定可能な引数
 | 引数名             | 説明                                                                                                           | 既定値       | 
@@ -412,6 +412,48 @@ End Sub
 
 ![alt text](doc/Ex_Element-Image3.png)
 
+## [text要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-text)
+アプリ通知で使用されるテキストを指定します。
+
+| プロパティ名                  | 配置位置 | 最大行数 | 
+| ----------------------------- | -------- | -------- | 
+| SetToastContent_TextTitle     | タイトル | 2行      | 
+| SetToastContent_TextBody      | 内容     | 4行      | 
+| SetToastContent_TextAttribute | 下部     | 2行      | 
+
+#### 設定可能な引数
+| 引数名             | 説明                                                                                                           | 既定値       | 
+| ------------------ | -------------------------------------------------------------------------------------------------------------- | ------------ | 
+| HintCallScenarioCenterAlign | 横中央揃えの配置にする設定です。trueにしつつ、シナリオモードを「IncomingCall」にしないと効果ありません。 | False        | 
+
+```bas
+Sub 最大行数テキスト()
+    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim ActionCmd As String
+
+    With AppNotification
+        'テキスト設定
+        .SetToastContent_TextTitle(False) = "タイトル 1Line" & vbCrLf & "タイトル 2Line" & vbCrLf & "タイトル 3Line"
+        .SetToastContent_TextBody(False) = "コンテンツ 1Line" & vbCrLf & "コンテンツ 2Line" & vbCrLf & "コンテンツ 3Line" & vbCrLf & "コンテンツ 4Line" & vbCrLf & "コンテンツ 5Line"
+        .SetToastContent_TextAttribute(False) = "コンテンツソース 1Line" & vbCrLf & "コンテンツソース 2Line" & vbCrLf & "コンテンツソース 3Line"
+
+
+
+        '中央揃えにするとき
+        .SetToastScenario = IncomingCall
+        
+        ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
+
+        'wsh.Run ActionCmd, False, False
+        .RunDll_ToastNotifierShow "sample"
+
+        Debug.Print ActionCmd
+    End With
+```
+
+| HintCallScenarioCenterAlign = False             | HintCallScenarioCenterAlign = True かつ、SetToastScenario = IncomingCall |
+| ------------------------------------------------- | --------------------------------------- |
+| ![alt text](doc/Ex_Element-text1-1.png)           | ![alt text](doc/Ex_Element-text1-2.png) |
 
 # メソッド説明
 ## GenerateCmd_ToastNotifierShow(ToastTag , Optional CollectionID , Optional ScheduleDate , Optional ExpirationDate , Optional Suppress)
