@@ -108,7 +108,9 @@ Sub ShowToastTest()
     With New cls_AppNotificationBuilder
         '切り替え
         .AllowUse_InternetImage = True
-    
+
+
+
         .SetToastContent_TextTitle = "Microsoft 365から"
         Shell .GenerateCmd_ToastNotifierShow("Run"), vbHide
     End With
@@ -124,7 +126,9 @@ Sub ShowToastTest()
     With New cls_AppNotificationBuilder
         '任意のAppUserModelID
         .SetToastContent_AppUserModelID = "Microsoft.WindowsTerminal_8wekyb3d8bbwe!App"
-    
+
+
+
         .SetToastContent_TextTitle = "By Terminal"
         Shell .GenerateCmd_ToastNotifierShow("Run"), vbHide
     End With
@@ -151,6 +155,8 @@ Sub 長く表示される通知()
         '25秒表示されます
         .SetToastContent_Duration = True
 
+
+
         .SetToastContent_TextTitle = "25秒間、表示"
 
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
@@ -162,9 +168,15 @@ End Sub
 ```
 ![alt text](doc/Ex_Element-Toast1.png)
 
-### SetToastContent_Launch(Optional ArgActivationType As String = "protocol")
+### SetToastContent_Launch
 [トースト通知自体のクリック](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-toast#:~:text=%E3%81%AA%E3%81%97-,launch,-%E3%83%88%E3%83%BC%E3%82%B9%E3%83%88%E9%80%9A%E7%9F%A5%E3%81%AB%E3%82%88%E3%81%A3%E3%81%A6)によって、アプリケーションがアクティブ化されるときにアプリケーションに渡される文字列です。
 VBAでは、起動スキーマ(https:// , ms-excel:// など)を設定するぐらいの役目です。
+
+#### 設定可能な引数
+| 引数名            | 解説                                                                                                                                                                                                                                                                                                                                                             | 既定値   | 
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | 
+| ArgActivationType | ユーザーが特定の操作を行った際に使用されるアクティブ化の種類を決定します。<br>・"foreground" - 既定値。 フォアグラウンド アプリが起動します。<br>・"background" - 対応するバックグラウンド タスクがトリガーされ、ユーザーを中断することなくバックグラウンドでコードを実行できます。<br>・"protocol" - プロトコルのアクティブ化を使用して別のアプリを起動します。 | protocol | 
+
 ```bas
 Sub リンクを開く()
     Dim AppNotification As New cls_AppNotificationBuilder
@@ -173,7 +185,9 @@ Sub リンクを開く()
     With AppNotification
         'URL等を指定
         .SetToastContent_Launch = "https://www.google.com/"
-        
+
+
+
         .SetToastContent_TextTitle = "このトーストをクリックすると、指定リンクに対応するアプリが起動"
         
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
@@ -196,6 +210,8 @@ Sub アプリ通知のカスタムタイムスタンプ()
     With AppNotification
         'シリアル値で設定。基本は過去に設定
         .SetToastContent_DisplayTimestamp = Now() - 0.1
+
+
 
         .SetToastContent_TextTitle = "Hello World"
         .SetToastContent_TextBody = "このメッセージは、以前から通知されてました。"
@@ -229,6 +245,8 @@ Sub シナリオテスト()
     With AppNotification
         'トーストのシナリオを設定(ctrl + Space で候補を表示できます)
         .SetToastScenario = Urgent
+
+
 
         '紐付け用識別子(解説は後述)
         Const ReminderID As String = "アラーム"
@@ -271,7 +289,9 @@ Sub UseButtonStyle()
     With AppNotification
         'スタイル付きボタンを有効化
         .AllowToastContent_UseButtonStyle = True
-        
+
+
+
         .SetToastContent_TextTitle = "緑と赤のボタン"
         
         '設定方法は後述
