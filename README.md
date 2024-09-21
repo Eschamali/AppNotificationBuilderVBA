@@ -1222,6 +1222,9 @@ Sub コレクションを使用したトースト通知のグループ化作成(
         .SetToastContent_TextBody = "Collection経由で通知しました"
         .SetToastContent_TextAttribute = "ToastCollectionTest"
 
+        'ヘッダーをクリア
+        .SetToastHeader(vbNullString) = ""
+
         '作ったCollectionにトーストを送信して表示
         .RunDll_ToastNotifierShow "CollectionTest", CollectionID
     End With
@@ -1237,3 +1240,7 @@ End Sub
 「通常」では、アプリ名が必ず名称になります。<br>
 対して、「Collection」は任意の名称で設定が可能です。<br>
 アイコン画像については、Microsoft 365 (PWA)を[インストール](https://www.microsoft.com/store/productId/9WZDNCRD29V9?ocid=pdpshare)することで、基本的なOfficeアイコンのセットがついてきます。
+
+#### 注意事項
+AppUserModelIDは、デスクトップアプリ系以外のを指定することを推奨します。
+「.AllowUse_InternetImage = True」をコメントアウトして同じ内容を実行すると、下記のように変な挙動を起こします。

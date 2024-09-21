@@ -347,6 +347,18 @@ long __stdcall UpdateToastNotificationWithProgressBar(ToastNotificationParams* T
 
 //引数で渡された値で、コレクションを使用したトースト通知のグループ化を作成します。エラーコード返却に対応します
 long __stdcall CreateToastCollection(ToastNotificationParams* ToastConfigData, const wchar_t* displayName, const wchar_t* launchArgs, const wchar_t* iconUri) {
+    // COMの初期化
+    HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    if (hr == RPC_E_CHANGED_MODE) {
+        // 既に異なるアパートメント モードで初期化されている場合は、そのまま続行
+    }
+    else if (FAILED(hr)) {
+        wchar_t errorMsg[256];
+        swprintf_s(errorMsg, 256, L"COM初期化に失敗しました。HRESULT: 0x%08X", hr);
+        MessageBoxW(nullptr, errorMsg, L"エラー", MB_OK);
+        return -1;
+    }
+
     //値Check用
     //MessageBoxW(nullptr, ToastConfigData->AppUserModelID, L"AppUserModelID", MB_OK);
     //MessageBoxW(nullptr, ToastConfigData->CollectionID, L"collectionId", MB_OK);
@@ -374,5 +386,56 @@ long __stdcall CreateToastCollection(ToastNotificationParams* ToastConfigData, c
         // エラーハンドリング (エラーコードを返す)
         MessageBoxW(nullptr, e.message().c_str(), L"エラー", MB_OK);
         return e.code();
+    }         
+
+    // CoUninitialize()は、CoInitializeExが成功した場合のみ呼び出す
+    if (SUCCEEDED(hr)) {
+        CoUninitialize();
     }
+
+}
+
+
+//引数で渡された値で、コレクションを使用したトースト通知のグループ化を削除します。エラーコード返却に対応します
+long __stdcall DeleteToastCollection(ToastNotificationParams* ToastConfigData) {
+    // COMの初期化
+    HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    if (hr == RPC_E_CHANGED_MODE) {
+        // 既に異なるアパートメント モードで初期化されている場合は、そのまま続行
+    }
+    else if (FAILED(hr)) {
+        wchar_t errorMsg[256];
+        swprintf_s(errorMsg, 256, L"COM初期化に失敗しました。HRESULT: 0x%08X", hr);
+        MessageBoxW(nullptr, errorMsg, L"エラー", MB_OK);
+        return -1;
+    }
+
+    try {
+        // トースト通知のマネージャーを取得
+        ToastNotificationManagerForUser userManager = ToastNotificationManager::GetDefault();
+        ToastCollectionManager collectionManager = userManager.GetToastCollectionManager(ToastConfigData->AppUserModelID);
+
+        //CollectionIDが未定義(NULL)なら、全てのCollectionToastを削除します。
+        if (ToastConfigData->CollectionID) {
+            collectionManager.RemoveAllToastCollectionsAsync();
+        }
+        else {
+            collectionManager.RemoveToastCollectionAsync(ToastConfigData->CollectionID);
+        }
+
+        // 成功したら0を返す
+        return 0;
+    }
+    catch (const hresult_error& e)
+    {
+        // エラーハンドリング (エラーコードを返す)
+        MessageBoxW(nullptr, e.message().c_str(), L"エラー", MB_OK);
+        return e.code();
+    }
+
+    // CoUninitialize()は、CoInitializeExが成功した場合のみ呼び出す
+    if (SUCCEEDED(hr)) {
+        CoUninitialize();
+    }
+
 }
