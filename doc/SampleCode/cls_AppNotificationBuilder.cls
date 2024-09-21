@@ -1628,7 +1628,7 @@ Public Property Get GenerateCmd_ToastNotifierShow_Progress(ByVal ToastTag As Str
 End Property
 
 '***************************************************************************************************
-'* 処理名　：Get GenerateCmd_ToastNotifierUpdate_Progress
+'* 処理名　：GenerateCmd_ToastNotifierUpdate_Progress
 '* 機能　　：引数に渡された値で、トーストの進行状況バーを更新します。
 '---------------------------------------------------------------------------------------------------
 '* 返り値　：引数に渡された値で、既存の進捗状況ゲージ込みのトーストを更新させるコマンド文字列を返します

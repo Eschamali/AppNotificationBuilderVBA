@@ -876,6 +876,7 @@ End Sub
 引数に渡された値で、単純なトースト通知を表示するコマンド文字列を返します。指定日時に通知するスケジュール機能も対応します<br>
 コマンド文字列を返すため、Shell関数と併用して使用して下さい。Windows PowerShell環境があれば、Windows 10 以降のどのPCでも動作が可能です。
 
+#### 利用可能な引数
 | 引数                                                                                                                                                         | 意味                                                                                 | 型         | 既定値       | 
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ | ---------- | ------------ | 
 | [ToastTag](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.tag)                                                         | グループ内のこの通知の一意識別子を設定します。                        | 文字列     | ※必須項目   | 
@@ -909,7 +910,12 @@ Sub スケジュールを設定()
     End With
 End Sub
 ```
-このようなコマンドをShellを介して、実行されます。Stop部分で確認可能です。
+10秒経つと、この通知ができます<br>
+![alt text](doc/ExampleMethod1.png)
+
+#### 返り値
+このようなコマンド文字列が、返ります。<br>
+これをShellに介すことで、通知表示出来ます。サンプルコードなら、Stop部分で確認可能です。
 ```bat
 powershell -Command "$xml = '<toast><visual><binding template=\"ToastGeneric\"><text>Hello World</text><text>10秒後に通知しました。</text><text placement=\"attribution\">スケジュールシステム</text></binding></visual><header id=\"Book1\" title=\"Book1\" arguments=\"\" activationType=\"protocol\"/></toast>';$XmlDocument = [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime]::New();$XmlDocument.loadXml($xml);$ToastNotification = [Windows.UI.Notifications.ScheduledToastNotification, Windows.UI.Notifications, ContentType = WindowsRuntime]::New($XmlDocument,'2024/09/21 11:27:02');$ToastNotification.id = 'ExcelSchedule';$ToastNotification.Group = 'Book1';$ToastNotification.Tag = 'sample';$AppId = 'Microsoft.Office.EXCEL.EXE.15';[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]::CreateToastNotifier($AppId).addToSchedule($ToastNotification)"
 ```
@@ -929,8 +935,6 @@ $AppId = 'Microsoft.Office.EXCEL.EXE.15';
 "
 ```
 
-10秒経つと、この通知ができます<br>
-![alt text](doc/ExampleMethod1.png)
 
 ### RunDll_ToastNotifierShow
 GenerateCmd_ToastNotifierShow と同様の機能です。
@@ -997,6 +1001,33 @@ End Sub
 ![alt text](doc/ExampleMethod2.png)<br>
 プログレスバーの色は、Windowsのテーマ色に基づきます。容易に色を変えることは出来ないでしょう。
 
+#### 返り値
+このようなコマンド文字列が、返ります。<br>
+これをShellに介すことで、プログレスバー付き通知を表示出来ます。サンプルコードなら、Stop部分で確認可能です。
+```bat
+powershell -Command "$xml = '<toast><visual><binding template=\"ToastGeneric\"><text>プログレスバーテスト</text><progress title=\"{progressTitle}\" status=\"{progressStatus}\" value=\"{progressValue}\"/></binding></visual><header id=\"Book1\" title=\"Book1\" arguments=\"\" activationType=\"protocol\"/></toast>';$XmlDocument = [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime]::New();$XmlDocument.loadXml($xml);$ToastNotification = [Windows.UI.Notifications.ToastNotification, Windows.UI.Notifications, ContentType = WindowsRuntime]::New($XmlDocument);$ToastNotification.Group = 'Book1';$ToastNotification.Tag = 'FirstProgressBar';$Dictionary = [System.Collections.Generic.Dictionary[String, String]]::New();$Dictionary.Add('progressTitle', '進捗バーテスト');$Dictionary.Add('progressValue', '0.5');$Dictionary.Add('progressStatus', 'Processing...');$ToastNotification.Data = [Windows.UI.Notifications.NotificationData]::New($Dictionary);$AppId = 'Microsoft.Office.EXCEL.EXE.15';[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]::CreateToastNotifier($AppId).Show($ToastNotification)"
+```
+整形するとこんな感じです。
+```ps1
+powershell -Command "
+$xml = '<toast><visual><binding template=\"ToastGeneric\"><text>プログレスバーテスト</text><progress title=\"{progressTitle}\" status=\"{progressStatus}\" value=\"{progressValue}\"/></binding></visual><header id=\"Book1\" title=\"Book1\" arguments=\"\" activationType=\"protocol\"/></toast>';
+$XmlDocument = [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime]::New();
+$XmlDocument.loadXml($xml);
+$ToastNotification = [Windows.UI.Notifications.ToastNotification, Windows.UI.Notifications, ContentType = WindowsRuntime]::New($XmlDocument);
+$ToastNotification.Group = 'Book1';
+$ToastNotification.Tag = 'FirstProgressBar';
+$Dictionary = [System.Collections.Generic.Dictionary[String, String]]::New();
+$Dictionary.Add('progressTitle', '進捗バーテスト');
+$Dictionary.Add('progressValue', '0.5');
+$Dictionary.Add('progressStatus', 'Processing...');
+$ToastNotification.Data = [Windows.UI.Notifications.NotificationData]::New($Dictionary);
+$AppId = 'Microsoft.Office.EXCEL.EXE.15';
+[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]::CreateToastNotifier($AppId).Show($ToastNotification)
+"
+```
+データ バインディングを使用したトースト更新に備えるため、「System.Collections.Generic.Dictionary」を使用しています。
+
+
 ### RunDll_ToastNotifierShow_Progress
 GenerateCmd_ToastNotifierShow_Progress と同様の機能です。
 先述と同様こちらも、DLLファイルを読み込んだときに使う専用メソッドです。Shellを介さない分、パフォーマンスが向上するので使える環境であればこちらがおすすめです。<br>
@@ -1020,3 +1051,135 @@ Sub プログレスバーを表示()
     End With
 End Sub
 ```
+
+### GenerateCmd_ToastNotifierUpdate_Progress
+引数に渡された値で、トーストの進行状況バーを更新します。既にGenerateCmd_ToastNotifierShow_Progress等でトーストの進行状況バーを表示しているとき、その時に指定したタグを指定することで、更新が可能です。
+
+#### サンプルコード
+次の例は、「データ準備→処理→完了」という一連の演出処理を行います。最初にお見せした4つ目のDEMOとほぼ同じ演出になります。
+```bas
+Sub UpdateProgressBar()
+    With New cls_AppNotificationBuilder
+        'ヘッダー情報をクリアする
+        .SetToastHeader(vbnullstring) = ""
+
+        'タイトル設定
+        .SetToastContent_TextTitle = "ログファイル収集"
+
+        '常時表示するため、シナリオを"IncomingCall"にする
+        .SetToastScenario = IncomingCall
+
+        '"Indeterminate"で、準備っぽい演出をする
+        Dim ToastTag As String
+        ToastTag = "ProgressUpdate"
+        shell .GenerateCmd_ToastNotifierShow_Progress(ToastTag, "Ready...", True), vbHide
+
+        '5s待機
+        Application.Wait(Now() + TimeValue("0:00:05"))
+
+
+
+        'Updateで、一部分の内容を置き換えるようにする
+        Dim currentProgress As Long
+        For currentProgress = 0 To 1000
+            DoEvents	'フリーズ対策
+            Shell .GenerateCmd_ToastNotifierUpdate_Progress(ToastTag, "処理中...", currentProgress / 1000, "プログレスバーを更新"), vbHide
+
+            '何かの処理
+        Next
+
+
+
+        'トーストのすべてのコンテンツ/レイアウトを完全に変更し、終了メッセージとして表示
+        .SetToastScenario = Default
+        .SetToastContent_TextBody = "プログレスバーの更新処理を終えました"
+        Shell .GenerateCmd_ToastNotifierShow(ToastTag), vbHide
+    End With
+End Sub
+```
+
+実行すると分かりますが、かなりCPUに負荷がかかるため、実際に運用する際は、一定ループ毎に1度のUpdate処理を流すのが望ましいです。<br>
+実際、Application.StatusBar も[毎回呼び出す](https://qiita.com/OldCity/items/8b24d4c45da17165fa4e)と、負荷がかかります。
+
+#### 返り値
+このようなコマンド文字列が、返ります。<br>
+これをShellに介すことで、既存のプログレスバー付き通知に、更新内容を反映出来ます。
+```bat
+powershell -Command "$Dictionary = [System.Collections.Generic.Dictionary[String, String]]::New();$Dictionary.Add('progressTitle', 'プログレスバーを更新');$Dictionary.Add('progressValue', '0');$Dictionary.Add('progressStatus', '処理中...');$ToastNotificationData = [Windows.UI.Notifications.NotificationData]::New($Dictionary);$AppId = 'Microsoft.Office.EXCEL.EXE.15';[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]::CreateToastNotifier($AppId).Update($ToastNotificationData, 'ProgressUpdate','Book1')"
+```
+整形するとこんな感じです。
+```ps1
+powershell -Command "
+$Dictionary = [System.Collections.Generic.Dictionary[String, String]]::New();
+$Dictionary.Add('progressTitle', 'プログレスバーを更新');
+$Dictionary.Add('progressValue', '0');
+$Dictionary.Add('progressStatus', '処理中...');
+$ToastNotificationData = [Windows.UI.Notifications.NotificationData]::New($Dictionary);
+$AppId = 'Microsoft.Office.EXCEL.EXE.15';
+[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]::CreateToastNotifier($AppId).Update($ToastNotificationData, 'ProgressUpdate','Book1')
+"
+```
+データ バインディングを使用したトースト更新を行うため、「System.Collections.Generic.Dictionary」を使用しています。
+
+
+### RunDll_ToastNotifierUpdate_Progress
+GenerateCmd_ToastNotifierUpdate_Progress と同様の機能です。
+先述と同様こちらも、DLLファイルを読み込んだときに使う専用メソッドです。Shellを介さない分、パフォーマンスが向上するので使える環境であればこちらがおすすめです。<br>
+引数等は、GenerateCmd_ToastNotifierUpdate_Progress と同じなので省略します。
+
+#### サンプルコード
+次の例も、「データ準備→処理→完了」という一連の演出処理を行います。最初にお見せした4つ目のDEMOとほぼ同じ演出になります。
+```bas
+Sub UpdateProgressBar()
+    With New cls_AppNotificationBuilder
+        'ヘッダー情報をクリアする
+        .SetToastHeader(vbNullString) = ""
+
+        'タイトル設定
+        .SetToastContent_TextTitle = "ログファイル収集"
+
+        '常時表示するため、シナリオを"IncomingCall"にする
+        .SetToastScenario = IncomingCall
+
+        '"Indeterminate"で、準備っぽい演出をする
+        Dim ToastTag As String
+        ToastTag = "ProgressUpdate"
+        .RunDll_ToastNotifierShow_Progress ToastTag, "Ready...", True
+
+        '5s待機
+        Application.Wait (Now() + TimeValue("0:00:05"))
+
+
+
+        'Updateで、一部分の内容を置き換えるようにする
+        Dim currentProgress As Long
+        Dim ResultCode As Long
+        For currentProgress = 0 To 1000
+            '該当のトーストを閉じた場合、更新処理を停止します。
+            If ResultCode = 0 Then
+                ResultCode = .RunDll_ToastNotifierUpdate_Progress(ToastTag, "処理中...", currentProgress / 1000, "プログレスバーを更新")
+                Debug.Print "トースト更新、送信中..."
+            End If
+
+            '何かの処理
+        Next
+
+
+
+        'トーストのすべてのコンテンツ/レイアウトを完全に変更し、終了メッセージとして表示
+        .SetToastScenario = Default
+        .SetToastContent_TextBody = "プログレスバーの更新処理を終えました"
+        .RunDll_ToastNotifierShow ToastTag
+    End With
+End Sub
+```
+
+#### 返り値
+| 返り値 | 説明                                                          | 
+| ------ | ------------------------------------------------------------ | 
+| 0      | Succeeded<br>通知が更新されました。                          | 
+| 1      | Failed<br>通知の更新に失敗しました。                         | 
+| 2      | NotificationNotFound<br>指定した通知が見つかりませんでした。 | 
+
+RunDll_ToastNotifierUpdate_Progressの場合、列挙型[NotificationUpdateResult](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.notificationupdateresult) の返却に対応しています。これにより、前述のサンプルコードにて、ユーザーが通知を閉じた時、トースト更新プログラムの送信を停止し、無駄な処理をなくすことが出来ます。<br>
+現状、「GenerateCmd_ToastNotifierUpdate_Progress」では、上記の対応は出来ません。
