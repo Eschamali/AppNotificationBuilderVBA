@@ -30,8 +30,6 @@ VBAから、[アプリ通知(トースト通知)](https://learn.microsoft.com/ja
 - Microsoft Office Excel 2019 以上 64bit
 - Windows 10 , 11 64bit
 
-少なくともサポート中のOffice , OSの組み合わせで、動作確認済みです。
-
 # Load DLL
 
 WindowsAPIの「LoadLibrary関数」を使って、読み込みます。
