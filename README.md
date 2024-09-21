@@ -1188,10 +1188,10 @@ RunDll_ToastNotifierUpdate_Progressの場合、列挙型[NotificationUpdateResul
 表示名とアイコンを指定したheader要素よりも高度なグループ化を提供します。<br>
 非同期処理を行わないと出来ない機能のため、これらの機能の利用にはDLLのインポートから利用することを推奨します。
 
-### RunDll_ToastCollectionManagerSaveToastCollectionAsync
-指定した[トースト通知グループの非同期作成または更新を開始](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastcollectionmanager.savetoastcollectionasync?view=winrt-26100)します。
+### [RunDll_ToastCollectionManagerSaveToastCollectionAsync](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastcollectionmanager.savetoastcollectionasync)
+指定したCollectionIDでグループを作成します。
 
-#### [利用可能な引数](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastcollection)
+#### [利用可能な引数](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastcollection.-ctor?view=winrt-26100#windows-ui-notifications-toastcollection-ctor(system-string-system-string-system-string-windows-foundation-uri))
 | 引数名       | 説明                                                                                                             | 
 | ------------ | ---------------------------------------------------------------------------------------------------------------- | 
 | CollectionId | このコレクション通知の ID を設定します。                                                                         | 
@@ -1203,7 +1203,7 @@ RunDll_ToastNotifierUpdate_Progressの場合、列挙型[NotificationUpdateResul
 作成に成功すると、0 を返します。
 
 #### サンプルコード
-次の例は、Microsoft 365 (PWA)として、Collection通知を作成し、そこの中で通知を表示します。
+次の例は、Microsoft 365 (PWA)として、CollectionIDを作成し、そこの中で通知を表示します。
 ```bas
 Sub コレクションを使用したトースト通知のグループ化作成()
     'CollectionIDをセット
@@ -1237,10 +1237,46 @@ End Sub
 | Collection   | ![alt text](doc/Ex_Collection1-1.png) | ![alt text](doc/Ex_Collection1-2.png) |
 | 通常         | ![alt text](doc/比較1.png) | ![alt text](doc/比較2.png) |
 
-「通常」では、アプリ名が必ず名称になります。<br>
-対して、「Collection」は任意の名称で設定が可能です。<br>
+「通常」では、アプリ名が必ずグループ名称になります。<br>
+対して、「Collection」は任意のグループ名称で設定が可能です。<br>
 アイコン画像については、Microsoft 365 (PWA)を[インストール](https://www.microsoft.com/store/productId/9WZDNCRD29V9?ocid=pdpshare)することで、基本的なOfficeアイコンのセットがついてきます。
 
 #### 注意事項
 AppUserModelIDは、デスクトップアプリ系以外のを指定することを推奨します。
-「.AllowUse_InternetImage = True」をコメントアウトして同じ内容を実行すると、下記のように変な挙動を起こします。
+「.AllowUse_InternetImage = True」をコメントアウトして、デスクトップアプリとして同じ内容を実行すると、下記のように変な挙動を起こします。
+
+![alt text](doc/Ex_Collection2.png)<br>
+- DisplayName ,IconUri が無視されます
+- CollectionId が DisplayName扱いになります。
+
+### RunRunDll_ToastCollectionManagerRemoveToastCollectionAsync
+「RunDll_ToastCollectionManagerSaveToastCollectionAsync」等で作成したCollectionIDのグループ化を削除します。
+
+#### 利用可能な引数
+| 引数名       | 説明                                                                                                             | 
+| ------------ | ---------------------------------------------------------------------------------------------------------------- | 
+| CollectionId | 削除したいコレクション通知の ID を設定します。<br><br>・指定時、[そのCollectionIDのみ削除](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastcollectionmanager.removetoastcollectionasync)<br>・省略時、[全てのCollectionIDを削除](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastcollectionmanager.removealltoastcollectionsasync)                                                                         | 
+
+#### 返り値
+削除に成功すると、0 を返します。
+
+#### サンプルコード
+次の例は、Microsoft 365 (PWA)として、前述の例で作成したCollectionIDを指定し、削除します
+```bas
+Sub コレクションを使用したトースト通知のグループ化削除()
+    'CollectionIDをセット
+    Const CollectionID As String = "TestGroup"
+    
+    With New cls_AppNotificationBuilder
+        'PWA Microsoft 365 を指定
+        .AllowUse_InternetImage = True
+
+        'コレクションを削除
+        Debug.Print .RunDll_ToastCollectionManagerRemoveToastCollectionAsync(CollectionID)
+    End With
+End Sub
+```
+
+#### 使い道
+無闇にCollectionIDを作成しまくると、[通知設定](ms-settings:notifications)に、赤枠のような欄が増殖してしまうので、必要に応じて削除を行って下さい。<br>
+![alt text](doc/Ex_Collection3.png)
