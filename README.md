@@ -895,13 +895,13 @@ Sub スケジュールを設定()
         'メッセージ内容を設定
         .SetToastContent_TextTitle = "Hello World"
         .SetToastContent_TextBody = "10秒後に通知しました。"
-        .SetToastContent_TextAttribute = "スケジュールシステム"
+        .SetToastContent_TextAttribute = "スケジュールシステム Shell"
 
         '現在から、10s後に通知するコマンド文字列を生成
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample", , Now() + #12:00:10 AM#)
-        Debug.Print ActionCmd
 
         '実行コマンド確認
+        Debug.Print ActionCmd
         Stop
 
         '通知表示
@@ -934,6 +934,26 @@ $AppId = 'Microsoft.Office.EXCEL.EXE.15';
 
 ### RunDll_ToastNotifierShow
 GenerateCmd_ToastNotifierShow と同様の機能です。
-こちらは、DLLファイルを読み込んだときに使う専用メソッドです。パフォーマンスが向上するので使える環境であればこちらがおすすめです。<br>
+こちらは、DLLファイルを読み込んだときに使う専用メソッドです。Shellを介さない分、パフォーマンスが向上するので使える環境であればこちらがおすすめです。<br>
 引数等は、GenerateCmd_ToastNotifierShow と同じなので省略します。
+
+#### サンプルコード
+次の例でも、10秒後に通知が来ます。
+```bas
+Sub スケジュールを設定()
+    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim ActionCmd As String
+
+    With AppNotification
+        'メッセージ内容を設定
+        .SetToastContent_TextTitle = "Hello World"
+        .SetToastContent_TextBody = "10秒後に通知しました。"
+        .SetToastContent_TextAttribute = "スケジュールシステム DLL"
+
+
+        '現在から、10s後に通知するコマンド文字列を生成
+        .RunDll_ToastNotifierShow "sample", , Now() + #12:00:10 AM#
+    End With
+End Sub
+```
 
