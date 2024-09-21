@@ -415,12 +415,14 @@ long __stdcall DeleteToastCollection(ToastNotificationParams* ToastConfigData) {
         ToastNotificationManagerForUser userManager = ToastNotificationManager::GetDefault();
         ToastCollectionManager collectionManager = userManager.GetToastCollectionManager(ToastConfigData->AppUserModelID);
 
-        //CollectionIDが未定義(NULL)なら、全てのCollectionToastを削除します。
+        //CollectionIDの定義Check
         if (ToastConfigData->CollectionID) {
-            collectionManager.RemoveAllToastCollectionsAsync();
+            //何かのCollectionIDが指定してあったら、それのみ削除
+            collectionManager.RemoveToastCollectionAsync(ToastConfigData->CollectionID);
         }
         else {
-            collectionManager.RemoveToastCollectionAsync(ToastConfigData->CollectionID);
+            //未定義の場合、全てのToastCollectionを削除
+            collectionManager.RemoveAllToastCollectionsAsync();
         }
 
         // 成功したら0を返す
