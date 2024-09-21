@@ -966,6 +966,7 @@ End Sub
 引数に渡された値で、トーストの進行状況バーを表示するコマンド文字列を返します。<br>
 プログレスバーの特性上、スケジュール、有効期限等の細かな挙動設定は設けません。
 
+#### 利用可能な引数
 | 引数名                  | 説明                                                                                                                                                                               | 既定値       | 
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | 
 | ToastTag                | グループ内のこの通知の一意識別子を設定します。                                                                                                                                     | ※必須項目   | 
@@ -1182,3 +1183,57 @@ End Sub
 
 RunDll_ToastNotifierUpdate_Progressの場合、列挙型[NotificationUpdateResult](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.notificationupdateresult) の返却に対応しています。これにより、前述のサンプルコードにて、ユーザーが通知を閉じた時、トースト更新プログラムの送信を停止し、無駄な処理をなくすことが出来ます。<br>
 現状、「GenerateCmd_ToastNotifierUpdate_Progress」では、上記の対応は出来ません。
+
+## [コレクションを使用したトースト通知のグループ化](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-collections)
+表示名とアイコンを指定したheader要素よりも高度なグループ化を提供します。<br>
+非同期処理を行わないと出来ない機能のため、これらの機能の利用にはDLLのインポートから利用することを推奨します。
+
+### RunDll_ToastCollectionManagerSaveToastCollectionAsync
+指定した[トースト通知グループの非同期作成または更新を開始](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastcollectionmanager.savetoastcollectionasync?view=winrt-26100)します。
+
+#### [利用可能な引数](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastcollection)
+| 引数名       | 説明                                                                                                             | 
+| ------------ | ---------------------------------------------------------------------------------------------------------------- | 
+| CollectionId | このコレクション通知の ID を設定します。                                                                         | 
+| DisplayName  | アクション センターに表示されるグループ タイトルを設定します                                                     | 
+| LaunchArgs   | アクション センターで通知グループのタイトルをクリックしたときにアプリに提供される起動引数を設定します。          | 
+| IconUri      | アクション センターのグループ タイトルの横に表示されるアイコンを設定します。<br>ローカルパスのみ対応しています。 | 
+
+#### 返り値
+作成に成功すると、0 を返します。
+
+#### サンプルコード
+次の例は、Microsoft 365 (PWA)として、Collection通知を作成し、そこの中で通知を表示します。
+```bas
+Sub コレクションを使用したトースト通知のグループ化作成()
+    'CollectionIDをセット
+    Const CollectionID As String = "TestGroup"
+    
+    With New cls_AppNotificationBuilder
+        'PWA Microsoft 365 を指定
+        .AllowUse_InternetImage = True
+
+        'コレクションの作成
+'        Debug.Print .RunDll_ToastCollectionManagerSaveToastCollectionAsync(CollectionID, "A社 ログ関係", "https://www.microsoft365.com/launch/excel", "C:\Program Files\WindowsApps\Microsoft.MicrosoftOfficeHub_18.2409.1051.0_x64__8wekyb3d8bbwe\Images\AppExcel32x32.png")
+        Stop
+
+        '通知内容を作成
+        .SetToastContent_TextTitle = "Hello World"
+        .SetToastContent_TextBody = "Collection経由で通知しました"
+        .SetToastContent_TextAttribute = "ToastCollectionTest"
+
+        '作ったCollectionにトーストを送信して表示
+        .RunDll_ToastNotifierShow "CollectionTest", CollectionID
+    End With
+End Sub
+```
+
+#### 通知の比較
+|       経由   | トースト       | アクションセンター                                                                                                             | 
+| ------------ | ------------ | ---------------------------------------------------------------------------------------------------------------- | 
+| Collection   | ![alt text](doc/Ex_Collection1-1.png) | ![alt text](doc/Ex_Collection1-2.png) |
+| 通常         | ![alt text](doc/比較1.png) | ![alt text](doc/比較2.png) |
+
+「通常」では、アプリ名が必ず名称になります。<br>
+対して、「Collection」は任意の名称で設定が可能です。<br>
+アイコン画像については、Microsoft 365 (PWA)を[インストール](https://www.microsoft.com/store/productId/9WZDNCRD29V9?ocid=pdpshare)することで、基本的なOfficeアイコンのセットがついてきます。
