@@ -871,28 +871,69 @@ End Sub
 
 
 # メソッド説明
-## GenerateCmd_ToastNotifierShow
+## 単純な通知
+### GenerateCmd_ToastNotifierShow
 引数に渡された値で、単純なトースト通知を表示するコマンド文字列を返します。指定日時に通知するスケジュール機能も対応します<br>
-Shell関数と併用して使用して下さい。Windows PowerShell環境があれば、どのWindows マシンでも動作が可能です。
+コマンド文字列を返すため、Shell関数と併用して使用して下さい。Windows PowerShell環境があれば、Windows 10 以降のどのPCでも動作が可能です。
 
 | 引数                                                                                                                                                         | 意味                                                                                 | 型         | 既定値       | 
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ | ---------- | ------------ | 
-| [ToastTag](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.tag)                                                         | 通知 グループ内のこの通知の一意識別子を取得または設定します。                        | 文字列     | ※必須項目   | 
-| [CollectionID](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotificationmanagerforuser.gettoastnotifierfortoastcollectionidasync) | 送信する通知グループの ID。                                                          | 文字列     | vbnullstring | 
-| [ScheduleDate](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.scheduledtoastnotification.-ctor)                                          | Windows でトースト通知を表示する日付と時刻。                                         | シリアル値 | 0            | 
-| [ExpirationDate](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.scheduledtoastnotification.expirationtime)                               | 通知の有効期限。                                                                     | シリアル値 | 0            | 
+| [ToastTag](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.tag)                                                         | グループ内のこの通知の一意識別子を設定します。                        | 文字列     | ※必須項目   | 
+| [CollectionID](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotificationmanagerforuser.gettoastnotifierfortoastcollectionidasync) | 送信する通知コレクションのID。                                                          | 文字列     | vbnullstring | 
+| [ScheduleDate](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.scheduledtoastnotification.-ctor)                                          | Windows でトースト通知を表示する日付と時刻。<br>設定日時になるまで、トーストは表示されません。<br><br>・過去にするとエラーになります。<br>・省略(0) で、即日通知です。                        | シリアル値 | 0            | 
+| [ExpirationDate](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.scheduledtoastnotification.expirationtime)                               | 通知の有効期限。<br>設定日時を超えると、アクションセンターから削除されます。<br><br>・過去にすると、通知が来ません。<br>・省略(0) で、3日後の有効期限になります。これはシステムで決められた[上限](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/send-local-toast-cpp-uwp?tabs=builder-syntax#set-an-expiration-time)です。                                                                     | シリアル値 | 0            | 
 | [Suppress](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.suppresspopup)                                               | トーストのポップアップ UI をユーザーの画面に表示するかどうかを取得または設定します。 | フラグ値   | False        | 
 
-
+#### サンプルコード
+次の例では、10秒後に通知が来ます。
 ```bas
-With New cls_AppNotificationBuilder
-    Shell .GenerateCmd_ToastNotifierShow("NoSetting"), vbHide
-End With
+Sub スケジュールを設定()
+    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim ActionCmd As String
+
+    With AppNotification
+        'メッセージ内容を設定
+        .SetToastContent_TextTitle = "Hello World"
+        .SetToastContent_TextBody = "10秒後に通知しました。"
+        .SetToastContent_TextAttribute = "スケジュールシステム"
+
+        '現在から、10s後に通知するコマンド文字列を生成
+        ActionCmd = .GenerateCmd_ToastNotifierShow("sample", , Now() + #12:00:10 AM#)
+        Debug.Print ActionCmd
+
+        '実行コマンド確認
+        Stop
+
+        '通知表示
+        Shell ActionCmd, vbHide
+    End With
+End Sub
 ```
-なお、上記のように特に事前設定なくとも動作は可能です。この場合は次のように表示されます<br>
+このようなコマンドをShellを介して、実行されます。Stop部分で確認可能です。
+```bat
+powershell -Command "$xml = '<toast><visual><binding template=\"ToastGeneric\"><text>Hello World</text><text>10秒後に通知しました。</text><text placement=\"attribution\">スケジュールシステム</text></binding></visual><header id=\"Book1\" title=\"Book1\" arguments=\"\" activationType=\"protocol\"/></toast>';$XmlDocument = [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime]::New();$XmlDocument.loadXml($xml);$ToastNotification = [Windows.UI.Notifications.ScheduledToastNotification, Windows.UI.Notifications, ContentType = WindowsRuntime]::New($XmlDocument,'2024/09/21 11:27:02');$ToastNotification.id = 'ExcelSchedule';$ToastNotification.Group = 'Book1';$ToastNotification.Tag = 'sample';$AppId = 'Microsoft.Office.EXCEL.EXE.15';[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]::CreateToastNotifier($AppId).addToSchedule($ToastNotification)"
+```
+
+整形するとこんな感じです。
+```ps1
+powershell -Command "
+$xml = '<toast><visual><binding template=\"ToastGeneric\"><text>Hello World</text><text>10秒後に通知しました。</text><text placement=\"attribution\">スケジュールシステム</text></binding></visual><header id=\"Book1\" title=\"Book1\" arguments=\"\" activationType=\"protocol\"/></toast>';
+$XmlDocument = [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime]::New();
+$XmlDocument.loadXml($xml);
+$ToastNotification = [Windows.UI.Notifications.ScheduledToastNotification, Windows.UI.Notifications, ContentType = WindowsRuntime]::New($XmlDocument,'2024/09/21 11:27:02');
+$ToastNotification.id = 'ExcelSchedule';
+$ToastNotification.Group = 'Book1';
+$ToastNotification.Tag = 'sample';
+$AppId = 'Microsoft.Office.EXCEL.EXE.15';
+[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]::CreateToastNotifier($AppId).addToSchedule($ToastNotification)
+"
+```
+
+10秒経つと、この通知ができます<br>
 ![alt text](doc/ExampleMethod1.png)
 
-## RunDll_ToastNotifierShow
+### RunDll_ToastNotifierShow
 GenerateCmd_ToastNotifierShow と同様の機能です。
 こちらは、DLLファイルを読み込んだときに使う専用メソッドです。パフォーマンスが向上するので使える環境であればこちらがおすすめです。<br>
 引数等は、GenerateCmd_ToastNotifierShow と同じなので省略します。
+
