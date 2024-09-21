@@ -957,3 +957,66 @@ Sub スケジュールを設定()
 End Sub
 ```
 
+## [プログレスバー付き通知](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-progress-bar)
+### GenerateCmd_ToastNotifierShow_Progress
+引数に渡された値で、トーストの進行状況バーを表示するコマンド文字列を返します。<br>
+プログレスバーの特性上、スケジュール、有効期限等の細かな挙動設定は設けません。
+
+| 引数名                  | 説明                                                                                                                                                                               | 既定値       | 
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | 
+| ToastTag                | グループ内のこの通知の一意識別子を設定します。                                                                                                                                     | ※必須項目   | 
+| Arg_Status              | 左側の進行状況バーの下に表示される状態文字列 (必須) を設定します。<br>この文字列は、"Downloading..."または "Installing..." のような操作の状態を反映している必要があります。 | ※必須項目   | 
+| Arg_Value               | 進行値を設定します。<br>0.0~1.0のDoubleで指定しないといけません。<br>ただし、負の値にすると、"Indeterminate" となり、アニメーションドットで示す特定の値が表示されない、処理中を示す状態になります。                                                                                                                   | 0            | 
+| Arg_Title               | タイトル文字列を設定します。                                                                                                                                                       | 空文字       | 
+| Arg_ValueStringOverride | 割合を示す既定の文字列に代わって表示される文字列 (オプション) を設定します。<br>これを指定しない場合は、"70%" などの文字が表示されます。                                              | vbnullstring | 
+| Suppress                | トーストのポップアップ UI をユーザーの画面に表示するかどうかを取得または設定します。                                                                                               | False        | 
+
+#### サンプルコード
+次の例では、50%として、プログレスバー付き通知を表示します。
+```bas
+Sub プログレスバーを表示()
+    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim ActionCmd As String
+
+    With AppNotification
+        'メッセージ内容を設定
+        .SetToastContent_TextTitle = "プログレスバーテスト"
+
+        'プログレスバー付き通知を表示するコマンド文字列を生成
+        ActionCmd = .GenerateCmd_ToastNotifierShow_Progress("FirstProgressBar", "Processing...", 0.5, "進捗バーテスト")
+
+        '実行コマンド確認
+        Debug.Print ActionCmd
+        Stop
+
+        '通知表示
+        Shell ActionCmd, vbHide
+    End With
+End Sub
+```
+![alt text](doc/ExampleMethod2.png)<br>
+プログレスバーの色は、Windowsのテーマ色に基づきます。容易に色を変えることは出来ないでしょう。
+
+### RunDll_ToastNotifierShow_Progress
+GenerateCmd_ToastNotifierShow_Progress と同様の機能です。
+先述と同様こちらも、DLLファイルを読み込んだときに使う専用メソッドです。Shellを介さない分、パフォーマンスが向上するので使える環境であればこちらがおすすめです。<br>
+引数等は、GenerateCmd_ToastNotifierShow_Progress と同じなので省略します。
+
+#### サンプルコード
+次の例も、50%として、プログレスバー付き通知を表示します。
+```bas
+Sub プログレスバーを表示()
+    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim ActionCmd As String
+
+    With AppNotification
+        'メッセージ内容を設定
+        .SetToastContent_TextTitle = "プログレスバーテスト"
+
+
+
+        'プログレスバー付き通知を表示する通知を表示
+        .RunDll_ToastNotifierShow_Progress "FirstProgressBar", "Processing...", 0.5, "進捗バーテスト"
+    End With
+End Sub
+```
