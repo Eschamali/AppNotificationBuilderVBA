@@ -711,7 +711,7 @@ Sub メッセージ()
     
     With AppNotification
         'テキスト入力要素を作成
-        .SetIToastInput("textBox",, "reply","はみがきなう！") = 1
+        .SetIToastInput("textBox", , "reply", "テキスト入力ができます。", "はみがきなう！") = 1
 
 
 
