@@ -1214,7 +1214,7 @@ Sub コレクションを使用したトースト通知のグループ化作成(
         .AllowUse_InternetImage = True
 
         'コレクションの作成
-'        Debug.Print .RunDll_ToastCollectionManagerSaveToastCollectionAsync(CollectionID, "A社 ログ関係", "https://www.microsoft365.com/launch/excel", "C:\Program Files\WindowsApps\Microsoft.MicrosoftOfficeHub_18.2409.1051.0_x64__8wekyb3d8bbwe\Images\AppExcel32x32.png")
+        Debug.Print .RunDll_ToastCollectionManagerSaveToastCollectionAsync(CollectionID, "A社 ログ関係", "https://www.microsoft365.com/launch/excel", "C:\Program Files\WindowsApps\Microsoft.MicrosoftOfficeHub_18.2409.1051.0_x64__8wekyb3d8bbwe\Images\AppExcel32x32.png")
         Stop
 
         '通知内容を作成
