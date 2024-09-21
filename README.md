@@ -905,7 +905,7 @@ Sub スケジュールを設定()
         Debug.Print ActionCmd
         Stop
 
-        '通知表示
+        '通知表示コマンド実行
         Shell ActionCmd, vbHide
     End With
 End Sub
@@ -955,7 +955,7 @@ Sub スケジュールを設定()
         .SetToastContent_TextAttribute = "スケジュールシステム DLL"
 
 
-        '現在から、10s後に通知するコマンド文字列を生成
+        '現在から、10s後に通知する
         .RunDll_ToastNotifierShow "sample", , Now() + #12:00:10 AM#
     End With
 End Sub
@@ -993,7 +993,7 @@ Sub プログレスバーを表示()
         Debug.Print ActionCmd
         Stop
 
-        '通知表示
+        '通知表示コマンド実行
         Shell ActionCmd, vbHide
     End With
 End Sub
@@ -1155,10 +1155,9 @@ Sub UpdateProgressBar()
         Dim currentProgress As Long
         Dim ResultCode As Long
         For currentProgress = 0 To 1000
-            '該当のトーストを閉じた場合、更新処理を停止します。
+            '該当のトーストを閉じた場合、更新送信の処理を停止します。
             If ResultCode = 0 Then
                 ResultCode = .RunDll_ToastNotifierUpdate_Progress(ToastTag, "処理中...", currentProgress / 1000, "プログレスバーを更新")
-                Debug.Print "トースト更新、送信中..."
             End If
 
             '何かの処理
