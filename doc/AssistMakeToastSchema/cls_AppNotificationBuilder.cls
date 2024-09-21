@@ -49,6 +49,7 @@ Private Declare PtrSafe Sub ShowToastNotification Lib "AppNotificationBuilderVBA
 Private Declare PtrSafe Sub ShowToastNotificationWithProgressBar Lib "AppNotificationBuilderVBA.dll" (ByRef Params_String As ToastNotificationParams, ByVal ProgressStatus As LongPtr, ByVal ProgressValue As Double, ByVal ProgressTitle As LongPtr, ByVal ProgressValueStringOverride As LongPtr) 'プログレスバー付き通知
 Private Declare PtrSafe Function UpdateToastNotificationWithProgressBar Lib "AppNotificationBuilderVBA.dll" (ByRef Params_String As ToastNotificationParams, ByVal ProgressStatus As LongPtr, ByVal ProgressValue As Double, ByVal ProgressTitle As LongPtr, ByVal ProgressValueStringOverride As LongPtr, SequenceNumber As Long) As Long 'プログレスバー付き通知の更新用
 Private Declare PtrSafe Function CreateToastCollection Lib "AppNotificationBuilderVBA.dll" (ByRef Params_String As ToastNotificationParams, ByVal DisplayName As LongPtr, ByVal LaunchArgs As LongPtr, ByVal IconUri As LongPtr) As Long 'ToastCollectionの作成
+Private Declare PtrSafe Function DeleteToastCollection Lib "AppNotificationBuilderVBA.dll" (ByRef Params_String As ToastNotificationParams) As Long 'ToastCollectionの削除
 
 
 
@@ -1948,7 +1949,7 @@ End Property
 '* 処理名　：RunDll_ToastCollectionManagerSaveToastCollectionAsync
 '* 機能　　：引数で渡された値で、コレクションを使用したトースト通知のグループ化を作成します。
 '---------------------------------------------------------------------------------------------------
-'* 返り値　：引数に渡された値で、既存の進捗状況ゲージ込みのトーストを更新させるコマンド文字列を返します
+'* 返り値　：引数に渡された値で、コレクションを使用したトースト通知のグループ化を作成するコマンド文字列を返します
 '* 引数　　：CollectionId   コレクションの ID。 ID を使用して、ToastCollectionManager を使用してグループを操作できます
 '            DisplayName    アクション センターに表示するグループのタイトル
 '            LaunchArgs     ユーザーがアクション センターで通知グループのタイトルをクリックしたときにアプリに渡される起動引数。
@@ -1979,6 +1980,39 @@ Public Property Get RunDll_ToastCollectionManagerSaveToastCollectionAsync(ByVal 
     
     'ToastCollectionを作成
     RunDll_ToastCollectionManagerSaveToastCollectionAsync = CreateToastCollection(ParamsConvertForDLL(ToastConfig), StrPtr(DisplayName), StrPtr(LaunchArgs), StrPtr(IconUri))
+End Property
+
+'***************************************************************************************************
+'* 処理名　：RunDll_ToastCollectionManagerRemoveToastCollectionAsync
+'* 機能　　：引数で渡された値で、コレクションを使用したトースト通知のグループ化を削除します。なお、省略時、全削除となります
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：0で、成功扱いです。
+'* 引数　　：CollectionId   コレクションの ID。 ID を使用して、ToastCollectionManager を使用してグループを操作できます
+'---------------------------------------------------------------------------------------------------
+'* URL     ：https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-collections
+'***************************************************************************************************
+Public Property Get RunDll_ToastCollectionManagerRemoveToastCollectionAsync(Optional ByVal CollectionID As String) As Long
+    '設定値をまとめる
+    With ToastConfig
+        .AppUserModelID = SetValueAppUserModelID(True)
+        'AllowUse_InternetImageFlag                     '事前に、設定済み
+        .XmlSchema = MakeXmlToastContentBuilder(False)
+
+        .Tag = vbNullString
+        .Group = vbNullString
+        .Schedule_ID = vbNullString
+        .CollectionID = CollectionID
+        
+        .ExpiresOnReboot = False
+        .SuppressPopup = False
+        
+        .Schedule_DeliveryTime = False
+        .ExpirationTime = False
+    End With
+    
+    
+    'ToastCollectionを削除
+    RunDll_ToastCollectionManagerRemoveToastCollectionAsync = DeleteToastCollection(ParamsConvertForDLL(ToastConfig))
 End Property
 
 
