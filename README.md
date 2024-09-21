@@ -65,7 +65,7 @@ hDll の中身が、0 以外であれば読み込み、成功です。
 
 # Usage
 
-1. [このクラスファイル](doc/SampleCode/cls_AppNotificationBuilder.cls)をVisual Basic Editorのプロジェクトにインポートして下さい。<br>
+1. [このクラスファイル](doc/AssistMakeToastSchema/cls_AppNotificationBuilder.cls)をVisual Basic Editorのプロジェクトにインポートして下さい。<br>
 
 2. Visual Basic Editorを開きメニューバーの「ツール」→「参照設定」→「Microsoft XML v6.0」にCheckをいれOKを押下して下さい。<br>
 ![alt text](doc/Usage1.png)<br>
