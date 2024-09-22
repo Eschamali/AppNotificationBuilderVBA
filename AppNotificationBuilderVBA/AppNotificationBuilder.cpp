@@ -25,7 +25,7 @@ Windows::Foundation::DateTime SystemTimeToDateTime(const SYSTEMTIME& st) {
 }
 
 // Excel マクロを実行する関数
-void ExecuteExcelMacro(const wchar_t* ExcelMacroPass) {
+void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, const wchar_t* UserInput1) {
     //詳細メッセージ、取得用
     EXCEPINFO excepInfo;
     memset(&excepInfo, 0, sizeof(EXCEPINFO));  // 初期化
@@ -71,11 +71,15 @@ void ExecuteExcelMacro(const wchar_t* ExcelMacroPass) {
         return ;
     }
 
-    // 5. マクロの引数設定
-    CComVariant macroName(ExcelMacroPass);  // 実行したいマクロのフルパス
-    DISPPARAMS params = { &macroName, nullptr, 1, 0 };
+    // 5. Application.Run メソッドの引数を設定
+    CComVariant macroName(ExcelMacroPass);  // 1. 実行したいマクロのフルパス
+    CComVariant macroArg1(UserInput1);      // 2. 第一引数
 
-    // 6. マクロの呼び出し
+    // 6. 引数を配列として渡す(※これらの引数は逆の順序で表示されるため、それを考慮した代入を行うこと)
+    CComVariant argsArray[2] = { macroArg1,macroName };
+    DISPPARAMS params = { argsArray, nullptr, 2, 0 };
+
+    // 7. マクロの呼び出し
     CComVariant result;
     hr = pExcelApp->Invoke(dispid, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_METHOD, &params, &result, &excepInfo, nullptr);
 
@@ -129,11 +133,22 @@ void OnActivated(ToastNotification const& sender, IInspectable const& args) {
     // IInspectable から ToastActivatedEventArgs にキャストして引数を取得
     auto activatedArgs = args.try_as<ToastActivatedEventArgs>();
 
+    //トーストからの args.try_as<ToastActivatedEventArgs> があれば、Excelマクロを動かす準備に入る
     if (activatedArgs) {
-        winrt::hstring argument = activatedArgs.Arguments();
+        try {
+            winrt::hstring argument = activatedArgs.Arguments();
 
-        //トーストのaction要素にあるarguments属性の値を渡す
-        ExecuteExcelMacro(argument.c_str());
+            // ユーザーの入力値を取得
+            winrt::hstring userInput = activatedArgs.UserInput().Lookup(L"InputText").as<winrt::hstring>();
+
+            //トーストのaction要素にあるarguments属性の値を渡す
+            ExecuteExcelMacro(argument.c_str(), userInput.c_str());
+        }
+        catch (const hresult_error& e)
+        {
+            // エラーハンドリング
+            MessageBoxW(nullptr, e.message().c_str(), L"エラー", MB_OK);
+        }
     }
 }
 
