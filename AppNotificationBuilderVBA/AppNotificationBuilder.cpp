@@ -214,6 +214,9 @@ winrt::fire_and_forget SendToastWithCollectionAsyncHelper(ToastNotificationParam
         // トースト通知を作成
         ToastNotification toast(toastXml);
 
+        // イベントハンドラーを設定
+        toast.Activated(TypedEventHandler<ToastNotification, IInspectable>(OnActivated)); // OnActivated関数をハンドラーとして設定
+
         // 上記で作成されたオブジェクトに各種設定(GroupとTag等)を施す
         toast.ExpiresOnReboot(ToastConfigData->ExpiresOnReboot);
         toast.Group(ToastConfigData->Group);
