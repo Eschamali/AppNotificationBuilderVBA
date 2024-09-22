@@ -441,6 +441,7 @@ void __stdcall ShowToastNotificationWithProgressBar(ToastNotificationParams* Toa
         toastWithProgress.Group(ToastConfigData->Group);
         toastWithProgress.Tag(ToastConfigData->Tag);
         toastWithProgress.SuppressPopup(ToastConfigData->SuppressPopup);
+        //if (ToastConfigData->ExpirationTime > 0) toastWithProgress.ExpirationTime(ExpirationTimeValue);
 
         //順序外の更新を防ぐため、シーケンス番号を指定します。初回なので1にします。
         ProgressParams.SequenceNumber(1);
