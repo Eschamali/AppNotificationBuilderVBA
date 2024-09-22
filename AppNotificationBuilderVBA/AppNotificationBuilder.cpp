@@ -25,7 +25,7 @@ Windows::Foundation::DateTime SystemTimeToDateTime(const SYSTEMTIME& st) {
 }
 
 // Excel マクロを実行する関数
-void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, const wchar_t* UserInput1) {
+void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInputs) {
     //詳細メッセージ、取得用
     EXCEPINFO excepInfo;
     memset(&excepInfo, 0, sizeof(EXCEPINFO));  // 初期化
@@ -72,8 +72,14 @@ void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, const wchar_t* UserInput1)
     }
 
     // 5. Application.Run メソッドの引数を設定
-    CComVariant macroName(ExcelMacroPass);  // 1. 実行したいマクロのフルパス
-    CComVariant macroArg1(UserInput1);      // 2. 第一引数
+    CComVariant macroName(ExcelMacroPass);  // 1. 実行したいマクロのフルパス(action要素のarguments属性)
+
+    // 2次元配列とマクロ名を引数として渡す(input要素一式)
+    CComVariant saVariant;
+    saVariant.vt = VT_ARRAY | VT_BSTR;
+    saVariant.parray = UserInputs;
+
+    CComVariant macroArg1(saVariant);      // 2. input要素一式
 
     // 6. 引数を配列として渡す(※これらの引数は逆の順序で表示されるため、それを考慮した代入を行うこと)
     CComVariant argsArray[2] = { macroArg1,macroName };
@@ -111,16 +117,17 @@ void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, const wchar_t* UserInput1)
     //// rgvarg の中身を確認
     //MessageBoxW(nullptr, debugMessage.c_str(), L"DISPPARAMS Debug", MB_OK);
 
-    //if (FAILED(hr)) {
-    //    std::wstring errorMessage = L"Invoke failed. HRESULT: " + std::to_wstring(hr);
+    // エラーが起こったら、エラーコードと詳細メッセージ(ある場合)を表示。
+    if (FAILED(hr)) {
+        std::wstring errorMessage = L"Invoke failed. HRESULT: " + std::to_wstring(hr);
 
-    //    if (excepInfo.bstrDescription) {
-    //        errorMessage += L"\nException: " + std::wstring(excepInfo.bstrDescription);
-    //        SysFreeString(excepInfo.bstrDescription);  // リソース解放
-    //    }
+        if (excepInfo.bstrDescription) {
+            errorMessage += L"\nException: " + std::wstring(excepInfo.bstrDescription);
+            SysFreeString(excepInfo.bstrDescription);  // リソース解放
+        }
 
-    //    MessageBoxW(nullptr, errorMessage.c_str(), L"Error1", MB_OK);
-    //}
+        MessageBoxW(nullptr, errorMessage.c_str(), L"Error1", MB_OK);
+    }
     //else {
     //    _com_error err(hr);
     //    MessageBoxW(nullptr, err.ErrorMessage(), L"Info", MB_OK);
@@ -130,19 +137,56 @@ void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, const wchar_t* UserInput1)
 
 // トースト通知のアクティベーションを処理する関数
 void OnActivated(ToastNotification const& sender, IInspectable const& args) {
-    // IInspectable から ToastActivatedEventArgs にキャストして引数を取得
+    // IInspectable から ToastActivatedEventArgs にキャストして引数情報を取得
     auto activatedArgs = args.try_as<ToastActivatedEventArgs>();
+
+    // UserInput()からすべてのキーと値のペアを取得
+    auto userInputs = activatedArgs.UserInput();
 
     //トーストからの args.try_as<ToastActivatedEventArgs> があれば、Excelマクロを動かす準備に入る
     if (activatedArgs) {
         try {
+            //ボタン押下したAction要素のarguments属性の内容を取得(マクロ名を想定)
             winrt::hstring argument = activatedArgs.Arguments();
 
-            // ユーザーの入力値を取得
-            winrt::hstring userInput = activatedArgs.UserInput().Lookup(L"InputText").as<winrt::hstring>();
+            // Input要素のIDと値を格納するための2次元配列を作成する準備(SAFEARRAY)
+            long inputCount = userInputs.Size();  // 入力フィールドの数を取得
+            SAFEARRAYBOUND bounds[2];                            // 2次元配列として設定
+            bounds[0].lLbound = 0;                               // 行数-最小要素番号
+            bounds[0].cElements = inputCount;                    // 行数-最大要素番号 (入力フィールドの数)
+            bounds[1].lLbound = 0;                               // 列数-最小要素番号
+            bounds[1].cElements = 2;                             // 列数-最大要素番号 (キーと値のペア)
 
-            //トーストのaction要素にあるarguments属性の値を渡す
-            ExecuteExcelMacro(argument.c_str(), userInput.c_str());
+            // 上記の設定を基に、2次元配列を作成
+            SAFEARRAY* InputElementsArray = SafeArrayCreate(VT_BSTR, 2, bounds);
+
+            long indices[2];
+            long rowIndex = 0;
+            for (auto const& input : userInputs) {
+                auto key = input.Key();                // 入力フィールドのID (キー)
+                auto value = input.Value();            // 入力された値 (IInspectable型)
+                auto inputValue = value.as<winrt::hstring>();
+
+                // 配列にキーを追加する準備
+                indices[0] = rowIndex;  //現時点のInput要素位置
+                indices[1] = 0;  // キーは0列目に
+                CComBSTR bstrKey(key.c_str()); //Input要素のID属性を取得
+                
+                //上記の設定で配列にキーを追加
+                SafeArrayPutElement(InputElementsArray, indices, bstrKey);
+
+                // 配列に値を追加する準備
+                indices[1] = 1;  // 値は1列目に
+                CComBSTR bstrValue(inputValue.c_str());//Input要素の値を取得
+
+                //上記の設定で配列にキーを追加
+                SafeArrayPutElement(InputElementsArray, indices, bstrValue);
+
+                rowIndex++;
+            }
+
+            //トーストのaction要素にあるarguments属性の値(マクロ名)と、Input要素一式をExcelマクロ処理用に渡す
+            ExecuteExcelMacro(argument.c_str(), InputElementsArray);
         }
         catch (const hresult_error& e)
         {
