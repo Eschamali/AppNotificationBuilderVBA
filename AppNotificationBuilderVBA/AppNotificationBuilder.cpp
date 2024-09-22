@@ -24,7 +24,128 @@ Windows::Foundation::DateTime SystemTimeToDateTime(const SYSTEMTIME& st) {
     return dateTime;
 }
 
-// 非同期処理をラップするヘルパー関数。コレクションを使用したトースト通知のグループ化に使用します。
+// Excel マクロを実行する関数
+void ExecuteExcelMacro() {
+    //詳細メッセージ、取得用
+    EXCEPINFO excepInfo;
+    memset(&excepInfo, 0, sizeof(EXCEPINFO));  // 初期化
+
+    // 1. ExcelのCLSIDを取得
+    CLSID clsid;
+    HRESULT hr = CLSIDFromProgID(L"Excel.Application", &clsid);
+
+    // 恐らく、Excelがインストールされてない場合
+    if (FAILED(hr)) {
+        MessageBoxW(nullptr, L"Failed to get CLSID for Excel", L"Error", MB_OK);
+        return;
+    }
+
+    // 2. 既存のExcelインスタンスを取得
+    CComPtr<::IUnknown> pUnk;
+    hr = GetActiveObject(clsid, nullptr, reinterpret_cast<::IUnknown**>(&pUnk));  // まずIUnknownを取得
+
+    // 起動中のExcelがない場合
+    if (FAILED(hr)) {
+        MessageBoxW(nullptr, L"Failed to get active Excel instance", L"Error", MB_OK);
+        return ;
+    }
+
+    // 3. IUnknownからIDispatchへのキャスト
+    CComPtr<IDispatch> pExcelApp;
+    hr = pUnk->QueryInterface(IID_IDispatch, reinterpret_cast<void**>(&pExcelApp));
+
+    //キャストに失敗した場合
+    if (FAILED(hr)) {
+        MessageBoxW(nullptr, L"Failed to get IDispatch from Excel instance", L"Error", MB_OK);
+        return ;
+    }
+
+    // 4. DISPIDの取得
+    DISPID dispid;
+    OLECHAR* name = const_cast<OLECHAR*>(L"Run");  // 実行するメソッド名(VBAのApplication.Run 相当)
+    hr = pExcelApp->GetIDsOfNames(IID_NULL, &name, 1, LOCALE_USER_DEFAULT, &dispid);
+
+    //Runメソッドの取得に失敗した場合
+    if (FAILED(hr)) {
+        MessageBoxW(nullptr, L"Failed to get DISPID for Run method", L"Error", MB_OK);
+        return ;
+    }
+
+    // 5. マクロの引数設定
+    CComVariant macroName(L"'ibento.xlsm'!ToastActivatedTest.TestToastTrigger");  // 実行したいマクロのフルパス
+    DISPPARAMS params = { &macroName, nullptr, 1, 0 };
+
+    // 6. マクロの呼び出し
+    CComVariant result;
+    hr = pExcelApp->Invoke(dispid, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_METHOD, &params, &result, &excepInfo, nullptr);
+
+    // 現在のExcelインスタンス内に、指定マクロがないと想定
+    if (FAILED(hr)) {
+        MessageBoxW(nullptr, L"Failed to get Excel macro", L"Error", MB_OK);
+    }
+
+    //-------------以降は、デバッグ用-------------
+
+    // MessageBoxでDISPPARAMSの内容を確認
+    //std::wstring debugMessage;
+
+    //// cArgsの確認
+    //debugMessage += L"Number of arguments: " + std::to_wstring(params.cArgs) + L"\n";
+
+    //// rgvarg の中身を文字列化
+    //for (UINT i = 0; i < params.cArgs; ++i) {
+    //    VARIANT& arg = params.rgvarg[i];
+
+    //    if (arg.vt == VT_BSTR) {
+    //        debugMessage += L"Argument " + std::to_wstring(i) + L": " + arg.bstrVal + L"\n";
+    //    }
+    //    else {
+    //        debugMessage += L"Argument " + std::to_wstring(i) + L": [not a BSTR]\n";
+    //    }
+    //}
+
+    //// rgvarg の中身を確認
+    //MessageBoxW(nullptr, debugMessage.c_str(), L"DISPPARAMS Debug", MB_OK);
+
+    //if (FAILED(hr)) {
+    //    std::wstring errorMessage = L"Invoke failed. HRESULT: " + std::to_wstring(hr);
+
+    //    if (excepInfo.bstrDescription) {
+    //        errorMessage += L"\nException: " + std::wstring(excepInfo.bstrDescription);
+    //        SysFreeString(excepInfo.bstrDescription);  // リソース解放
+    //    }
+
+    //    MessageBoxW(nullptr, errorMessage.c_str(), L"Error1", MB_OK);
+    //}
+    //else {
+    //    _com_error err(hr);
+    //    MessageBoxW(nullptr, err.ErrorMessage(), L"Info", MB_OK);
+    //}
+}
+
+
+// トースト通知のアクティベーションを処理する関数
+void OnActivated(ToastNotification const& sender, IInspectable const& args) {
+    // IInspectable から ToastActivatedEventArgs にキャストして引数を取得
+    auto activatedArgs = args.try_as<ToastActivatedEventArgs>();
+
+    if (activatedArgs) {
+        winrt::hstring argument = activatedArgs.Arguments();
+
+        if (argument == L"run_macro") {
+            // Excel マクロ実行などの処理をここに追加
+            ExecuteExcelMacro();
+        }
+    }
+}
+
+
+
+//***************************************************************************************************
+//                              ■■■ ヘルパー関数 ■■■
+//***************************************************************************************************
+
+// 非同期処理をラップするヘルパー関数。コレクションを使用したトースト通知の表示に使用します。一旦は、表示系のみです。
 winrt::fire_and_forget SendToastWithCollectionAsyncHelper(ToastNotificationParams* ToastConfigData)
 {
     try
@@ -55,6 +176,12 @@ winrt::fire_and_forget SendToastWithCollectionAsyncHelper(ToastNotificationParam
         MessageBoxW(nullptr, e.message().c_str(), L"エラー", MB_OK);
     }
 }
+
+
+
+//***************************************************************************************************
+//                              ■■■ VBA側から呼び出せる関数 ■■■
+//***************************************************************************************************
 
 //引数に渡された値で、単純なトースト通知を表示します。指定日時に通知するスケジュール機能も対応します
 void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData){
@@ -148,6 +275,9 @@ void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData){
         else {
             // 通常のトースト通知を作成
             ToastNotification toast(toastXml);
+
+            // イベントハンドラーを設定
+            toast.Activated(TypedEventHandler<ToastNotification, IInspectable>(OnActivated)); // OnActivated関数をハンドラーとして設定
 
             // 上記で作成されたオブジェクトに各種設定(GroupとTag等)を施す
             toast.ExpiresOnReboot(ToastConfigData->ExpiresOnReboot);

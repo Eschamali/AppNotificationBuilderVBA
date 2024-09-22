@@ -10,6 +10,13 @@
 #include <string>                                   //文字列へ変換系モジュール
 #include <chrono>
 
+#include <comdef.h>
+#include <atlbase.h>
+#include <atlcom.h>
+#include <Exdisp.h>
+#include <Exdispid.h>
+#include <iostream>
+
 
 #ifdef AppNotificationBuilderVBA_EXPORTS
 #define AppNotificationBuilderVBA_API __declspec(dllexport)
