@@ -25,7 +25,7 @@ Windows::Foundation::DateTime SystemTimeToDateTime(const SYSTEMTIME& st) {
 }
 
 // Excel マクロを実行する関数
-void ExecuteExcelMacro() {
+void ExecuteExcelMacro(const wchar_t* ExcelMacroPass) {
     //詳細メッセージ、取得用
     EXCEPINFO excepInfo;
     memset(&excepInfo, 0, sizeof(EXCEPINFO));  // 初期化
@@ -72,7 +72,7 @@ void ExecuteExcelMacro() {
     }
 
     // 5. マクロの引数設定
-    CComVariant macroName(L"'ibento.xlsm'!ToastActivatedTest.TestToastTrigger");  // 実行したいマクロのフルパス
+    CComVariant macroName(ExcelMacroPass);  // 実行したいマクロのフルパス
     DISPPARAMS params = { &macroName, nullptr, 1, 0 };
 
     // 6. マクロの呼び出し
@@ -86,7 +86,7 @@ void ExecuteExcelMacro() {
 
     //-------------以降は、デバッグ用-------------
 
-    // MessageBoxでDISPPARAMSの内容を確認
+    ////MessageBoxでDISPPARAMSの内容を確認
     //std::wstring debugMessage;
 
     //// cArgsの確認
@@ -132,10 +132,8 @@ void OnActivated(ToastNotification const& sender, IInspectable const& args) {
     if (activatedArgs) {
         winrt::hstring argument = activatedArgs.Arguments();
 
-        if (argument == L"run_macro") {
-            // Excel マクロ実行などの処理をここに追加
-            ExecuteExcelMacro();
-        }
+        //トーストのaction要素にあるarguments属性の値を渡す
+        ExecuteExcelMacro(argument.c_str());
     }
 }
 
