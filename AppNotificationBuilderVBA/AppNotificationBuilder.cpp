@@ -199,10 +199,11 @@ void OnActivated(ToastNotification const& sender, IInspectable const& args) {
 
 
 //***************************************************************************************************
-//                              ■■■ ヘルパー関数 ■■■
+//                              ■■■ CollectionToast関連処理専用 ■■■
 //***************************************************************************************************
 
-// 非同期処理をラップするヘルパー関数。コレクションを使用したトースト通知の表示に使用します。一旦は、表示系のみです。
+// 非同期処理をラップするヘルパー関数。コレクションを使用したトースト通知の表示に使用します。
+// 処理の流れは、ShowToastNotificationとほとんど一緒ですが、非同期処理が必要のため、このようなラッパー用関数を作成しています。
 winrt::fire_and_forget SendToastWithCollectionAsyncHelper(ToastNotificationParams* ToastConfigData)
 {
     try
@@ -211,24 +212,58 @@ winrt::fire_and_forget SendToastWithCollectionAsyncHelper(ToastNotificationParam
         XmlDocument toastXml;
         toastXml.LoadXml(ToastConfigData->XmlTemplate);
 
-        // トースト通知を作成
-        ToastNotification toast(toastXml);
-
-        // イベントハンドラーを設定
-        toast.Activated(TypedEventHandler<ToastNotification, IInspectable>(OnActivated)); // OnActivated関数をハンドラーとして設定
-
-        // 上記で作成されたオブジェクトに各種設定(GroupとTag等)を施す
-        toast.ExpiresOnReboot(ToastConfigData->ExpiresOnReboot);
-        toast.Group(ToastConfigData->Group);
-        toast.Tag(ToastConfigData->Tag);
-        toast.SuppressPopup(ToastConfigData->SuppressPopup);
-        //if (ToastConfigData->ExpirationTime > 0) toast.ExpirationTime(ExpirationTimeValue);
+        //通知の有効期限が設定されてあったら、設定値を準備する
+        Windows::Foundation::DateTime ExpirationTimeValue;
+        if (ToastConfigData->ExpirationTime > 0) {
+            //変換処理
+            SYSTEMTIME ex;
+            VariantTimeToSystemTime(ToastConfigData->ExpirationTime, &ex);
+            ExpirationTimeValue = SystemTimeToDateTime(ex);
+        }
 
         // ToastNotifierForToastCollectionIdAsyncを使って特定のコレクションのNotifierを非同期で取得
         ToastNotifier notifier = co_await ToastNotificationManager::GetDefault().GetToastNotifierForToastCollectionIdAsync(ToastConfigData->CollectionID);
 
-        // Collection経由によるトーストを表示
-        notifier.Show(toast);
+        //スケジュールが指定されてあったらその処理を行う
+        if (ToastConfigData->Schedule_DeliveryTime > 0) {
+            // スケジュール通知の場合
+            SYSTEMTIME sc;
+            VariantTimeToSystemTime(ToastConfigData->Schedule_DeliveryTime, &sc);
+
+            // SYSTEMTIMEをDateTimeに変換
+            Windows::Foundation::DateTime scheduleDateTime = SystemTimeToDateTime(sc);
+
+            // スケジュールされたトースト通知を作成
+            ScheduledToastNotification scheduledToast(toastXml, scheduleDateTime);
+
+            // 上記で作成されたオブジェクトに各種設定(GroupとTag等)を施す
+            scheduledToast.Id(ToastConfigData->Schedule_ID);
+            scheduledToast.Group(ToastConfigData->Group);
+            scheduledToast.Tag(ToastConfigData->Tag);
+            scheduledToast.SuppressPopup(ToastConfigData->SuppressPopup);
+            if (ToastConfigData->ExpirationTime > 0) scheduledToast.ExpirationTime(ExpirationTimeValue);
+
+            // スケジュールトーストを追加
+            notifier.AddToSchedule(scheduledToast);
+        }
+        else {
+
+            // 通常のトースト通知を作成
+            ToastNotification toast(toastXml);
+
+            // イベントハンドラーを設定
+            toast.Activated(TypedEventHandler<ToastNotification, IInspectable>(OnActivated)); // OnActivated関数をハンドラーとして設定
+
+            // 上記で作成されたオブジェクトに各種設定(GroupとTag等)を施す
+            toast.ExpiresOnReboot(ToastConfigData->ExpiresOnReboot);
+            toast.Group(ToastConfigData->Group);
+            toast.Tag(ToastConfigData->Tag);
+            toast.SuppressPopup(ToastConfigData->SuppressPopup);
+            if (ToastConfigData->ExpirationTime > 0) toast.ExpirationTime(ExpirationTimeValue);
+
+            // Collection経由によるトーストを表示
+            notifier.Show(toast);
+        }
     }
     catch (const hresult_error& e)
     {

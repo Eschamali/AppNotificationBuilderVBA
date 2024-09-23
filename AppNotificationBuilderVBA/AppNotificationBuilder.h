@@ -1,4 +1,6 @@
-﻿#include <windows.h>  // Windows APIの基本的な型や関数を含む
+﻿#pragma once
+
+#include <windows.h>  // Windows APIの基本的な型や関数を含む
 
 #include <winrt/Windows.UI.Notifications.h>         //トースト関連モジュール全般
 #include <winrt/Windows.UI.Notifications.Management.h>
