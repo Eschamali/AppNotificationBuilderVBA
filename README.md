@@ -1279,15 +1279,154 @@ End Sub
 無闇にCollectionIDを作成しまくると、[通知設定](ms-settings:notifications)に、赤枠のような欄が増殖してしまうので、必要に応じて削除を行って下さい。<br>
 ![alt text](doc/Ex_Collection3.png)
 
+# [アクティブ化処理](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.activated)
+ユーザーがクリックまたはタッチでトースト通知をアクティブ化したとき、指定マクロを実行する事ができます。<br>
+action要素のarguments属性にマクロ名、activationType属性に"foreground"を設定して、"RunDll_ToastNotifierShow"関数を実行する事で、アクティブ化処理が可能です。<br>
+アクティブ化処理は、高度な処理を行うため、DLLファイルをインポートしてそこから"RunDll_ToastNotifierShowを使用する必要があります。
+
+## アクティブ化準備
+### アクティブ化できる箇所
+下記の要素と属性に、実行したいマクロ名を記述することができます。
+- toast要素 － [launch属性](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-toast#:~:text=%E3%81%AA%E3%81%97-,launch,-%E3%83%88%E3%83%BC%E3%82%B9%E3%83%88%E9%80%9A%E7%9F%A5%E3%81%AB%E3%82%88%E3%81%A3%E3%81%A6)
+```bas
+    With New cls_AppNotificationBuilder
+        .SetToastContent_Launch("foreground") = "[ここに実行したいマクロ名]"
+        ~
+    End With
+```
+
+- action要素 － [arguments属性](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-action#:~:text=%E3%81%AA%E3%81%97-,arguments,-%E3%83%A6%E3%83%BC%E3%82%B6%E3%83%BC%E3%81%8C%E3%81%93%E3%81%AE)
+```bas
+    With New cls_AppNotificationBuilder
+        .SetIToastActions("TestRun", "[ここに実行したいマクロ名]", "foreground") = 1
+        ~
+    End With
+```
+
+### アクティブ化時のプロシージャ記述
+下記の要件に合うように記述すること
+
+#### 引数
+| 順番 | 型      | 説明                                                                            | 
+| ---- | ------- | ------------------------------------------------------------------------------- | 
+| 1    | Variant | 2次元配列<br>・行数：入力フィールドの数。最大5つ<br>・列数：2（キーと値のペア） | 
+
+#### 配列の構造について
+![alt text](doc/ToastActived1.png)
+| 列位置  | 説明                                                                            | 
+| ----  | ------------------------------------------------------------------------------- | 
+| 0     | Input要素のID属性の名称 |
+| 1     | Input要素のID属性に紐づく入力値。<br> selection要素での入力値の場合、そのID属性の名称となります。|
+
+- 最小要素数：0
+- 入力フィールドがない場合は行数が、-1
+- 利用時には、CreateObject("Scripting.Dictionary") で整理することをおすすめします。
+- 引数を扱わないプロシージャでも、用意する必要があります。
+
+#### プロシージャの種類
+Sub,Function 問いませんが、publicとして設定する必要があります。
+
+### サンプルコード
+いくつかのアクティブ化パターンを体験できるサンプルコードを提示します。<br>
+この例では、アプリ通知上で簡易的なクイズを作ってみます。
+```bas
+Option Explicit
+
+'トーストのアクティブ化テスト
+Sub ToastWithActiveShow()
+    With New cls_AppNotificationBuilder
+        'タイトル設定
+        .SetToastContent_TextTitle = "クイズ！"
+        '内容設定
+        .SetToastContent_TextBody = "正しい回答を選択、入力しよう"
+        'ソース
+        .SetToastContent_TextAttribute = "トーストアクティブ化テスト"
+        'synalioをリマインダーにする
+        .SetToastScenario = Reminder
+        'ヘッダーをクリア
+        .SetToastHeader(vbNullString) = ""
+        
+        
+        'トーストクリック時の、プロシージャ名を記載
+        .SetToastContent_Launch("foreground") = "ToastTrigger_Click"
+        
+        
+        '選択肢を用意する
+        .SetToastSelectionBox("選択肢A", "1 m") = 1
+        .SetToastSelectionBox("選択肢B", "1 km") = 2
+        .SetToastSelectionBox("選択肢C", "1 天文単位") = 3
+        .SetToastSelectionBox("選択肢D", "1 光年") = 4
+        '上記の選択肢を、下記のInput要素として、インポート
+        .SetIToastInput("地学問題", True, , "Q1：太陽から地球の距離は？") = 1
+        
+        'テキスト入力を用意
+        .SetIToastInput("冥王星とは", , , "Q2：冥王星は何惑星？", "〇惑星") = 2
+        
+        '各ボタンに対応するプロシージャ名を記載(接頭語等を付けて区別をつけよう)
+        .SetIToastActions("回答する", "ToastTrigger_Answer", "foreground") = 1
+        .SetIToastActions("閉じる", "ToastTrigger_Close", "foreground") = 2
+        
+        '通知実行
+        .RunDll_ToastNotifierShow "RunMacto"
+    End With
+End Sub
+
+
+
+'-----------------------C++(ToastActive)から呼ばれるマクロを記述-----------------------
+'クリック時
+Sub ToastTrigger_Click(UserInputs As Variant)
+    'メッセージを表示するだけ
+    MsgBox "アプリ通知をクリックして、マクロ起動しました", vbInformation, "クリックで、アクティブ化テスト"
+End Sub
+
+'1つ目のボタン押下時
+Sub ToastTrigger_Answer(UserInputs As Variant)
+    Dim Dict_UserInputs As Object
+    Dim keyToFind As String
+    Dim foundValue As Variant
+    
+    ' Scripting.Dictionaryオブジェクトを作成
+    Set Dict_UserInputs = CreateObject("Scripting.Dictionary")
+    Dim i As Long
+    For i = 0 To UBound(UserInputs)
+        'キーと値を設定
+        Dict_UserInputs.Add UserInputs(i, 0), UserInputs(i, 1)
+    Next
+
+    'AnswerCheck1
+    If Dict_UserInputs("地学問題") = "選択肢C" Then
+        MsgBox "正解！", vbInformation, "問題1の結果"
+    Else
+        MsgBox "不正解", vbCritical, "問題1の結果"
+        Exit Sub
+    End If
+    
+    'AnswerCheck2
+    If Dict_UserInputs("冥王星とは") = "準惑星" Then
+        MsgBox "正解！", vbInformation, "問題2の結果"
+    Else
+        MsgBox "不正解", vbCritical, "問題2の結果"
+        Exit Sub
+    End If
+    
+    MsgBox "全問正解！", vbInformation, "All Clear!"
+    
+End Sub
+
+'2つ目のボタン押下時
+Sub ToastTrigger_Close(UserInputs As Variant)
+    'メッセージを表示するだけ
+    MsgBox "回答をキャンセルしました", vbExclamation, "回答辞退"
+End Sub
+```
+アプリ通知で選択した選択肢や、入力テキストを扱う場合は、予め辞書型（Scripting.Dictionary）で内容をインポートして処理することをおすすめします。
+
 # Attention
 DLL側の処理は、ある程度のエラー処理を施していますが、現時点ではあまり完璧ではありません。<br>
 一応、クラスファイル側でもエラー処理を施していますが、突然Excelが落ちることがあるので利用前には保存を推奨します。
 
 # Todo
-## イベントについて
-例えば、アプリ通知に付いているボタンを押下すると特定のマクロを発動、というのは技術的には可能ですが、ほぼc++の役目になるため、VBA側では自由に追加等はできません。<br>
-ただ、出来たら面白そうではあるので、次のアップデートで追加予定です。
-
 ## subgroup要素について
 他のスキーマ要素と比べて、かなり複雑な変数管理が必要なため、追加は一旦保留です。<br>
 これも出来たら面白そうではあるので、いずれ追加は行おうと思います。

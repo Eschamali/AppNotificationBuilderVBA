@@ -306,7 +306,6 @@ End Type
 '====================================================================================================
 'ˆÊ’u        Finpute—v‘f‚Ìselectionq—v‘f‚Åg‚¦‚é‘®«’lB
 'ƒhƒLƒ…ƒƒ“ƒgFhttps://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-selection
-'’ß        FVBA‚©‚çg—p‚·‚é“s‡ãAƒŠƒ}ƒCƒ“ƒ_[—p“r‚Ì‚İ‚ÉŒÀ’è‚µ‚Ü‚·B
 '----------------------------------------------------------------------------------------------------
 '“ü‚ê‚ê‚éÅ‘å—v‘f”‚ğ’è”’è‹`
 Private Const MaxElementSelectionNum As Integer = 5    '‘I‘ğˆ‚ÍÅ‘å5‚ÂA“ü‚ê‚ê‚Ü‚·
@@ -314,7 +313,7 @@ Private Const MaxElementSelectionNum As Integer = 5    '‘I‘ğˆ‚ÍÅ‘å5‚ÂA“ü‚ê‚ê‚
 Private ElementSelection(1 To MaxElementSelectionNum) As AttributeSelection
 
 Private Type AttributeSelection
-    MinuteValue As LongPtr  'Ä’Ê’m‚·‚éŠÔB(’PˆÊF•ª)
+    MinuteValue As String  'Ä’Ê’m‚·‚éŠÔB(’PˆÊF•ª)
     ChoseName   As String   '‘I‘ğˆ‚Éo‚·–¼Ì
 End Type
 
@@ -865,9 +864,9 @@ End Property
 '            ArgChoseName   ‘I‘ğ€–Ú‚Ì–¼Ì
 '            Index          ‘}“üˆÊ’u
 '---------------------------------------------------------------------------------------------------
-'* ’ˆÓ–€FVBA‚Å‚ÍAƒŠƒ}ƒCƒ“ƒ_[—p“r‚µ‚©g‚¢Š‚ª‚ ‚è‚Ü‚¹‚ñ
+'* ’ˆÓ–€FVBA‚Å‚ÍŠî–{AƒŠƒ}ƒCƒ“ƒ_[—p“r‚µ‚©g‚¢Š‚ª‚ ‚è‚Ü‚¹‚ñ
 '***************************************************************************************************
-Public Property Let SetToastSelectionBox(ByVal ReminderMinute As LongPtr, ByVal ArgChoseName As String, ByVal Index As Integer)
+Public Property Let SetToastSelectionBox(ByVal ReminderMinute As String, ByVal ArgChoseName As String, ByVal Index As Integer)
     With ElementSelection(Index)
         .MinuteValue = ReminderMinute
         .ChoseName = ArgChoseName
@@ -1164,8 +1163,8 @@ Private Function MakeXmlToastContentBuilder(UseProgress As Boolean) As String
                     'Œ»İ‚ÌInput—v‘f‚É‚ÄAtype‘®«‚ª"selection"‚È‚çA—v‘f”Ô†‚É‘Î‰‚·‚éSelection—v‘f”z—ñ‚ğ‘}“ü‚·‚é
                     If ElementInput(i).Type = "selection" Then
                         For j = 1 To MaxElementSelectionNum
-                            'ƒŠƒ}ƒCƒ“ƒ_[’Ê’m‚ª0•ª‚Ìê‡A‘}“ü‚ğSKIP‚·‚é
-                            If ElementInput(i).Value(j).MinuteValue Then
+                            'Input—v‘f‚ÌID‘®«‚ª‚È‚¢ê‡A‘}“ü‚ğSKIP‚·‚é
+                            If StrPtr(ElementInput(i).Value(j).MinuteValue) Then
                                 With Node03_01__input.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode03_01_01__selection, "")).Attributes
                                     .setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "id", "")).NodeValue = ElementInput(i).Value(j).MinuteValue
                                     .setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "content", "")).NodeValue = ElementInput(i).Value(j).ChoseName
