@@ -687,7 +687,7 @@ End With
 ## [input要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-input)
 ### SetIToastInput
 トースト通知に表示される入力 (テキスト ボックスまたは選択メニュー) を指定します。<br>
-VBAでは、リマインダー用途でしか使い所がないと思います。
+VBAでは基本、リマインダー用途でしか使い所がないと思います。
 
 #### 設定値
 Input要素の配置順。1~5まで有効です。
@@ -746,7 +746,7 @@ selection要素の配置順。1~5まで有効です。
 #### 利用可能な引数
 | 引数名         | 説明                                               | 備考                       | 
 | -------------- | -------------------------------------------------- | -------------------------- | 
-| ReminderMinute | 何分後にリマインダー通知させるか、値で指定します。 | 現状、数値以外は扱いません。<br>0で、未定義扱いとします。 | 
+| ReminderMinute | 何分後にリマインダー通知させるか、値で指定します。 | vbnullstringで未定義扱いとします。 | 
 | ArgChoseName   | 選択項目の内容                                     |                            | 
 
 #### [リマインダーの設定方法](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/adaptive-interactive-toasts?tabs=xml#snoozedismiss)
