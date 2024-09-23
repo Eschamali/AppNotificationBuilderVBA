@@ -90,9 +90,9 @@ void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInputs) {
     hr = pExcelApp->Invoke(dispid, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_METHOD, &params, &result, &excepInfo, nullptr);
 
     // 現在のExcelインスタンス内に、指定マクロがないと想定
-    if (FAILED(hr)) {
-        MessageBoxW(nullptr, L"Failed to get Excel macro", L"Error", MB_OK);
-    }
+    //if (FAILED(hr)) {
+    //    MessageBoxW(nullptr, L"Failed to get Excel macro", L"Error", MB_OK);
+    //}
 
     //-------------以降は、デバッグ用-------------
 
@@ -118,16 +118,16 @@ void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInputs) {
     //MessageBoxW(nullptr, debugMessage.c_str(), L"DISPPARAMS Debug", MB_OK);
 
     // エラーが起こったら、エラーコードと詳細メッセージ(ある場合)を表示。
-    if (FAILED(hr)) {
-        std::wstring errorMessage = L"Invoke failed. HRESULT: " + std::to_wstring(hr);
+    //if (FAILED(hr)) {
+    //    std::wstring errorMessage = L"Invoke failed. HRESULT: " + std::to_wstring(hr);
 
-        if (excepInfo.bstrDescription) {
-            errorMessage += L"\nException: " + std::wstring(excepInfo.bstrDescription);
-            SysFreeString(excepInfo.bstrDescription);  // リソース解放
-        }
+    //    if (excepInfo.bstrDescription) {
+    //        errorMessage += L"\nException: " + std::wstring(excepInfo.bstrDescription);
+    //        SysFreeString(excepInfo.bstrDescription);  // リソース解放
+    //    }
 
-        MessageBoxW(nullptr, errorMessage.c_str(), L"Error1", MB_OK);
-    }
+    //    MessageBoxW(nullptr, errorMessage.c_str(), L"Error1", MB_OK);
+    //}
     //else {
     //    _com_error err(hr);
     //    MessageBoxW(nullptr, err.ErrorMessage(), L"Info", MB_OK);
