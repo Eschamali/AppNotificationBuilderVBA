@@ -847,6 +847,13 @@ Public Property Let SetIToastInput(ByVal ArgID As String, Optional ByVal ChoseFl
         If ChoseFlag Then
             .Type = "selection"
             .Value = ElementSelection
+            
+            '挿入後、同じ変数で使い回すため、初期化する
+            Dim i As Long
+            For i = 1 To MaxElementSelectionNum
+                ElementSelection(i).MinuteValue = vbNullString
+                ElementSelection(i).ChoseName = vbNullString
+            Next
         Else
             .Type = "text"
         End If
@@ -877,7 +884,7 @@ End Property
 '* 機能　　：header要素の各属性にセットしたものをtoast要素に挿入します
 '---------------------------------------------------------------------------------------------------
 '* 引数　　：ArgID            ：このヘッダーを一意に識別します。 2 つの通知が同じヘッダー ID を持つ場合、アクション センターで同じヘッダーの下に表示されます。(省略時：このExcelのファイル名)
-'            ArgTitle         ：ヘッダーのタイトルです。(省略時：このExcelのBook名)
+'            ArgTitle         ：ヘッダーのタイトルです。(推奨：このExcelのBook名)
 '            ArgArguments     ：起動スキーマ。URLやファイルパスなど(省略時：このExcelの保存フォルダパス)
 '            ArgActivationType：このヘッダーがクリックされた場合に使用するアクティブ化の種類
 '---------------------------------------------------------------------------------------------------
