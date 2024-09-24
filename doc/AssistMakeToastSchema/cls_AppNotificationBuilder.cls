@@ -45,11 +45,11 @@ Option Explicit
 '***************************************************************************************************
 ' 機能     ：C++で書かれたDLLに、 Windows.UI.Notifications 関連の処理を埋め込ませ、Shell経由より高速に処理できます
 '---------------------------------------------------------------------------------------------------
-Private Declare PtrSafe Sub ShowToastNotification Lib "AppNotificationBuilderVBA.dll" (ByRef Params_String As ToastNotificationParams)  '一般的な通知
-Private Declare PtrSafe Sub ShowToastNotificationWithProgressBar Lib "AppNotificationBuilderVBA.dll" (ByRef Params_String As ToastNotificationParams, ByVal ProgressStatus As LongPtr, ByVal ProgressValue As Double, ByVal ProgressTitle As LongPtr, ByVal ProgressValueStringOverride As LongPtr) 'プログレスバー付き通知
-Private Declare PtrSafe Function UpdateToastNotificationWithProgressBar Lib "AppNotificationBuilderVBA.dll" (ByRef Params_String As ToastNotificationParams, ByVal ProgressStatus As LongPtr, ByVal ProgressValue As Double, ByVal ProgressTitle As LongPtr, ByVal ProgressValueStringOverride As LongPtr, SequenceNumber As Long) As Long 'プログレスバー付き通知の更新用
-Private Declare PtrSafe Function CreateToastCollection Lib "AppNotificationBuilderVBA.dll" (ByRef Params_String As ToastNotificationParams, ByVal DisplayName As LongPtr, ByVal LaunchArgs As LongPtr, ByVal IconUri As LongPtr) As Long 'ToastCollectionの作成
-Private Declare PtrSafe Function DeleteToastCollection Lib "AppNotificationBuilderVBA.dll" (ByRef Params_String As ToastNotificationParams) As Long 'ToastCollectionの削除
+Private Declare PtrSafe Sub ShowToastNotification Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams)  '一般的な通知
+Private Declare PtrSafe Sub ShowToastNotificationWithProgressBar Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams, ByVal ProgressStatus As LongPtr, ByVal progressValue As Double, ByVal ProgressTitle As LongPtr, ByVal ProgressValueStringOverride As LongPtr) 'プログレスバー付き通知
+Private Declare PtrSafe Function UpdateToastNotificationWithProgressBar Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams, ByVal ProgressStatus As LongPtr, ByVal progressValue As Double, ByVal ProgressTitle As LongPtr, ByVal ProgressValueStringOverride As LongPtr, SequenceNumber As Long) As Long 'プログレスバー付き通知の更新用
+Private Declare PtrSafe Function CreateToastCollection Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams, ByVal DisplayName As LongPtr, ByVal LaunchArgs As LongPtr, ByVal IconUri As LongPtr) As Long 'ToastCollectionの作成
+Private Declare PtrSafe Function DeleteToastCollection Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams) As Long 'ToastCollectionの削除
 
 
 
