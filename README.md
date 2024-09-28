@@ -646,7 +646,7 @@ End Sub
 #### 利用可能な引数
 | 引数名            | 説明                                                                                                                           | 既定値            | 
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------- | 
-| [HintStyle](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptivetextstyle)             | 書式設定を施します。指定の文字列を入力することで、それに対応する書式が反映されます | Default | 
+| [HintStyle](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptivetextstyle)             | 書式設定を施します。 | Default | 
 | HintWrap      | ・True：テキストの折り返しが有効になります。<br>・False：テキストの折り返しが無効になります。(最大行数1行)                                        | False | 
 | HintMaxLines | 表示が許可される、テキスト要素の最大行数です。 | 0(上限なし) | 
 | HintMinLines | 表示する必要のある、テキスト要素の最小行数です。 | 0 | 
