@@ -373,6 +373,14 @@ Public Enum AdaptiveTextAlign
     TextAlign_Right   'テキストを右側に水平方向に配置します。
 End Enum
 
+'コンテンツの垂直方向の配置を指定します。
+Public Enum AdaptiveSubgroupTextStacking
+    TextStacking_Default    '既定値です。 レンダラーが既定の垂直方向の配置を自動的に選択します。
+    TextStacking_Top        '上に合わせて垂直に配置されます。
+    TextStacking_Center     '中央に合わせて垂直に配置されます。
+    TextStacking_Bottom     '下に合わせて垂直に配置されます。
+End Enum
+
 
 
 '====================================================================================================
@@ -779,7 +787,7 @@ End Property
 '---------------------------------------------------------------------------------------------------
 '* 注意事項：このプロパティを使用すると以前設定した、subgroup要素内のtext,image要素はリセットされます。
 '***************************************************************************************************
-Public Sub AddToastSubgroup(Optional ByVal Weight As Integer, Optional ByVal TextStacking As String)
+Public Sub AddToastSubgroup(Optional ByVal Weight As Integer, Optional ByVal TextStacking As AdaptiveSubgroupTextStacking)
     '加算処理(0基準)
     SubgroupTotal = SubgroupTotal + 1
 
@@ -790,7 +798,22 @@ Public Sub AddToastSubgroup(Optional ByVal Weight As Integer, Optional ByVal Tex
     With ElementsSubgroup(SubgroupTotal)
         '各属性
         .HintWeight = Weight
-        .HintTextStacking = TextStacking
+        
+        Select Case TextStacking
+
+            Case AdaptiveSubgroupTextStacking.TextStacking_Top
+                .HintTextStacking = "top"
+            
+            Case AdaptiveSubgroupTextStacking.TextStacking_Center
+                .HintTextStacking = "center"
+            
+            Case AdaptiveSubgroupTextStacking.TextStacking_Bottom
+                .HintTextStacking = "bottom"
+            
+            Case Else
+                .HintTextStacking = vbNullString
+        End Select
+        
         
         '順序データ
         .QueueOrder = SubgroupInnerOrder
