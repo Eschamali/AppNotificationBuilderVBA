@@ -209,6 +209,17 @@ Private Type AttributeToast
 End Type
 
 '===================================================================================================
+'位置        ：binding要素に付けれる属性値
+'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-binding
+'---------------------------------------------------------------------------------------------------
+Private ElementBinding As AttributeBinding
+
+Private Type AttributeBinding
+    Baseuri     As String   'イメージ ソース属性の相対 URI と組み合わせた既定のベース URI。
+    template    As String   'この値は "ToastGeneric" に設定する必要があります
+End Type
+
+'===================================================================================================
 '位置        ：binding親要素のimage子要素で使える属性値
 'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-image
 '---------------------------------------------------------------------------------------------------
@@ -216,11 +227,11 @@ Private ElementsImage As ElementImage
 
 'image要素で使える属性
 Private Type AttributeImage
-    addImageQuery As Boolean    'イメージ URI にクエリ文字列を追加できるようにするかの設定値です
+    AddImageQuery As Boolean    'イメージ URI にクエリ文字列を追加できるようにするかの設定値です
     alt           As String     '支援技術のユーザー向けの画像の説明
     src           As String     'イメージ ソースの URI。ローカル画像や、httpsソースも使える
     Placement     As String     'イメージ配置
-    hintcrop      As String     '円にトリミングする印
+    HintCrop      As String     '円にトリミングする印
 End Type
 
 'image要素の立ち位置(属性ノード：placement  の値ごとに分けています)
@@ -256,6 +267,62 @@ Private Type ElementText
     Title       As ParameterText    'タイトル
     Body        As ParameterText    'コンテンツ
     Attribution As ParameterText    '常に下部に表示するもの
+End Type
+
+'====================================================================================================
+'位置        ：subgroup要素に付けれる属性値と値
+'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-subgroup
+'----------------------------------------------------------------------------------------------------
+Private ElementsSubgroup()      As ElementSubgroup, SubgroupTotal As Long
+Private SubgroupInnerTexts()    As SubgroupInnerText, SubgroupInnerTextsTotal As Long
+Private SubgroupInnerImages()   As SubgroupInnerImage, SubgroupInnerImagesTotal As Long
+Private SubgroupInnerOrder()    As SubgroupInnerOrder, SubgroupInnerTotal As Long
+
+'グループ/サブグループの子として配置されるテキスト要素
+'https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptivetext
+Private Type SubgroupInnerText
+    '各属性
+    HintStyle       As String   'テキストのフォント サイズ、太さ、および不透明度を制御します。
+    HintWrap        As Boolean  'true に設定すると、テキストの折り返しが有効になります。
+    HintMaxLines    As Integer  '表示が許可される、テキスト要素の最大行数です。
+    HintMinLines    As Integer  '表示する必要のある、テキスト要素の最小行数です。
+    HintAlign       As String   'テキストの水平方向の配置。
+    Language        As String   'XML ペイロードの対象ロケールです。
+    
+    '値
+    Value          As String   '表示するテキスト。
+End Type
+
+'グループ/サブグループの子として配置されるインライン画像
+'https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptiveimage
+Private Type SubgroupInnerImage
+    '各属性
+    src                 As String   '画像パス
+    HintCrop            As String   'イメージの目的のトリミングを制御
+    HintRemoveMargin    As Boolean  'このプロパティを true に設定することで余白を削除できます。
+    HintAlign           As String   '画像の水平方向の配置です。
+    AlternateText       As String   'アクセシビリティ対応目的で使用される、画像を説明する代替テキストです。
+    AddImageQuery       As Boolean  'クエリ文字列を追加できるようになります
+End Type
+
+'配置順の管理
+Private Type SubgroupInnerOrder
+    UseText           As Boolean  'テキストか画像かのフラグ値
+    TargetElementNo   As Long     '対象の要素No
+End Type
+
+'subgroupに付けれる属性と値、順序データ
+Private Type ElementSubgroup
+    '各属性
+    HintWeight As Integer       '別のサブグループを基準として太さを指定することで、このサブグループの列の幅を制御します。
+    HintTextStacking As String  'このサブグループのコンテンツの垂直方向の配置を制御します。
+
+    '順序データ
+    QueueOrder() As SubgroupInnerOrder
+
+    '値
+    QueueText() As SubgroupInnerText
+    QueueImage() As SubgroupInnerImage
 End Type
 
 '====================================================================================================
@@ -329,7 +396,7 @@ Private ElementInput(1 To MaxElementInputNum) As AttributeInput
 
 Private Type AttributeInput
     '属性一覧
-    ID                 As String    '入力に関連付けられている ID
+    id                 As String    '入力に関連付けられている ID
     Type               As String    'この属性には、"text"、"selection" のいずれかの値を指定できます。
     PlaceHolderContent As String    'テキスト入力用に表示されるプレースホルダー
     Title              As String    '入力のラベルとして表示されるテキスト。
@@ -346,7 +413,7 @@ End Type
 Private ElementHeader As AttributeHeader
 
 Private Type AttributeHeader
-    ID             As String    'このヘッダーを一意に識別します。 2 つの通知が同じヘッダー ID を持つ場合、アクション センターで同じヘッダーの下に表示されます。
+    id             As String    'このヘッダーを一意に識別します。 2 つの通知が同じヘッダー ID を持つ場合、アクション センターで同じヘッダーの下に表示されます。
     Title          As String    'ヘッダーのタイトルです。
     Arguments      As String    'ユーザーがこのヘッダーをクリックするとアプリに返されます。 null にすることはできません。
     ActivationType As String    'このヘッダーがクリックされた場合に使用するアクティブ化の種類。
@@ -529,6 +596,19 @@ Public Property Let AllowToastContent_UseButtonStyle(ByVal ArgUseButtonStyle As 
 End Property
 
 '***************************************************************************************************
+'* 機能　　binding要素の各属性へ値をセット
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：Baseuri    イメージ ソース属性の相対 URI と組み合わせた既定のベース URI。
+'            template   この値は "ToastGeneric" に設定する必要があります
+'***************************************************************************************************
+Public Property Let SetToastBinding(Optional ByVal ArgTemp As String = "ToastGeneric", ByVal ArgBaseURL As String)
+    With ElementBinding
+        .Baseuri = ArgBaseURL
+        .template = ArgTemp     '※この値は "ToastGeneric" に設定する必要があります
+    End With
+End Property
+
+'***************************************************************************************************
 '* 機能　　：binding親要素のimage子要素のうち、インラインに設定する画像のパスと、丸いロゴフラグの設定を行う
 '---------------------------------------------------------------------------------------------------
 '* 引数　　：Arg_InlineImageSrc    イメージ ソースの URI。ファイルパスや、http(s)画像など
@@ -542,10 +622,10 @@ End Property
 Public Property Let SetToastContent_ImageInline(Optional ByVal Arg_InlineCircle As Integer, Optional ByVal Flag_addImageQuery As Boolean, Optional ByVal Arg_Alt As String, ByVal Arg_InlineImageSrc As String)
     With ElementsImage.Inline
         .src = Arg_InlineImageSrc
-        .addImageQuery = Flag_addImageQuery
+        .AddImageQuery = Flag_addImageQuery
         .alt = Arg_Alt
 
-        If Arg_InlineCircle Then .hintcrop = "circle"
+        If Arg_InlineCircle Then .HintCrop = "circle"
     End With
 End Property
 
@@ -559,7 +639,7 @@ End Property
 Public Property Let SetToastContent_ImageHero(Optional ByVal Flag_addImageQuery As Boolean, Optional ByVal Arg_Alt As String, ByVal Arg_HeroImageSrc As String)
     With ElementsImage.Hero
         .src = Arg_HeroImageSrc
-        .addImageQuery = Flag_addImageQuery
+        .AddImageQuery = Flag_addImageQuery
         .alt = Arg_Alt
 
         .Placement = "hero"
@@ -580,12 +660,12 @@ End Property
 Public Property Let SetToastContent_ImageAppLogo(Optional ByVal Arg_LogoCircle As Boolean, Optional ByVal Flag_addImageQuery As Boolean, Optional ByVal Arg_Alt As String, ByVal Arg_AppLogoSrc As String)
     With ElementsImage.AppLogo
         .src = Arg_AppLogoSrc
-        .addImageQuery = Flag_addImageQuery
+        .AddImageQuery = Flag_addImageQuery
         .alt = Arg_Alt
 
         .Placement = "appLogoOverride"
 
-        If Arg_LogoCircle Then .hintcrop = "circle"
+        If Arg_LogoCircle Then .HintCrop = "circle"
     End With
 End Property
 
@@ -638,6 +718,124 @@ Public Property Let SetToastContent_TextAttribute(Optional ByVal HintCallScenari
         .Attribute.HintCallScenarioCenterAlign = HintCallScenarioCenterAlign
 
         .Attribute.Placement = "attribution"
+    End With
+End Property
+
+'***************************************************************************************************
+'* 機能　　：subgroup要素に属性と事前に定義した値をそれぞれ追加します
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：Weight         別のサブグループを基準として太さを指定することで、このサブグループの列の幅を制御します。
+'            TextStacking   このサブグループのコンテンツの垂直方向の配置を制御します。
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：このプロパティを使用すると以前設定した、subgroup要素内のtext,image要素はリセットされます。
+'***************************************************************************************************
+Public Sub AddToastSubgroup(Optional ByVal Weight As Integer, Optional ByVal TextStacking As String)
+    '加算処理(0基準)
+    SubgroupTotal = SubgroupTotal + 1
+
+    '配列を増やします
+    ReDim Preserve ElementsSubgroup(SubgroupTotal)
+    
+    'パラメーターを設定します
+    With ElementsSubgroup(SubgroupTotal)
+        '各属性
+        .HintWeight = Weight
+        .HintTextStacking = TextStacking
+        
+        '順序データ
+        .QueueOrder = SubgroupInnerOrder
+        
+        '各値
+        .QueueText = SubgroupInnerTexts
+        .QueueImage = SubgroupInnerImages
+    End With
+
+    '以前定義したsubgroup要素内のtext,image要素をリセットする
+    '  カウントリセット
+    SubgroupInnerTextsTotal = -1
+    SubgroupInnerImagesTotal = -1
+    SubgroupInnerTotal = -1
+    '  配列リセット
+    ReDim SubgroupInnerTexts(SubgroupInnerTextsTotal + 1)
+    ReDim SubgroupInnerImages(SubgroupInnerImagesTotal + 1)
+    ReDim SubgroupInnerOrder(SubgroupInnerTotal + 1)
+End Sub
+
+'***************************************************************************************************
+'* 機能　　：subgroup親要素のimage子要素に値と属性をそれぞれ追加します
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：       src                 As String   '画像パス
+'                   HintCrop            As String   'イメージの目的のトリミングを制御
+'                   HintRemoveMargin    As Boolean  'このプロパティを true に設定することで余白を削除できます。
+'                   HintAlign           As String   '画像の水平方向の配置です。
+'                   AlternateText       As String   'アクセシビリティ対応目的で使用される、画像を説明する代替テキストです。
+'                   AddImageQuery       As Boolean  'クエリ文字列を追加できるようになります
+'---------------------------------------------------------------------------------------------------
+'* 機能説明：アダプティブを使用した画像をレンダリング出来ます。
+'***************************************************************************************************
+Public Property Let Add_SubgroupInnerImage(Optional ByVal Crop As String, Optional ByVal RemoveMargin As Boolean, Optional ByVal Align As String, Optional ByVal AltText As String, Optional ByVal AddImageQuery As Boolean, ImageSrc As String)
+    '加算処理(0基準)
+    SubgroupInnerImagesTotal = SubgroupInnerImagesTotal + 1     '画像挿入数
+    SubgroupInnerTotal = SubgroupInnerTotal + 1                 'Subgroup要素内の挿入要素数
+    
+    '配列を増やします
+    ReDim Preserve SubgroupInnerImages(SubgroupInnerImagesTotal)
+    
+    '順序データを設定します
+    ReDim Preserve SubgroupInnerOrder(SubgroupInnerTotal)
+    SubgroupInnerOrder(SubgroupInnerTotal).TargetElementNo = SubgroupInnerImagesTotal
+    SubgroupInnerOrder(SubgroupInnerTotal).UseText = False
+
+    'パラメーターを設定します
+    With SubgroupInnerImages(SubgroupInnerImagesTotal)
+        '各属性
+        .src = ImageSrc
+        .HintCrop = Crop
+        .HintRemoveMargin = RemoveMargin
+        .HintAlign = Align
+        .AlternateText = AltText
+        .AddImageQuery = AddImageQuery
+    End With
+End Property
+
+'***************************************************************************************************
+'* 機能　　：subgroup親要素のtext子要素に値と属性をそれぞれ追加します
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：   Style        テキストのフォント サイズ、太さ、および不透明度を制御します。
+'               Wrap         true に設定すると、テキストの折り返しが有効になります。
+'               MaxLines     表示が許可される、テキスト要素の最大行数です。
+'               MinLines     表示する必要のある、テキスト要素の最小行数です。
+'               Align        テキストの水平方向の配置。
+'               Arg_Language XML ペイロードの対象ロケールです。
+'               TextContents 表示テキスト
+'---------------------------------------------------------------------------------------------------
+'* 機能説明：アダプティブを使用したテキストをレンダリング出来ます。
+'***************************************************************************************************
+Public Property Let Add_SubgroupInnerText(Optional ByVal Style As String, Optional ByVal Wrap As Boolean, Optional ByVal MaxLines As Integer, Optional ByVal MinLines As Integer, Optional ByVal Align As String, Optional ByVal Arg_Language As String, ByVal TextContents As String)
+    '加算処理(0基準)
+    SubgroupInnerTextsTotal = SubgroupInnerTextsTotal + 1   'テキスト挿入数
+    SubgroupInnerTotal = SubgroupInnerTotal + 1             'Subgroup要素内の挿入要素数
+    
+    '配列を増やします
+    ReDim Preserve SubgroupInnerTexts(SubgroupInnerTextsTotal)
+    
+    '順序データを設定します
+    ReDim Preserve SubgroupInnerOrder(SubgroupInnerTotal)
+    SubgroupInnerOrder(SubgroupInnerTotal).TargetElementNo = SubgroupInnerTextsTotal
+    SubgroupInnerOrder(SubgroupInnerTotal).UseText = True
+
+    'パラメーターを設定します
+    With SubgroupInnerTexts(SubgroupInnerTextsTotal)
+        '各属性
+        .HintStyle = Style
+        .HintWrap = Wrap
+        .HintMaxLines = MaxLines
+        .HintMinLines = MinLines
+        .HintAlign = Align
+        .Language = Arg_Language
+        
+        '値
+        .Value = TextContents
     End With
 End Property
 
@@ -838,11 +1036,11 @@ End Property
 '            ArgDefaultInput        デフォルトの入力値
 '            Index                  追加位置
 '---------------------------------------------------------------------------------------------------
-'* 注意事項：VBAでは、ChoseFlag：text　は無意味です。
+'* 注意事項：このプロパティを使用すると以前設定したSelection要素はリセットされます。
 '***************************************************************************************************
 Public Property Let SetIToastInput(ByVal ArgID As String, Optional ByVal ChoseFlag As Boolean, Optional ByVal ArgPlaceHolderContent As String, Optional ByVal ArgTitle As String, Optional ByVal ArgDefaultInput As String, ByVal Index As Integer)
     With ElementInput(Index)
-        .ID = ArgID
+        .id = ArgID
 
         'Typeが、"selection"の場合、予め作成されたSelection要素を入れるようにします。
         If ChoseFlag Then
@@ -895,9 +1093,9 @@ Public Property Let SetToastHeader(Optional ByVal ArgID As String, Optional ByVa
     With ElementHeader
         '省略時：このExcelのファイル名
         If StrPtr(ArgID) Then
-            .ID = ArgID
+            .id = ArgID
         Else
-            .ID = ThisWorkbook.Name
+            .id = ThisWorkbook.Name
         End If
 
         '省略時：このExcelの保存フォルダパス
@@ -950,15 +1148,24 @@ Private Function MakeXmlToastContentBuilder(UseProgress As Boolean) As String
     Const NameNode01_01_02__text As String = "text"
     'progress要素
     Const NameNode01_01_03__progress As String = "progress"
+    'group要素
+    Const NameNode01_01_04__group As String = "group"
 
-    '--------------------action要素内で使える要素関係の宣言--------------------
+    '--------------------group要素内で使える要素関係の宣言--------------------
+    Const NameNode01_01_04_01__subgroup As String = "subgroup"
+    'subgroub用text要素
+    Const NameNode01_01_04_01_01__text As String = "text"
+    'subgroub用text要素
+    Const NameNode01_01_04_01_02__image As String = "image"
+    
+    '--------------------actions要素内で使える要素関係の宣言--------------------
     'input要素
     Dim Node03_01__input As MSXML2.IXMLDOMNode: Const NameNode03_01__input As String = "input"
     'action要素
     Const NameNode03_02__action As String = "action"
 
     '--------------------input要素内で使える要素関係の宣言--------------------
-     Const NameNode03_01_01__selection As String = "selection"
+    Const NameNode03_01_01__selection As String = "selection"
 
 
 
@@ -990,16 +1197,23 @@ Private Function MakeXmlToastContentBuilder(UseProgress As Boolean) As String
 
 
 
-    '-------------------------------------------------------visual,binding要素を設定-------------------------------------------------------
+    '-------------------------------------------------------visual要素を設定-------------------------------------------------------
     'ノード：visual  を作成してルートノードの子ノードとして追加します。
     Set Node01__visual = RootNode_toast.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01__visual, ""))
 
     'ノード：binding  を作成して「visual」ノードの子ノードとして追加します。
     Set Node01_01__binding = Node01__visual.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01__binding, ""))
 
-    '属性ノード：template  を作成して値を設定し、先程の「binding」ノードの属性に追加します。
-    '※この値は "ToastGeneric" に設定する必要があります
-    Node01_01__binding.Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "template", "")).NodeValue = "ToastGeneric"
+
+
+    '-------------------------------------------------------binding要素を設定-------------------------------------------------------
+    With Node01_01__binding
+        '属性ノード：template  を作成して値を設定し、先程の「binding」ノードの属性に追加します。
+        .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "template", "")).NodeValue = ElementBinding.template
+
+        '属性ノード：baseUri  を作成して値を設定し、先程の「binding」ノードの属性に追加します。
+        If StrPtr(ElementBinding.Baseuri) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "baseUri", "")).NodeValue = ElementBinding.Baseuri
+    End With
 
 
 
@@ -1010,7 +1224,7 @@ Private Function MakeXmlToastContentBuilder(UseProgress As Boolean) As String
         If StrPtr(ElementsImage.AppLogo.src) Then
             With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_01__image, ""))
                 '属性ノード：addImageQuery  に値があったら、先ほどのノード：image  の属性に追加します
-                If ElementsImage.AppLogo.addImageQuery Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "addImageQuery", "")).NodeValue = LCase(ElementsImage.AppLogo.addImageQuery)   'フラグ値は、全て小文字でないと正しく機能しないので変換をかまします
+                If ElementsImage.AppLogo.AddImageQuery Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "addImageQuery", "")).NodeValue = LCase(ElementsImage.AppLogo.AddImageQuery)   'フラグ値は、全て小文字でないと正しく機能しないので変換をかまします
 
                 '属性ノード：alt  に値があったら、先ほどのノード：image  の属性に追加します
                 If StrPtr(ElementsImage.AppLogo.alt) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "alt", "")).NodeValue = ElementsImage.AppLogo.alt
@@ -1022,7 +1236,7 @@ Private Function MakeXmlToastContentBuilder(UseProgress As Boolean) As String
                 .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "placement", "")).NodeValue = ElementsImage.AppLogo.Placement
 
                 '円にトリミングするフラグがあったら、属性ノード：hint-crop  に値を設定したのを、先ほどのノード：image  の属性に追加します
-                If StrPtr(ElementsImage.AppLogo.hintcrop) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-crop", "")).NodeValue = ElementsImage.AppLogo.hintcrop
+                If StrPtr(ElementsImage.AppLogo.HintCrop) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-crop", "")).NodeValue = ElementsImage.AppLogo.HintCrop
             End With
         End If
 
@@ -1030,7 +1244,7 @@ Private Function MakeXmlToastContentBuilder(UseProgress As Boolean) As String
         If StrPtr(ElementsImage.Inline.src) Then
             With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_01__image, ""))
                 '属性ノード：addImageQuery  に値があったら、先ほどのノード：image  の属性に追加します
-                If ElementsImage.Inline.addImageQuery Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "addImageQuery", "")).NodeValue = LCase(ElementsImage.Inline.addImageQuery)   'フラグ値は、全て小文字でないと正しく機能しないので変換をかまします
+                If ElementsImage.Inline.AddImageQuery Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "addImageQuery", "")).NodeValue = LCase(ElementsImage.Inline.AddImageQuery)   'フラグ値は、全て小文字でないと正しく機能しないので変換をかまします
 
                 '属性ノード：alt  に値があったら、先ほどのノード：image  の属性に追加します
                 If StrPtr(ElementsImage.Inline.alt) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "alt", "")).NodeValue = ElementsImage.Inline.alt
@@ -1039,7 +1253,7 @@ Private Function MakeXmlToastContentBuilder(UseProgress As Boolean) As String
                 .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "src", "")).NodeValue = ElementsImage.Inline.src
 
                 '円にトリミングするフラグがあったら、属性ノード：hint-crop  に値を設定したのを、先ほどのノード：image  の属性に追加します
-                If StrPtr(ElementsImage.Inline.hintcrop) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-crop", "")).NodeValue = ElementsImage.Inline.hintcrop
+                If StrPtr(ElementsImage.Inline.HintCrop) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-crop", "")).NodeValue = ElementsImage.Inline.HintCrop
             End With
         End If
 
@@ -1047,7 +1261,7 @@ Private Function MakeXmlToastContentBuilder(UseProgress As Boolean) As String
         If StrPtr(ElementsImage.Hero.src) Then
             With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_01__image, ""))
                 '属性ノード：addImageQuery  に値があったら、先ほどのノード：image  の属性に追加します
-                If ElementsImage.Hero.addImageQuery Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "addImageQuery", "")).NodeValue = LCase(ElementsImage.Hero.addImageQuery)   'フラグ値は、全て小文字でないと正しく機能しないので変換をかまします
+                If ElementsImage.Hero.AddImageQuery Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "addImageQuery", "")).NodeValue = LCase(ElementsImage.Hero.AddImageQuery)   'フラグ値は、全て小文字でないと正しく機能しないので変換をかまします
 
                 '属性ノード：alt  に値があったら、先ほどのノード：image  の属性に追加します
                 If StrPtr(ElementsImage.Hero.alt) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "alt", "")).NodeValue = ElementsImage.Hero.alt
@@ -1106,6 +1320,44 @@ Private Function MakeXmlToastContentBuilder(UseProgress As Boolean) As String
 
 
 
+    '-------------------------------------------------------group,subgroup要素関係の設定-------------------------------------------------------
+    '条件で付与
+    If True Then
+        Dim ii, jj
+        'ノード：group  を作成して「binding」ノードの子ノードとして追加します。
+        With Node01_01__binding.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_04__group, ""))
+            'ノード：subgroup  を作成して「group」ノードの子ノードとして追加します。
+            For ii = 1 To 5
+                With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_04_01__subgroup, ""))
+                    '属性ノード：hint-align  に値を設定したのを、先ほどのノード：subgroup  の属性に追加します
+                    .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-align", "")).NodeValue = 1
+                
+                    '「text」、「image」を「subgroup」ノードの子ノードとして追加します。
+                    For jj = 1 To 2
+                        'text要素
+                        With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_04_01_01__text, ""))
+                            '値
+                            .Text = ii & "-" & jj & "testtext"
+                            
+                            '各属性
+                            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-align", "")).NodeValue = "center"
+                            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-style", "")).NodeValue = "captionsubtle"
+                        End With
+                    
+                        'image要素
+                        With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_04_01_02__image, ""))
+                            '各属性
+                            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "src", "")).NodeValue = "sample.png"
+                            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-removeMargin", "")).NodeValue = LCase(True)
+                        End With
+                    Next
+                End With
+            Next
+        End With
+    End If
+
+
+
     '-------------------------------------------------------progress要素関係の設定-------------------------------------------------------
     '引数：UseProgress  がTrueなら、「progress」ノードを追加します
     If UseProgress Then
@@ -1149,7 +1401,7 @@ Private Function MakeXmlToastContentBuilder(UseProgress As Boolean) As String
 
     '-------------------------------------------------------actions要素を設定-------------------------------------------------------
     'action要素に、1番目のContent属性または、input要素に、1番目のID属性が設定されてあったら、ノード：actions  を作成してルートノードの子ノードとして追加します。
-    If StrPtr(ElementAction(1).Content) Or StrPtr(ElementInput(1).ID) Then
+    If StrPtr(ElementAction(1).Content) Or StrPtr(ElementInput(1).id) Then
         Set Node03__actions = RootNode_toast.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode03__actions, ""))
 
 
@@ -1159,10 +1411,10 @@ Private Function MakeXmlToastContentBuilder(UseProgress As Boolean) As String
         Dim i As Integer, j As Integer
         For i = 1 To MaxElementInputNum
             '属性ノード：ID  がない場合は、作成をSKIPします
-            If StrPtr(ElementInput(i).ID) Then
+            If StrPtr(ElementInput(i).id) Then
                 Set Node03_01__input = Node03__actions.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode03_01__input, ""))
                 With Node03_01__input.Attributes
-                    .setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "id", "")).NodeValue = ElementInput(i).ID
+                    .setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "id", "")).NodeValue = ElementInput(i).id
                     .setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "type", "")).NodeValue = ElementInput(i).Type
                     If StrPtr(ElementInput(i).PlaceHolderContent) Then .setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "placeHolderContent", "")).NodeValue = ElementInput(i).PlaceHolderContent
                     If StrPtr(ElementInput(i).Title) Then .setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "title", "")).NodeValue = ElementInput(i).Title
@@ -1211,9 +1463,9 @@ Private Function MakeXmlToastContentBuilder(UseProgress As Boolean) As String
 
     '-------------------------------------------------------header要素を設定-------------------------------------------------------
     'header要素に、id属性が設定されてあったら、ノード：header  を作成してルートノードの子ノードとして追加します。
-    If StrPtr(ElementHeader.ID) Then
+    If StrPtr(ElementHeader.id) Then
         With RootNode_toast.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode04__header, ""))
-            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "id", "")).NodeValue = ElementHeader.ID
+            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "id", "")).NodeValue = ElementHeader.id
             .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "title", "")).NodeValue = ElementHeader.Title
             .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "arguments", "")).NodeValue = ElementHeader.Arguments
             .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "activationType", "")).NodeValue = ElementHeader.ActivationType
@@ -2027,14 +2279,17 @@ End Property
 '***************************************************************************************************
 ' ■■■ インスタンス生成時に自動で設定する内容 ■■■
 '***************************************************************************************************
-'* 機能　　：1.トーストのヘッダー情報を設定します。不要ならコメントアウトしてください。デフォルトで以下にしています
+'* 機能　　：・トーストのヘッダー情報を設定します。不要ならコメントアウトしてください。デフォルトで以下にしています
 '               Header_ID           このExcelのファイル名
 '               Header_Title        このExcelのBook名
 '               Header_Arguments    このExcelの保存フォルダパス
 '
-'            2.タイムゾーンを日本基準にします。
+'            ・タイムゾーンを日本基準にします。
 '**************************************************************************************************
 Private Sub Class_Initialize()
+    '必ず設定
+    ElementBinding.template = "ToastGeneric"
+    
     With ThisWorkbook
         '拡張子の位置を調べる
         Dim FileTypePos As Long: FileTypePos = InStrRev(.Name, ".")
@@ -2048,4 +2303,10 @@ Private Sub Class_Initialize()
 
     'タイムゾーンを日本基準にします
     SetTimeZone 9, 0
+    
+    'subgroup要素に関する初期値を設定
+    SubgroupTotal = -1
+    SubgroupInnerTextsTotal = -1
+    SubgroupInnerImagesTotal = -1
+    SubgroupInnerTotal = -1
 End Sub
