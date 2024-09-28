@@ -1321,35 +1321,55 @@ Private Function MakeXmlToastContentBuilder(UseProgress As Boolean) As String
 
 
     '-------------------------------------------------------group,subgroup要素関係の設定-------------------------------------------------------
-    '条件で付与
-    If True Then
-        Dim ii, jj
+    'subgroup要素が定義されてたら、挿入します。
+    Dim i As Integer, j As Integer
+    If SubgroupTotal >= 0 Then
         'ノード：group  を作成して「binding」ノードの子ノードとして追加します。
         With Node01_01__binding.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_04__group, ""))
-            'ノード：subgroup  を作成して「group」ノードの子ノードとして追加します。
-            For ii = 1 To 5
+            '要素位置格納用
+            Dim GetPos As Long
+        
+            'subgroup要素が定義されている分、ノード：subgroup  を作成して「group」ノードの子ノードとして追加します。
+            For i = 0 To SubgroupTotal
                 With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_04_01__subgroup, ""))
-                    '属性ノード：hint-align  に値を設定したのを、先ほどのノード：subgroup  の属性に追加します
-                    .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-align", "")).NodeValue = 1
+                    '各属性
+                    If StrPtr(ElementsSubgroup(i).HintWeight) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-weight", "")).NodeValue = ElementsSubgroup(i).HintWeight
+                    If StrPtr(ElementsSubgroup(i).HintTextStacking) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-textStacking", "")).NodeValue = ElementsSubgroup(i).HintTextStacking
                 
-                    '「text」、「image」を「subgroup」ノードの子ノードとして追加します。
-                    For jj = 1 To 2
-                        'text要素
-                        With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_04_01_01__text, ""))
-                            '値
-                            .Text = ii & "-" & jj & "testtext"
+                
+                    '「text」、「image」を「subgroup」ノードの子ノードとして順番に追加します。
+                    For j = 0 To UBound(ElementsSubgroup(i).QueueOrder)
+                        '現在の順番での要素位置を取得
+                        GetPos = ElementsSubgroup(i).QueueOrder(j).TargetElementNo
+
+                        '画像かテキストを判別
+                        If ElementsSubgroup(i).QueueOrder(j).UseText Then
+                            'text要素を挿入します
+                            With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_04_01_01__text, ""))
+                                '値
+                                .Text = ElementsSubgroup(i).QueueText(GetPos).Value
                             
-                            '各属性
-                            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-align", "")).NodeValue = "center"
-                            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-style", "")).NodeValue = "captionsubtle"
-                        End With
-                    
-                        'image要素
-                        With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_04_01_02__image, ""))
-                            '各属性
-                            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "src", "")).NodeValue = "sample.png"
-                            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-removeMargin", "")).NodeValue = LCase(True)
-                        End With
+                                '各属性
+                                If StrPtr(ElementsSubgroup(i).QueueText(GetPos).HintStyle) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-style", "")).NodeValue = ElementsSubgroup(i).QueueText(GetPos).HintStyle
+                                If ElementsSubgroup(i).QueueText(GetPos).HintWrap Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-wrap", "")).NodeValue = LCase(ElementsSubgroup(i).QueueText(GetPos).HintWrap)
+                                If ElementsSubgroup(i).QueueText(GetPos).HintMaxLines Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-maxLines", "")).NodeValue = ElementsSubgroup(i).QueueText(GetPos).HintMaxLines
+                                If ElementsSubgroup(i).QueueText(GetPos).HintMinLines Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-minLines", "")).NodeValue = ElementsSubgroup(i).QueueText(GetPos).HintMinLines
+                                If StrPtr(ElementsSubgroup(i).QueueText(GetPos).HintAlign) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-align", "")).NodeValue = ElementsSubgroup(i).QueueText(GetPos).HintAlign
+                                If StrPtr(ElementsSubgroup(i).QueueText(GetPos).Language) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "language", "")).NodeValue = ElementsSubgroup(i).QueueText(GetPos).Language
+                            End With
+                        Else
+                            'image要素を挿入します
+                            With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_04_01_02__image, ""))
+                                '各属性
+                                .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "src", "")).NodeValue = ElementsSubgroup(i).QueueImage(GetPos).src
+                                
+                                If StrPtr(ElementsSubgroup(i).QueueImage(GetPos).HintCrop) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-crop", "")).NodeValue = ElementsSubgroup(i).QueueImage(GetPos).HintCrop
+                                If ElementsSubgroup(i).QueueImage(GetPos).HintRemoveMargin Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-removeMargin", "")).NodeValue = LCase(ElementsSubgroup(i).QueueImage(GetPos).HintRemoveMargin)
+                                If StrPtr(ElementsSubgroup(i).QueueImage(GetPos).HintAlign) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-align", "")).NodeValue = ElementsSubgroup(i).QueueImage(GetPos).HintAlign
+                                If StrPtr(ElementsSubgroup(i).QueueImage(GetPos).AlternateText) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "alternateText", "")).NodeValue = ElementsSubgroup(i).QueueImage(GetPos).AlternateText
+                                If ElementsSubgroup(i).QueueImage(GetPos).AddImageQuery Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "addImageQuery", "")).NodeValue = LCase(ElementsSubgroup(i).QueueImage(GetPos).AddImageQuery)
+                            End With
+                        End If
                     Next
                 End With
             Next
@@ -1408,7 +1428,6 @@ Private Function MakeXmlToastContentBuilder(UseProgress As Boolean) As String
         '-------------------------------------------------------input要素を設定-------------------------------------------------------
         '各属性ノードを作成して値を設定し、「input」ノードの属性に追加します。
         '5つまで、繰り返す
-        Dim i As Integer, j As Integer
         For i = 1 To MaxElementInputNum
             '属性ノード：ID  がない場合は、作成をSKIPします
             If StrPtr(ElementInput(i).id) Then
