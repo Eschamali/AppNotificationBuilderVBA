@@ -635,7 +635,128 @@ End Sub
 ![alt text](doc/Ex_Element-Action1-1.png) ![alt text](doc/Ex_Element-Action1-2.png)
 
 ## [subgroup要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-subgroup)
-現時点では、作成アシストには非対応です。
+更に情報を追加したい場合にお使い下さい。比較的、カスタマイズ性が高いです。
+### [Add_SubgroupInnerText](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptivetext)
+テキスト要素を追加します。ある程度の書式設定が可能です。
+
+#### 設定値
+任意の文字列<br>
+折り返しを使用する場合は引数：HintWrap を True にすること。
+
+#### 利用可能な引数
+| 引数名            | 説明                                                                                                                           | 既定値            | 
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------- | 
+| [HintStyle](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptivetextstyle)             | 書式設定を施します。指定の文字列を入力することで、それに対応する書式が反映されます | Default | 
+| HintWrap      | ・True：テキストの折り返しが有効になります。<br>・False：テキストの折り返しが無効になります。(最大行数1行)                                        | False | 
+| HintMaxLines | 表示が許可される、テキスト要素の最大行数です。 | 0(上限なし) | 
+| HintMinLines | 表示する必要のある、テキスト要素の最小行数です。 | 0 | 
+| [HintAlign](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptivetextalign) | テキストの水平方向の配置を指定します。             | Default | 
+| Language | "en-US" や "ja-JP" のように BCP-47 言語タグとして指定されます。 | vbnullstring | 
+
+### [Add_SubgroupInnerImage](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptiveimage)
+画像要素を追加します。
+
+#### 設定値
+画像パス<br>
+ローカルパス、httpソースがつかえます。
+
+#### 利用可能な引数
+| 引数名            | 説明                                                                                                                           | 既定値            | 
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------- | 
+| [HintCrop](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptiveimagecrop)  | イメージの目的のトリミングを制御します。 | Default | 
+| HintRemoveMargin      | ・True：8 ピクセルの余白を生成(マージン処理)<br>・False：マージン処理なし                                       | True | 
+| [HintAlign](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptiveimagealign) | 画像の水平方向の配置です。 | Default  | 
+| AlternateText | アクセシビリティ対応目的で使用される、画像を説明する代替テキストです。 | Default  | 
+| AddImageQuery | ・True：クエリ文字列付きURLを許可<br>・False：クエリ文字列付きURLを拒否  | False  | 
+
+### [AddToastSubgroup](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptivesubgroup)
+事前に、Add_SubgroupInnerText、Add_SubgroupInnerImage を呼び出した物に対して、Subgroup要素に挿入します。<br>
+なお、これを呼び出すと以前設定した、subgroup要素内のtext,image要素はリセットされます。
+#### 利用可能な引数
+| 引数名            | 説明                                                                                                                           | 
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------ | 
+| HintWeight        | 列の幅を制御します。         |
+| [HintTextStacking](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptivesubgrouptextstacking)  | 垂直方向の配置を制御します。  |
+
+#### サンプルコード
+次のコードは、週間天気予報っぽい通知を作成します
+```bas
+Sub 天気予報ライク()
+    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim ActionCmd As String
+    
+    With AppNotification
+        'ネット上の画像を使うようにする
+        .AllowUse_InternetImage = True
+        
+        'ルートURLを設定
+        .SetToastBinding = "https://weathernews.jp/s/topics/img/wxicon/"
+        
+        'タイトル
+        .SetToastContent_TextTitle = "来週の天気予報"
+        .SetToastHeader(vbNullString) = ""
+        
+        '1subgroup
+        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "Mon"
+        .Add_SubgroupInnerImage = "100.png"
+        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "29℃"
+        .Add_SubgroupInnerText(TextStyle_CaptionSubtle, , , , TextAlign_Center) = "23℃"
+        .AddToastSubgroup (1)
+
+        '2subgroup
+        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "Tue"
+        .Add_SubgroupInnerImage = "550.png"
+        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "36℃"
+        .Add_SubgroupInnerText(TextStyle_CaptionSubtle, , , , TextAlign_Center) = "26℃"
+        .AddToastSubgroup (1)
+
+        '3subgroup
+        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "Wed"
+        .Add_SubgroupInnerImage = "200.png"
+        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "26℃"
+        .Add_SubgroupInnerText(TextStyle_CaptionSubtle, , , , TextAlign_Center) = "23℃"
+        .AddToastSubgroup (1)
+
+        '4subgroup
+        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "Thu"
+        .Add_SubgroupInnerImage = "300.png"
+        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "25℃"
+        .Add_SubgroupInnerText(TextStyle_CaptionSubtle, , , , TextAlign_Center) = "23℃"
+        .AddToastSubgroup (1)
+
+        '5subgroup
+        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "Fri"
+        .Add_SubgroupInnerImage = "850.png"
+        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "24℃"
+        .Add_SubgroupInnerText(TextStyle_CaptionSubtle, , , , TextAlign_Center) = "22℃"
+        .AddToastSubgroup (1)
+
+        '6subgroup
+        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "Sat"
+        .Add_SubgroupInnerImage = "430.png"
+        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "20℃"
+        .Add_SubgroupInnerText(TextStyle_CaptionSubtle, , , , TextAlign_Center) = "14℃"
+        .AddToastSubgroup (1)
+
+        '7subgroup
+        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "Sun"
+        .Add_SubgroupInnerImage = "411.png"
+        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "21℃"
+        .Add_SubgroupInnerText(TextStyle_CaptionSubtle, , , , TextAlign_Center) = "18℃"
+        .AddToastSubgroup (1)
+
+
+
+        '実行コマンドを格納
+        ActionCmd = .GenerateCmd_ToastNotifierShow("sample033")
+
+        '通知表示
+        .RunDll_ToastNotifierShow "sample033"
+        'wsh.Run ActionCmd, 0, False
+    End With
+End Sub
+```
+![alt text](doc/Ex_Element-Subgroup.png)
 
 ## [header要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-header)
 ### SetToastHeader
@@ -1420,13 +1541,9 @@ Sub ToastTrigger_Close(UserInputs As Variant)
     MsgBox "回答をキャンセルしました", vbExclamation, "回答辞退"
 End Sub
 ```
+![alt text](doc/ToastActived2.png)<br>
 アプリ通知で選択した選択肢や、入力テキストを扱う場合は、予め辞書型（Scripting.Dictionary）で内容をインポートして処理することをおすすめします。
 
 # Attention
 DLL側の処理は、ある程度のエラー処理を施していますが、現時点ではあまり完璧ではありません。<br>
 一応、クラスファイル側でもエラー処理を施していますが、突然Excelが落ちることがあるので利用前には保存を推奨します。
-
-# Todo
-## subgroup要素について
-他のスキーマ要素と比べて、かなり複雑な変数管理が必要なため、追加は一旦保留です。<br>
-これも出来たら面白そうではあるので、いずれ追加は行おうと思います。

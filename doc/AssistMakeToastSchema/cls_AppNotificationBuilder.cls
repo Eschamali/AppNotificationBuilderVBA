@@ -325,6 +325,56 @@ Private Type ElementSubgroup
     QueueImage() As SubgroupInnerImage
 End Type
 
+'<subgroup用の便利な列挙型>
+'画像トリミングを指定します。
+Public Enum AdaptiveImageCrop
+    ImageCrop_Default   '既定値です。トリミングの動作がレンダラーによって決定されます。
+    ImageCrop_None      '画像がトリミングされません。
+    ImageCrop_Circle    '画像が円形にトリミングされます。
+End Enum
+
+'画像の水平方向の配置を指定します。
+Public Enum AdaptiveImageAlign
+    ImageAlign_Default  '既定値です。配置の動作がレンダラーによって決定されます。
+    ImageAlign_Stretch  '利用可能な幅いっぱいに画像が拡大されます (また同時に、画像が配置される位置に応じて、利用可能な高さいっぱいに拡大されることもあります)。
+    ImageAlign_Left     '画像を左側に配置し、ネイディブの解像度で表示します。
+    ImageAlign_Center   '画像を中央に水平方向に配置し、ネイティブの解像度で表示します。
+    ImageAlign_Right    '画像を右側に配置し、ネイディブの解像度で表示します。
+End Enum
+
+'フォント サイズ、太さ、および不透明度を制御します。 "Subtle" の不透明度は 60% の不透明度になります。
+Public Enum AdaptiveTextStyle
+    TextStyle_Default           '既定値です。 スタイルがレンダラーによって決定されます。
+    TextStyle_Caption           '段落のフォント サイズより小さいサイズです。
+    TextStyle_CaptionSubtle     'Caption と同じですが、不透明度が Subtle です。
+    TextStyle_Body              '段落本文のフォント サイズです。
+    TextStyle_BodySubtle        'Body と同じですが、不透明度が Subtle です。
+    TextStyle_Base              '段落本文のフォント サイズで、太字です。 基本的には、Body の太字バージョンと言えます。
+    TextStyle_BaseSubtle        'Base と同じですが、不透明度が Subtle です。
+    TextStyle_Subtitle          'H4 のフォント サイズです。
+    TextStyle_SubtitleSubtle    'Subtitle と同じですが、不透明度が Subtle です。
+    TextStyle_Title             'H3 のフォント サイズです。
+    TextStyle_TitleSubtle       'Title と同じですが、不透明度が Subtle です。
+    TextStyle_TitleNumeral      'Title と同じですが、上/下のパディングが削除されます。
+    TextStyle_Subheader         'H2 のフォント サイズです。
+    TextStyle_SubheaderSubtle   'Subheader と同じですが、不透明度が Subtle です。
+    TextStyle_SubheaderNumeral  'Subheader と同じですが、上/下のパディングが削除されます。
+    TextStyle_Header            'H1 のフォント サイズです。
+    TextStyle_HeaderSubtle      'Header と同じですが、不透明度が Subtle です。
+    TextStyle_HeaderNumeral     'Header と同じですが、上/下のパディングが削除されます。
+End Enum
+
+'テキストの水平方向の配置を制御します。
+Public Enum AdaptiveTextAlign
+    TextAlign_Default '既定値です。 配置がレンダラーによって自動的に決定されます。
+    TextAlign_Auto    '配置が現在の言語とカルチャによって決定されます。
+    TextAlign_Left    'テキストを左側に水平方向に配置します。
+    TextAlign_Center  'テキストを中央に水平方向に配置します。
+    TextAlign_Right   'テキストを右側に水平方向に配置します。
+End Enum
+
+
+
 '====================================================================================================
 '位置        ：binding親要素のprogress子要素で使える属性値
 'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-progress
@@ -773,7 +823,7 @@ End Sub
 '---------------------------------------------------------------------------------------------------
 '* 機能説明：アダプティブを使用した画像をレンダリング出来ます。
 '***************************************************************************************************
-Public Property Let Add_SubgroupInnerImage(Optional ByVal Crop As String, Optional ByVal RemoveMargin As Boolean, Optional ByVal Align As String, Optional ByVal AltText As String, Optional ByVal AddImageQuery As Boolean, ImageSrc As String)
+Public Property Let Add_SubgroupInnerImage(Optional ByVal Crop As AdaptiveImageCrop, Optional ByVal RemoveMargin As Boolean, Optional ByVal Align As AdaptiveImageAlign, Optional ByVal AltText As String, Optional ByVal AddImageQuery As Boolean, ImageSrc As String)
     '加算処理(0基準)
     SubgroupInnerImagesTotal = SubgroupInnerImagesTotal + 1     '画像挿入数
     SubgroupInnerTotal = SubgroupInnerTotal + 1                 'Subgroup要素内の挿入要素数
@@ -790,9 +840,37 @@ Public Property Let Add_SubgroupInnerImage(Optional ByVal Crop As String, Option
     With SubgroupInnerImages(SubgroupInnerImagesTotal)
         '各属性
         .src = ImageSrc
-        .HintCrop = Crop
+        
+        Select Case Crop
+            Case AdaptiveImageCrop.ImageCrop_Circle
+                .HintCrop = "circle"
+            
+            Case AdaptiveImageCrop.ImageCrop_None
+                .HintCrop = "none"
+            
+            Case Else
+                .HintCrop = vbNullString
+        End Select
+        
         .HintRemoveMargin = RemoveMargin
-        .HintAlign = Align
+        
+        Select Case Align
+            Case AdaptiveImageAlign.ImageAlign_Stretch
+                .HintAlign = "stretch"
+            
+            Case AdaptiveImageAlign.ImageAlign_Left
+                .HintAlign = "left"
+            
+            Case AdaptiveImageAlign.ImageAlign_Center
+                .HintAlign = "center"
+            
+            Case AdaptiveImageAlign.ImageAlign_Right
+                .HintAlign = "right"
+            
+            Case Else
+                .HintAlign = vbNullString
+        End Select
+        
         .AlternateText = AltText
         .AddImageQuery = AddImageQuery
     End With
@@ -811,7 +889,7 @@ End Property
 '---------------------------------------------------------------------------------------------------
 '* 機能説明：アダプティブを使用したテキストをレンダリング出来ます。
 '***************************************************************************************************
-Public Property Let Add_SubgroupInnerText(Optional ByVal Style As String, Optional ByVal Wrap As Boolean, Optional ByVal MaxLines As Integer, Optional ByVal MinLines As Integer, Optional ByVal Align As String, Optional ByVal Arg_Language As String, ByVal TextContents As String)
+Public Property Let Add_SubgroupInnerText(Optional ByVal Style As AdaptiveTextStyle, Optional ByVal Wrap As Boolean, Optional ByVal MaxLines As Integer, Optional ByVal MinLines As Integer, Optional ByVal Align As AdaptiveTextAlign, Optional ByVal Arg_Language As String, ByVal TextContents As String)
     '加算処理(0基準)
     SubgroupInnerTextsTotal = SubgroupInnerTextsTotal + 1   'テキスト挿入数
     SubgroupInnerTotal = SubgroupInnerTotal + 1             'Subgroup要素内の挿入要素数
@@ -827,11 +905,84 @@ Public Property Let Add_SubgroupInnerText(Optional ByVal Style As String, Option
     'パラメーターを設定します
     With SubgroupInnerTexts(SubgroupInnerTextsTotal)
         '各属性
-        .HintStyle = Style
+        Select Case Style
+            Case AdaptiveTextStyle.TextStyle_Caption
+                .HintStyle = "caption"
+
+            Case AdaptiveTextStyle.TextStyle_CaptionSubtle
+                .HintStyle = "captionsubtle"
+
+            Case AdaptiveTextStyle.TextStyle_Body
+                .HintStyle = "body"
+
+            Case AdaptiveTextStyle.TextStyle_BodySubtle
+                .HintStyle = "bodysubtle"
+
+            Case AdaptiveTextStyle.TextStyle_Base
+                .HintStyle = "base"
+
+            Case AdaptiveTextStyle.TextStyle_BaseSubtle
+                .HintStyle = "basesubtle"
+
+            Case AdaptiveTextStyle.TextStyle_Subtitle
+                .HintStyle = "subtitle"
+
+            Case AdaptiveTextStyle.TextStyle_SubtitleSubtle
+                .HintStyle = "subtitlesubtle"
+
+            Case AdaptiveTextStyle.TextStyle_Title
+                .HintStyle = "title"
+
+            Case AdaptiveTextStyle.TextStyle_TitleSubtle
+                .HintStyle = "titlesubtle"
+
+            Case AdaptiveTextStyle.TextStyle_TitleNumeral
+                .HintStyle = "titlenumeral"
+
+            Case AdaptiveTextStyle.TextStyle_Subheader
+                .HintStyle = "subheader"
+
+            Case AdaptiveTextStyle.TextStyle_SubheaderSubtle
+                .HintStyle = "subheadersubtle"
+
+            Case AdaptiveTextStyle.TextStyle_SubheaderNumeral
+                .HintStyle = "subheadernumeral"
+
+            Case AdaptiveTextStyle.TextStyle_Header
+                .HintStyle = "header"
+
+            Case AdaptiveTextStyle.TextStyle_HeaderSubtle
+                .HintStyle = "headersubtle"
+
+            Case AdaptiveTextStyle.TextStyle_HeaderNumeral
+                .HintStyle = "headernumeral"
+            
+            Case Else
+                .HintStyle = vbNullString
+        
+        End Select
+
         .HintWrap = Wrap
         .HintMaxLines = MaxLines
         .HintMinLines = MinLines
-        .HintAlign = Align
+        
+        Select Case Align
+            Case AdaptiveTextAlign.TextAlign_Auto
+                .HintAlign = "auto"
+            
+            Case AdaptiveTextAlign.TextAlign_Left
+                .HintAlign = "left"
+            
+            Case AdaptiveTextAlign.TextAlign_Center
+                .HintAlign = "center"
+            
+            Case AdaptiveTextAlign.TextAlign_Right
+                .HintAlign = "right"
+            
+            Case Else
+                .HintAlign = vbNullString
+        End Select
+        
         .Language = Arg_Language
         
         '値
