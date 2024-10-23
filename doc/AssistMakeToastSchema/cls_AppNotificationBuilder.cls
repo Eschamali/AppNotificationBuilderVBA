@@ -66,7 +66,7 @@ Private Declare PtrSafe Function mciSendString Lib "winmm.dll" Alias "mciSendStr
 '***************************************************************************************************
 '■■■ 一部の設定プロパティ値を列挙型で宣言 ■■■
 '***************************************************************************************************
-'トーストが表すシナリオを指定します。数字の代わりにこの名称でも機能します。
+'  機能     ：トーストが表すシナリオを指定します。数字の代わりにこの名称でも機能します。
 '---------------------------------------------------------------------------------------------------
 Public Enum ToastScenario
     Default
@@ -77,7 +77,7 @@ Public Enum ToastScenario
 End Enum
 
 '===================================================================================================
-'トースト通知を表示するときに再生するサウンドを指定します。数字の代わりにこの名称でも機能します。
+'  機能     ：トースト通知を表示するときに再生するサウンドを指定します。数字の代わりにこの名称でも機能します。
 '---------------------------------------------------------------------------------------------------
 Public Enum MsWinSoundEvent
     NotificationDefault = 1
@@ -108,12 +108,21 @@ Public Enum MsWinSoundEvent
 End Enum
 
 '===================================================================================================
-'ボタンのスタイルを指定します。数字の代わりにこの名称でも機能します。
+'  機能     ：ボタンのスタイルを指定します。数字の代わりにこの名称でも機能します。
 '---------------------------------------------------------------------------------------------------
 Public Enum ToastButtonStyle
     NoStyle
     Success
     Critical
+End Enum
+
+'===================================================================================================
+'  機能     ：ユーザーが特定の操作を行った際に使用されるアクティブ化の種類を決定します。
+'---------------------------------------------------------------------------------------------------
+Public Enum ToastActivationType
+    Foreground = 1  'フォアグラウンド アプリが起動します。
+    background      '対応するバックグラウンド タスクがトリガーされ、ユーザーを中断することなくバックグラウンドでコードを実行できます。
+    Protocol        'プロトコルのアクティブ化を使用して別のアプリを起動します。
 End Enum
 
 '---------------------------------------------------------------------------------------------------
@@ -531,6 +540,22 @@ Public Sub SetTimeZone(ByVal ArgUTC_Hour As Integer, ByVal ArgUTC_Minute As Inte
 End Sub
 
 '===================================================================================================
+'* 機能    ：引数に応じて、アクティブ化の種類を文字列で返します
+'---------------------------------------------------------------------------------------------------
+Private Function ActivationMode(ByVal activationID As ToastActivationType) As String
+    Select Case activationID
+        Case 1
+            ActivationMode = "foreground"
+        Case 2
+            ActivationMode = "background"
+        Case 3
+            ActivationMode = "protocol"
+        Case Else
+            ActivationMode = vbNullString
+    End Select
+End Function
+
+'===================================================================================================
 '* 機能    ：設定値を纏めたユーザー定義型：ToastNotification　を基に、DLLで扱えるユーザー定義型：ToastNotificationParams　に変換します
 '---------------------------------------------------------------------------------------------------
 '* 注意事項：Windows API の文字列関係は、ポインターで取得するパターンが多いので、StrPtrで経由する必要があります
@@ -587,10 +612,10 @@ End Property
 '* 引数　　：ArgSchema          起動スキーマ。URLやファイルパスなど
 '            ArgActivationType  このヘッダーがクリックされた場合に使用するアクティブ化の種類(VBAでは、"protocol"以外では意味をなしません)
 '***************************************************************************************************
-Public Property Let SetToastContent_Launch(Optional ByVal ArgActivationType As String = "protocol", ByVal ArgSchema As String)
+Public Property Let SetToastContent_Launch(Optional ByVal ArgActivationType As ActivationType = 3, ByVal ArgSchema As String)
     With ElementToast
         .Launch = ArgSchema
-        .ActivationType = ArgActivationType     'プロトコルのアクティブ化を使用して別のアプリを起動します。(ArgActivationTypeがprotocolの場合)
+        .ActivationType = ActivationMode(ArgActivationType)
     End With
 End Property
 
@@ -1170,12 +1195,12 @@ End Property
 '            ArgHintToolTip     ボタンに空のコンテンツ文字列がある場合のボタンのヒント。
 '            Index              追加位置
 '***************************************************************************************************
-Public Property Let SetIToastActions(ByVal ArgContent As String, ByVal ArgArguments As String, Optional ByVal ArgActivationType As String = "protocol", Optional ArgPendingUpdate As Boolean, Optional ByVal ArgContextMenu As Boolean, Optional ByVal ArgIcon As String, Optional ByVal ArgHintInputId As String, Optional ArgHintButtonStyle As ToastButtonStyle, Optional ByVal ArgHintToolTip As String, ByVal Index As Integer)
+Public Property Let SetIToastActions(ByVal ArgContent As String, ByVal ArgArguments As String, Optional ByVal ArgActivationType As ToastActivationType = 3, Optional ArgPendingUpdate As Boolean, Optional ByVal ArgContextMenu As Boolean, Optional ByVal ArgIcon As String, Optional ByVal ArgHintInputId As String, Optional ArgHintButtonStyle As ToastButtonStyle, Optional ByVal ArgHintToolTip As String, ByVal Index As Integer)
     With ElementAction(Index)
 
         .Content = ArgContent
         .Arguments = ArgArguments
-        .ActivationType = ArgActivationType
+        .ActivationType = ActivationMode(ArgActivationType)
 
         If ArgPendingUpdate Then .afterActivationBehavior = "pendingUpdate"
         If ArgContextMenu Then .Placement = "contextMenu"
@@ -1263,7 +1288,7 @@ End Property
 '---------------------------------------------------------------------------------------------------
 '* 注意事項：VBAでは、ArgActivationType:"protocol"以外では意味をなしません
 '***************************************************************************************************
-Public Property Let SetToastHeader(Optional ByVal ArgID As String, Optional ByVal ArgArguments As String, Optional ByVal ArgActivationType As String = "protocol", ByVal ArgTitle As String)
+Public Property Let SetToastHeader(Optional ByVal ArgID As String, Optional ByVal ArgArguments As String, Optional ByVal ArgActivationType As ToastActivationType = 3, ByVal ArgTitle As String)
     With ElementHeader
         '省略時：このExcelのファイル名
         If StrPtr(ArgID) Then
@@ -1280,7 +1305,7 @@ Public Property Let SetToastHeader(Optional ByVal ArgID As String, Optional ByVa
         End If
 
         '省略時：protocol
-        .ActivationType = ArgActivationType
+        .ActivationType = ActivationMode(ArgActivationType)
 
         .Title = ArgTitle
     End With
