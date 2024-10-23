@@ -603,7 +603,7 @@ End Function
 '* 注意事項：アクセシビリティ→視覚効果→この時間が経過したら通知を破棄する  で表示時間をオーバーライド可能です。(longの場合は、上回る場合にオーバーライド)
 '***************************************************************************************************
 Public Property Let SetToastContent_Duration(ByVal ArgExtensionDuration As Boolean)
-    If ArgExtensionDuration Then ElementToast.Duration = "long"
+    If ArgExtensionDuration Then ElementToast.Duration = "long" Else ElementToast.Duration = vbNullString
 End Property
 
 '***************************************************************************************************
@@ -612,7 +612,7 @@ End Property
 '* 引数　　：ArgSchema          起動スキーマ。URLやファイルパスなど
 '            ArgActivationType  このヘッダーがクリックされた場合に使用するアクティブ化の種類(VBAでは、"protocol"以外では意味をなしません)
 '***************************************************************************************************
-Public Property Let SetToastContent_Launch(Optional ByVal ArgActivationType As ActivationType = 3, ByVal ArgSchema As String)
+Public Property Let SetToastContent_Launch(Optional ByVal ArgActivationType As ToastActivationType = 3, ByVal ArgSchema As String)
     With ElementToast
         .Launch = ArgSchema
         .ActivationType = ActivationMode(ArgActivationType)
@@ -629,7 +629,7 @@ End Property
 '***************************************************************************************************
 Public Property Let SetToastContent_DisplayTimestamp(Optional ArgUTC_Hour As Integer = 9, Optional ArgUTC_Minute As Integer = 0, ByVal ArgDisplayTimestamp As Date)
     With WorksheetFunction
-        If ArgDisplayTimestamp Then ElementToast.DisplayTimestamp = .Text(ArgDisplayTimestamp, "yyyy-mm-ddThh:mm:ss") & .Text(TargetTimeZone.Hour, "+00:;-00:") & .Text(TargetTimeZone.Minute, "00")
+        If ArgDisplayTimestamp Then ElementToast.DisplayTimestamp = .Text(ArgDisplayTimestamp, "yyyy-mm-ddThh:mm:ss") & .Text(TargetTimeZone.Hour, "+00:;-00:") & .Text(TargetTimeZone.Minute, "00") Else ElementToast.DisplayTimestamp = vbNullString
     End With
 End Property
 
@@ -708,7 +708,7 @@ Public Property Let SetToastContent_ImageInline(Optional ByVal Arg_InlineCircle 
         .AddImageQuery = Flag_addImageQuery
         .alt = Arg_Alt
 
-        If Arg_InlineCircle Then .HintCrop = "circle"
+        If Arg_InlineCircle Then .HintCrop = "circle" Else .HintCrop = vbNullString
     End With
 End Property
 
@@ -748,7 +748,7 @@ Public Property Let SetToastContent_ImageAppLogo(Optional ByVal Arg_LogoCircle A
 
         .Placement = "appLogoOverride"
 
-        If Arg_LogoCircle Then .HintCrop = "circle"
+        If Arg_LogoCircle Then .HintCrop = "circle" Else .HintCrop = vbNullString
     End With
 End Property
 
@@ -1202,8 +1202,8 @@ Public Property Let SetIToastActions(ByVal ArgContent As String, ByVal ArgArgume
         .Arguments = ArgArguments
         .ActivationType = ActivationMode(ArgActivationType)
 
-        If ArgPendingUpdate Then .afterActivationBehavior = "pendingUpdate"
-        If ArgContextMenu Then .Placement = "contextMenu"
+        If ArgPendingUpdate Then .afterActivationBehavior = "pendingUpdate" Else .afterActivationBehavior = vbNullString
+        If ArgContextMenu Then .Placement = "contextMenu" Else .Placement = vbNullString
 
         .ImageUri = ArgIcon
         .HintInputId = ArgHintInputId
