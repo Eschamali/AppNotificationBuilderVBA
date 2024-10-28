@@ -60,6 +60,7 @@ Private Declare PtrSafe Function DeleteToastCollection Lib "AppNotificationBuild
 '  機能     ：Windows API：mciSendString  を使って任意のパスやURLの音源ファイルを再生させる機能です
 '---------------------------------------------------------------------------------------------------
 Private Declare PtrSafe Function mciSendString Lib "winmm.dll" Alias "mciSendStringA" (ByVal lpstrCommand As String, ByVal lpstrReturnString As String, ByVal uReturnLength As Long, ByVal hwndCallback As Long) As Long
+Private Declare PtrSafe Function URLDownloadToFile Lib "urlmon" Alias "URLDownloadToFileA" (ByVal pCaller As Long, ByVal szURL As String, ByVal szFileName As String, ByVal dwReserved As Long, ByVal lpfnCB As Long) As Long
 
 
 
@@ -1982,6 +1983,48 @@ Public Property Let CustomNotificationSoundPlay(ByVal SoundURI As String)
     '再生
     mciSendString "Play """ & SoundURI & Chr(34), "", 0, 0
 End Property
+
+
+
+'***************************************************************************************************
+'                           ■■■ URLDownloadToFile  に関するメソッド ■■■
+'***************************************************************************************************
+'* 機能　　：インターネット上の画像ファイルをダウンロードし、トーストの画像ソースとして使用できる準備をします
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：保存先ローカルパス
+'* 引数　　：SourceURI          画像イメージURL
+'          ：SaveCurrentDir     保存先ディレクトリパス。指定無しの場合、ユーザーのtempフォルダに保存されます
+'---------------------------------------------------------------------------------------------------
+'* 機能説明：httpソースが使えないAppUserModelIDでも、WindowsAPI:URLDownloadToFile で擬似的にできるようにします。
+'***************************************************************************************************
+Public Function UseHttpImage(SourceURL As String, Optional SaveCurrentDir As String)
+    'URLの「/」区切りの最後の部分をファイル名として指定
+    Dim SaveImageFileName As String, tmp
+    tmp = Split(SourceURL, "/")
+    
+    '保存時の禁則文字を防ぐため、URLエンコードを使います。
+    SaveImageFileName = WorksheetFunction.EncodeURL(tmp(UBound(tmp)))
+
+    '保存先フルパスを指定
+    Dim TempDir As String, TargetFullPass As String
+    If StrPtr(SaveCurrentDir) Then
+        '保存先が指定されてたらそれにする
+        TempDir = SaveCurrentDir
+    Else
+        '規定のtempフォルダパス
+        TempDir = Environ("tmp")
+    End If
+    TargetFullPass = WorksheetFunction.TextJoin("\", True, TempDir, SaveImageFileName)
+
+    'キャッシュが消えてたら再度ダウンロードして保存
+    If Dir(TargetFullPass, vbNormal) = "" Then
+        'ダウンロード開始
+        URLDownloadToFile 0, SourceURL, TargetFullPass, 0, 0
+    End If
+    
+    '返却
+    UseHttpImage = TargetFullPass
+End Function
 
 
 
