@@ -1681,8 +1681,8 @@ Private Function MakeXmlToastContentBuilder(UseProgress As Boolean) As String
 
 
     '-------------------------------------------------------header要素を設定-------------------------------------------------------
-    'header要素に、id属性が設定されてあったら、ノード：header  を作成してルートノードの子ノードとして追加します。
-    If StrPtr(ElementHeader.id) Then
+    'header要素に、Title属性が設定されてあったら、ノード：header  を作成してルートノードの子ノードとして追加します。
+    If StrPtr(ElementHeader.Title) Then
         With RootNode_toast.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode04__header, ""))
             .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "id", "")).NodeValue = ElementHeader.id
             .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "title", "")).NodeValue = ElementHeader.Title
