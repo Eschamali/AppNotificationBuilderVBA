@@ -609,6 +609,43 @@ long __stdcall UpdateToastNotificationWithProgressBar(ToastNotificationParams* T
 }
 
 //***************************************************************************************************
+//* 処理名　：RemoveToastNotification
+//* 機能　　：トースト通知を削除します
+//---------------------------------------------------------------------------------------------------
+//* 引数　　：ToastConfigData    ヘッダーファイルに定義した引数。ここから必要な値を使用する方針です
+//---------------------------------------------------------------------------------------------------
+//* 機能説明：最も細かく設定できる引数、tag,group,appid　の3つで削除を指定します。
+//***************************************************************************************************
+void __stdcall RemoveToastNotification(ToastNotificationParams* ToastConfigData) {
+    // COMの初期化
+    HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    if (hr == RPC_E_CHANGED_MODE) {
+        // 既に異なるアパートメント モードで初期化されている場合は、そのまま続行
+    }
+    else if (FAILED(hr)) {
+        wchar_t errorMsg[256];
+        swprintf_s(errorMsg, 256, L"COM初期化に失敗しました。HRESULT: 0x%08X", hr);
+        MessageBoxW(nullptr, errorMsg, L"エラー", MB_OK);
+        return;
+    }
+
+    try{
+
+        //値Check用
+        //MessageBoxW(nullptr, ToastConfigData->AppUserModelID, L"AppUserModelID", MB_OK);
+        //MessageBoxW(nullptr, ToastConfigData->Tag, L"Tag", MB_OK);
+        //MessageBoxW(nullptr, ToastConfigData->Group, L"Group", MB_OK);
+
+        // ToastNotificationManagerからToastNotificationHistory.Remove メソッドを使用し、該当の通知を削除する
+        ToastNotificationManager::History().Remove(ToastConfigData->Tag, ToastConfigData->Group, ToastConfigData->AppUserModelID);
+    }
+    catch (const hresult_error& ex){
+        // エラー処理: 必要に応じてエラーメッセージを表示
+        MessageBox(nullptr, ex.message().c_str(), L"Error", MB_OK);
+    }
+}
+
+//***************************************************************************************************
 //* 処理名　：CreateToastCollection
 //* 機能　　：引数に渡された値から、コレクションを使用したトースト通知のグループ化を作成します。エラーコード返却に対応します
 //---------------------------------------------------------------------------------------------------

@@ -49,6 +49,7 @@ Option Explicit
 Private Declare PtrSafe Sub ShowToastNotification Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams)  '一般的な通知
 Private Declare PtrSafe Sub ShowToastNotificationWithProgressBar Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams, ByVal ProgressStatus As LongPtr, ByVal progressValue As Double, ByVal ProgressTitle As LongPtr, ByVal ProgressValueStringOverride As LongPtr) 'プログレスバー付き通知
 Private Declare PtrSafe Function UpdateToastNotificationWithProgressBar Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams, ByVal ProgressStatus As LongPtr, ByVal progressValue As Double, ByVal ProgressTitle As LongPtr, ByVal ProgressValueStringOverride As LongPtr, SequenceNumber As Long) As Long 'プログレスバー付き通知の更新用
+Private Declare PtrSafe Sub RemoveToastNotification Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams)  '通知を削除
 Private Declare PtrSafe Function CreateToastCollection Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams, ByVal DisplayName As LongPtr, ByVal LaunchArgs As LongPtr, ByVal IconUri As LongPtr) As Long 'ToastCollectionの作成
 Private Declare PtrSafe Function DeleteToastCollection Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams) As Long 'ToastCollectionの削除
 
@@ -2314,7 +2315,7 @@ End Property
 '* 機能　　：ToastTagに紐づく通知をアクションセンターから削除します
 '---------------------------------------------------------------------------------------------------
 '* 返り値　：ToastTagに紐づく通知をアクションセンターから削除するコマンド文字列
-'* 引数　　：ToastTag   以前通知を発行した際の通知Tag名
+'* 引数　　：ToastTag   削除するToastTagを指定します。
 '***************************************************************************************************
 Function GenerateCmd_ToastRemove(RemoveTag As String) As String
     With ToastConfig
@@ -2496,6 +2497,38 @@ Public Property Get RunDll_ToastNotifierUpdate_Progress(ByVal ToastTag As String
     'Dll内の「UpdateToastNotificationWithProgressBar」関数を実行します
     RunDll_ToastNotifierUpdate_Progress = UpdateToastNotificationWithProgressBar(ParamsConvertForDLL(ToastConfig), StrPtr(Arg_Status), Arg_Value, StrPtr(Arg_Title), StrPtr(Arg_ValueStringOverride), SequenceNumber)
 End Property
+
+'**************************************************************************************************
+'* 処理名　：RunDll_RemoveToastNotification
+'* 機能　　：タグから、トースト通知を削除します
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：ToastTag           削除するToastTagを指定します。
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：これを実行すると、即座にDll内で処理を行います。
+'**************************************************************************************************
+Public Sub RunDll_RemoveToastNotification(ByVal ToastTag As String)
+    '設定値をまとめる
+    With ToastConfig
+        .AppUserModelID = SetValueAppUserModelID(True)
+        'AllowUse_InternetImageFlag                     '事前に、設定済み
+        .XmlSchema = vbNullString
+
+        .Tag = ToastTag
+        .Group = ThisWorkbook.Name
+        .Schedule_ID = vbNullString
+        .CollectionID = vbNullString
+        
+        .ExpiresOnReboot = False
+        .SuppressPopup = False
+        
+        .Schedule_DeliveryTime = False
+        .ExpirationTime = False
+    End With
+
+
+    'Dll内の「RemoveToastNotification」関数を実行します
+    RemoveToastNotification ParamsConvertForDLL(ToastConfig)
+End Sub
 
 '***************************************************************************************************
 '* 処理名　：RunDll_ToastCollectionManagerSaveToastCollectionAsync
