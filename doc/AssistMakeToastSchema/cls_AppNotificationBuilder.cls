@@ -155,7 +155,7 @@ Private ToastConfig As ToastNotification
 Private Type ToastNotification
     '[Windows.UI.Notifications]の挙動を決める設定値
     AppUserModelID              As String   'https://learn.microsoft.com/ja-jp/windows/win32/shell/appids
-    AllowUse_InternetImageFlag  As Boolean  'インターネット上の画像を使用する権限設定(実際は単に、Office関連のAppUserModelIDを切り替えてるだけ)
+    AllowUse_InternetImageFlag  As Boolean  'インターネット上の画像を使用する権限設定
     XmlSchema                   As String   'https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema
 
     '[Windows.UI.Notifications]の主な設定値
@@ -491,11 +491,10 @@ End Type
 
 
 '***************************************************************************************************
-' ■■■ VBA上で使うのに相応しいAppIDをプリセット ■■■
+' ■■■ VBA上で使うのに相応しいAppUserModelIDをプリセット ■■■
 '***************************************************************************************************
-Private Const AppID_Excel        As String = "Microsoft.Office.EXCEL.EXE.15"                                            'DeskTopアプリ：Excel
-Private Const AppID_Microsoft365 As String = "Microsoft.MicrosoftOfficeHub_8wekyb3d8bbwe!Microsoft.MicrosoftOfficeHub"  'Store  アプリ：Microsoft365(Office) PWA
-Private AppID_Any As String                                                                                            '任意のAppID設定用変数
+Private Const AppUserModelID_Excel  As String = "Microsoft.Office.EXCEL.EXE.15" 'DeskTopアプリ：Excel
+Private AppUserModelID_Any          As String                                   '任意のAppID設定用変数
 
 
 
@@ -522,11 +521,11 @@ End Property
 '===================================================================================================
 '* 機能    ：この通知をどのアプリで出すかを設定します
 '---------------------------------------------------------------------------------------------------
-'* 機能説明：設定すると、「AllowUse_InternetImageFlag」よりも優先して設定されます。batファイル等、VBAと直接関係なくなり、アイコンが噛み合わない時に使います。
+'* 機能説明：設定すると、ExcelのAppUserModelIDよりも優先して設定されます。batファイル等、VBAと直接関係なくなり、アイコンが噛み合わない時に使います。
 '* 注意事項：存在しない(未インストール)AppID、無効な文字列を指定すると、Toastが発行されないのでご注意ください。
 '---------------------------------------------------------------------------------------------------
 Public Property Let SetToastContent_AppUserModelID(ByVal ArgAppID As String)
-    AppID_Any = ArgAppID
+    AppUserModelID_Any = ArgAppID
 End Property
 
 '===================================================================================================
@@ -540,24 +539,6 @@ Public Sub SetTimeZone(ByVal ArgUTC_Hour As Integer, ByVal ArgUTC_Minute As Inte
         .Minute = ArgUTC_Minute
     End With
 End Sub
-
-'===================================================================================================
-'* 機能    ：引数に応じて、アクティブ化の種類を文字列で返します
-'---------------------------------------------------------------------------------------------------
-Private Function ActivationMode(ByVal activationID As ToastActivationType) As String
-    Select Case activationID
-        Case 1
-            ActivationMode = "foreground"
-        Case 2
-            ActivationMode = "background"
-        Case 3
-            ActivationMode = "protocol"
-        Case 4
-            ActivationMode = "system"
-        Case Else
-            ActivationMode = vbNullString
-    End Select
-End Function
 
 '===================================================================================================
 '* 機能    ：設定値を纏めたユーザー定義型：ToastNotification　を基に、DLLで扱えるユーザー定義型：ToastNotificationParams　に変換します
@@ -670,6 +651,24 @@ Public Property Let SetToastScenario(ToastScenarioMode As ToastScenario)
 End Property
 
 '***************************************************************************************************
+'* 機能    ：引数に応じて、アクティブ化の種類を文字列で返します
+'***************************************************************************************************
+Private Function ActivationMode(ByVal activationID As ToastActivationType) As String
+    Select Case activationID
+        Case 1
+            ActivationMode = "foreground"
+        Case 2
+            ActivationMode = "background"
+        Case 3
+            ActivationMode = "protocol"
+        Case 4
+            ActivationMode = "system"
+        Case Else
+            ActivationMode = vbNullString
+    End Select
+End Function
+
+'***************************************************************************************************
 '* 機能　　：toast要素のuseButtonStyle属性へ値をセット
 '---------------------------------------------------------------------------------------------------
 '* 引数　　：ArguseButtonStyle
@@ -708,7 +707,7 @@ End Property
 '***************************************************************************************************
 Public Property Let SetToastContent_ImageInline(Optional ByVal Arg_InlineCircle As Integer, Optional ByVal Flag_addImageQuery As Boolean, Optional ByVal Arg_Alt As String, ByVal Arg_InlineImageSrc As String)
     With ElementsImage.Inline
-        .src = Arg_InlineImageSrc
+        .src = UseHttpImageCheck(Arg_InlineImageSrc)
         .AddImageQuery = Flag_addImageQuery
         .alt = Arg_Alt
 
@@ -725,7 +724,7 @@ End Property
 '***************************************************************************************************
 Public Property Let SetToastContent_ImageHero(Optional ByVal Flag_addImageQuery As Boolean, Optional ByVal Arg_Alt As String, ByVal Arg_HeroImageSrc As String)
     With ElementsImage.Hero
-        .src = Arg_HeroImageSrc
+        .src = UseHttpImageCheck(Arg_HeroImageSrc)
         .AddImageQuery = Flag_addImageQuery
         .alt = Arg_Alt
 
@@ -746,7 +745,7 @@ End Property
 '***************************************************************************************************
 Public Property Let SetToastContent_ImageAppLogo(Optional ByVal Arg_LogoCircle As Boolean, Optional ByVal Flag_addImageQuery As Boolean, Optional ByVal Arg_Alt As String, ByVal Arg_AppLogoSrc As String)
     With ElementsImage.AppLogo
-        .src = Arg_AppLogoSrc
+        .src = UseHttpImageCheck(Arg_AppLogoSrc)
         .AddImageQuery = Flag_addImageQuery
         .alt = Arg_Alt
 
@@ -891,7 +890,7 @@ Public Property Let Add_SubgroupInnerImage(Optional ByVal Crop As AdaptiveImageC
     'パラメーターを設定します
     With SubgroupInnerImages(SubgroupInnerImagesTotal)
         '各属性
-        .src = ImageSrc
+        .src = UseHttpImageCheck(ImageSrc)
         
         Select Case Crop
             Case AdaptiveImageCrop.ImageCrop_Circle
@@ -1209,7 +1208,7 @@ Public Property Let SetIToastActions(ByVal ArgContent As String, ByVal ArgArgume
         If ArgPendingUpdate Then .afterActivationBehavior = "pendingUpdate" Else .afterActivationBehavior = vbNullString
         If ArgContextMenu Then .Placement = "contextMenu" Else .Placement = vbNullString
 
-        .ImageUri = ArgIcon
+        .ImageUri = UseHttpImageCheck(ArgIcon)
         .HintInputId = ArgHintInputId
 
         '属性：hint-buttonStyle  は、引数の値に応じて命名します
@@ -1725,7 +1724,7 @@ End Function
 '---------------------------------------------------------------------------------------------------
 '* 返り値　：AppIDを設定するコマンド文字列
 '* 引数　　：UseDll
-'               True ：カスタマイズしたDllで処理する際に指定。AppIDをそのまま返します
+'               True ：カスタマイズしたDllで処理する際に指定。AppUserModelIDをそのまま返します
 '               False：PowerShellコマンドで実行する際に指定します。変数格納用の「$AppId」が追加されます(規定)
 '---------------------------------------------------------------------------------------------------
 '* 機能説明：ネット上の画像も使用して通知を表示するかを設定します
@@ -1733,14 +1732,12 @@ End Function
 '**************************************************************************************************
 Private Function SetValueAppUserModelID(Optional UseDll As Boolean) As String
     '任意のAppIDの設定があったら、そちらを優先します。
-    If StrPtr(AppID_Any) Then
-        ToastConfig.AppUserModelID = AppID_Any
+    If StrPtr(AppUserModelID_Any) Then
+        ToastConfig.AppUserModelID = AppUserModelID_Any
 
-    '未設定の場合は、フラグ値に基づいて、プリセットAppIDをセットします。
-    ElseIf ToastConfig.AllowUse_InternetImageFlag Then
-        ToastConfig.AppUserModelID = AppID_Microsoft365
+    '未設定の場合は、ExcelのAppUserModelIDをセットします。
     Else
-        ToastConfig.AppUserModelID = AppID_Excel
+        ToastConfig.AppUserModelID = AppUserModelID_Excel
     End If
 
 
@@ -2007,37 +2004,41 @@ End Property
 '---------------------------------------------------------------------------------------------------
 '* 返り値　：保存先ローカルパス
 '* 引数　　：SourceURI          画像イメージURL
-'          ：SaveCurrentDir     保存先ディレクトリパス。指定無しの場合、ユーザーのtempフォルダに保存されます
 '---------------------------------------------------------------------------------------------------
 '* 機能説明：httpソースが使えないAppUserModelIDでも、WindowsAPI:URLDownloadToFile で擬似的にできるようにします。
+'* 注意事項：任意の保存先指定は設けません。「C:\Users\XXX\AppData\Local\Temp」固定です。
 '***************************************************************************************************
-Private Function UseHttpImage(SourceURL As String, Optional SaveCurrentDir As String)
-    'URLの「/」区切りの最後の部分をファイル名として指定
-    Dim SaveImageFileName As String, tmp
-    tmp = Split(SourceURL, "/")
-    
-    '保存時の禁則文字を防ぐため、URLエンコードを使います。
-    SaveImageFileName = WorksheetFunction.EncodeURL(tmp(UBound(tmp)))
+Private Function UseHttpImageCheck(Source As String) As String
+    'ネット上の画像を使用するように設定しており尚且つ、httpソースとして指定されている場合、次の処理に移ります
+    Dim BaseUriHttpSourceFlag As Boolean: BaseUriHttpSourceFlag = (Left(ElementBinding.Baseuri, 4) = "http")
+    Dim HttpSourceFlag As Boolean: HttpSourceFlag = (Left(Source, 4) = "http")
+    If ToastConfig.AllowUse_InternetImageFlag And (HttpSourceFlag Or BaseUriHttpSourceFlag) Then
 
-    '保存先フルパスを指定
-    Dim TempDir As String, TargetFullPass As String
-    If StrPtr(SaveCurrentDir) Then
-        '保存先が指定されてたらそれにする
-        TempDir = SaveCurrentDir
+        'URLの「/」区切りの最後の部分をファイル名として指定
+        Dim SaveImageFileName As String, tmp
+        tmp = Split(Source, "/")
+    
+        '保存時の禁則文字を防ぐため、URLエンコードを使います。
+        SaveImageFileName = WorksheetFunction.EncodeURL(tmp(UBound(tmp)))
+
+        '規定のtempフォルダパスを取得し、保存先パスを取得します
+        Dim TargetFullPass As String: TargetFullPass = WorksheetFunction.TextJoin("\", True, Environ("tmp"), SaveImageFileName)
+
+        'httpソースのベースURIになってたら、連結します
+        If BaseUriHttpSourceFlag And Not (HttpSourceFlag) Then Source = ElementBinding.Baseuri & Source
+
+        'キャッシュが消えてたら再度ダウンロードして保存
+        If Dir(TargetFullPass, vbNormal) = "" Then
+            'ダウンロード開始
+            URLDownloadToFile 0, Source, TargetFullPass, 0, 0
+        End If
+    
+        '返却
+        UseHttpImageCheck = TargetFullPass
     Else
-        '規定のtempフォルダパス
-        TempDir = Environ("tmp")
+        'そのまんま返却
+        UseHttpImageCheck = Source
     End If
-    TargetFullPass = WorksheetFunction.TextJoin("\", True, TempDir, SaveImageFileName)
-
-    'キャッシュが消えてたら再度ダウンロードして保存
-    If Dir(TargetFullPass, vbNormal) = "" Then
-        'ダウンロード開始
-        URLDownloadToFile 0, SourceURL, TargetFullPass, 0, 0
-    End If
-    
-    '返却
-    UseHttpImage = TargetFullPass
 End Function
 
 
@@ -2061,7 +2062,7 @@ Public Property Get GenerateCmd_ToastNotifierShow(ByVal ToastTag As String, Opti
     With ToastConfig
         '設定値をまとめる
         '.AppUserModelID = SetValueAppUserModelID(False)    '事前に、設定済み
-        'AllowUse_InternetImageFlag                         '事前に、設定済み
+        '.AllowUse_InternetImageFlag                        '事前に、設定済み
         .XmlSchema = MakeXmlToastContentBuilder(False)
         
         .Tag = ToastTag
@@ -2125,7 +2126,7 @@ Public Property Get GenerateCmd_ToastNotifierShow_Progress(ByVal ToastTag As Str
     With ToastConfig
         '設定値をまとめる
         '.AppUserModelID = SetValueAppUserModelID(False)    '事前に、設定済み
-        'AllowUse_InternetImageFlag                         '事前に、設定済み
+        '.AllowUse_InternetImageFlag                        '事前に、設定済み
         .XmlSchema = MakeXmlToastContentBuilder(True)
 
         .Tag = ToastTag
@@ -2182,7 +2183,7 @@ Public Property Get GenerateCmd_ToastNotifierUpdate_Progress(ByVal ToastTag As S
     With ToastConfig
         '設定値をまとめる
         '.AppUserModelID = SetValueAppUserModelID(False)    '事前に、設定済み
-        'AllowUse_InternetImageFlag                         '事前に、設定済み
+        '.AllowUse_InternetImageFlag                        '事前に、設定済み
         .XmlSchema = vbNullString
 
         .Tag = ToastTag
@@ -2229,7 +2230,7 @@ Public Property Get GenerateCmd_ToastCollectionManagerSaveToastCollectionAsync(C
     With ToastConfig
         '設定値をまとめる
         '.AppUserModelID = SetValueAppUserModelID(False)    '事前に、設定済み
-        'AllowUse_InternetImageFlag                         '事前に、設定済み
+        '.AllowUse_InternetImageFlag                        '事前に、設定済み
         .XmlSchema = MakeXmlToastContentBuilder(False)
 
         .Tag = vbNullString
@@ -2323,7 +2324,7 @@ Function GenerateCmd_ToastRemove(RemoveTag As String) As String
     With ToastConfig
         '設定値をまとめる
         '.AppUserModelID = SetValueAppUserModelID(False)    '事前に、設定済み
-        'AllowUse_InternetImageFlag                         '事前に、設定済み
+        '.AllowUse_InternetImageFlag                        '事前に、設定済み
 
         .Tag = RemoveTag
         .Group = ThisWorkbook.Name
@@ -2391,7 +2392,7 @@ Public Sub RunDll_ToastNotifierShow(ByVal ToastTag As String, Optional ByVal Col
     '設定値をまとめる
     With ToastConfig
         .AppUserModelID = SetValueAppUserModelID(True)
-        'AllowUse_InternetImageFlag                     '事前に、設定済み
+        '.AllowUse_InternetImageFlag                     '事前に、設定済み
         .XmlSchema = MakeXmlToastContentBuilder(False)
         
         .Tag = ToastTag
@@ -2433,7 +2434,7 @@ Sub RunDll_ToastNotifierShow_Progress(ByVal ToastTag As String, ByVal Arg_Status
     '設定値をまとめる
     With ToastConfig
         .AppUserModelID = SetValueAppUserModelID(True)
-        'AllowUse_InternetImageFlag                     '事前に、設定済み
+        '.AllowUse_InternetImageFlag                     '事前に、設定済み
         .XmlSchema = MakeXmlToastContentBuilder(True)
 
         .Tag = ToastTag
@@ -2480,7 +2481,7 @@ Public Property Get RunDll_ToastNotifierUpdate_Progress(ByVal ToastTag As String
     '設定値をまとめる
     With ToastConfig
         .AppUserModelID = SetValueAppUserModelID(True)
-        'AllowUse_InternetImageFlag                     '事前に、設定済み
+        '.AllowUse_InternetImageFlag                     '事前に、設定済み
         .XmlSchema = vbNullString
 
         .Tag = ToastTag
@@ -2512,7 +2513,7 @@ Public Sub RunDll_RemoveToastNotification(ByVal ToastTag As String)
     '設定値をまとめる
     With ToastConfig
         .AppUserModelID = SetValueAppUserModelID(True)
-        'AllowUse_InternetImageFlag                     '事前に、設定済み
+        '.AllowUse_InternetImageFlag                     '事前に、設定済み
         .XmlSchema = vbNullString
 
         .Tag = ToastTag
@@ -2549,7 +2550,7 @@ Public Property Get RunDll_ToastCollectionManagerSaveToastCollectionAsync(ByVal 
     '設定値をまとめる
     With ToastConfig
         .AppUserModelID = SetValueAppUserModelID(True)
-        'AllowUse_InternetImageFlag                     '事前に、設定済み
+        '.AllowUse_InternetImageFlag                     '事前に、設定済み
         .XmlSchema = MakeXmlToastContentBuilder(False)
 
         .Tag = vbNullString
@@ -2582,7 +2583,7 @@ Public Property Get RunDll_ToastCollectionManagerRemoveToastCollectionAsync(Opti
     '設定値をまとめる
     With ToastConfig
         .AppUserModelID = SetValueAppUserModelID(True)
-        'AllowUse_InternetImageFlag                     '事前に、設定済み
+        '.AllowUse_InternetImageFlag                     '事前に、設定済み
         .XmlSchema = MakeXmlToastContentBuilder(False)
 
         .Tag = vbNullString
