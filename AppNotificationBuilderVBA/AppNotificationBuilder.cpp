@@ -24,7 +24,15 @@ Windows::Foundation::DateTime SystemTimeToDateTime(const SYSTEMTIME& st) {
     return dateTime;
 }
 
-// Excel マクロを実行する関数
+
+
+//***************************************************************************************************
+//* 処理名　：ExecuteExcelMacro
+//* 機能　　：Excel マクロを実行する関数
+//---------------------------------------------------------------------------------------------------
+//* 引数　　：ExcelMacroPass     Action要素のarguments。マクロ名を想定してます。
+//            UserInputs         Input要素で入力した内容、あるいはSelect要素のID名称とそれに紐づくInput要素のIDとのセットとなる2次元配列                             
+//***************************************************************************************************
 void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInputs) {
     //詳細メッセージ、取得用
     EXCEPINFO excepInfo;
@@ -135,7 +143,11 @@ void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInputs) {
 }
 
 
-// トースト通知のアクティベーションを処理する関数
+
+//***************************************************************************************************
+//* 処理名　：OnActivated
+//* 機能　　：トースト通知のアクティベーションを処理する関数
+//***************************************************************************************************
 void OnActivated(ToastNotification const& sender, IInspectable const& args) {
     // IInspectable から ToastActivatedEventArgs にキャストして引数情報を取得
     auto activatedArgs = args.try_as<ToastActivatedEventArgs>();
@@ -201,9 +213,14 @@ void OnActivated(ToastNotification const& sender, IInspectable const& args) {
 //***************************************************************************************************
 //                              ■■■ CollectionToast関連処理専用 ■■■
 //***************************************************************************************************
-
-// 非同期処理をラップするヘルパー関数。コレクションを使用したトースト通知の表示に使用します。
-// 処理の流れは、ShowToastNotificationとほとんど一緒ですが、非同期処理が必要のため、このようなラッパー用関数を作成しています。
+//* 処理名　：SendToastWithCollectionAsyncHelper
+//* 機能　　：コレクションを使用したトースト通知の表示を行います
+//---------------------------------------------------------------------------------------------------
+//* 引数　　：ToastConfigData    ヘッダーファイルに定義した引数。ここから必要な値を使用する方針です
+//---------------------------------------------------------------------------------------------------
+//* 機能説明：非同期処理をラップするヘルパー関数。
+//            処理の流れは、ShowToastNotificationとほとんど一緒ですが、非同期処理が必要のため、このようなラッパー用関数を作成しています。
+//***************************************************************************************************
 winrt::fire_and_forget SendToastWithCollectionAsyncHelper(ToastNotificationParams* ToastConfigData)
 {
     try
@@ -277,8 +294,11 @@ winrt::fire_and_forget SendToastWithCollectionAsyncHelper(ToastNotificationParam
 //***************************************************************************************************
 //                              ■■■ VBA側から呼び出せる関数 ■■■
 //***************************************************************************************************
-
-//引数に渡された値で、単純なトースト通知を表示します。指定日時に通知するスケジュール機能も対応します
+//* 処理名　：ShowToastNotification
+//* 機能　　：単純なトースト通知を表示します。指定日時に通知するスケジュール機能も対応します
+//---------------------------------------------------------------------------------------------------
+//* 引数　　：ToastConfigData    ヘッダーファイルに定義した引数。ここから必要な値を使用する方針です
+//***************************************************************************************************
 void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData){
     // COMの初期化
     HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -395,7 +415,16 @@ void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData){
     }
 }
 
-//引数に渡された値で、最初のトーストの進行状況バーを表示します
+//***************************************************************************************************
+//* 処理名　：ShowToastNotificationWithProgressBar
+//* 機能　　：引数に渡された値で、最初のトーストの進行状況バーを表示します
+//---------------------------------------------------------------------------------------------------
+//* 引数　　：ToastConfigData                ヘッダーファイルに定義した引数。ここから必要な値を使用する方針です
+//            ProgressStatus                 ステータス表記
+//            ProgressValue                  0.0-1.0の値。プログレスバーの表示割合を決めます 
+//          　ProgressTitle                  タイトル
+//            ProgressValueStringOverride    %表記から変えたいとき用(0/88等)                       
+//***************************************************************************************************
 void __stdcall ShowToastNotificationWithProgressBar(ToastNotificationParams* ToastConfigData, const wchar_t* ProgressStatus, double ProgressValue, const wchar_t* ProgressTitle, const wchar_t* ProgressValueStringOverride) {
     // COMの初期化
     HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -495,8 +524,17 @@ void __stdcall ShowToastNotificationWithProgressBar(ToastNotificationParams* Toa
     }
 }
 
-
-//引数に渡された値で、トーストの進行状況バーを更新します。
+//***************************************************************************************************
+//* 処理名　：UpdateToastNotificationWithProgressBar
+//* 機能　　：引数に渡された値で、トーストの進行状況バーを更新します。
+//---------------------------------------------------------------------------------------------------
+//* 引数　　：ToastConfigData                ヘッダーファイルに定義した引数。ここから必要な値を使用する方針です
+//            ProgressStatus                 ステータス表記
+//            ProgressValue                  0.0-1.0の値。プログレスバーの表示割合を決めます 
+//          　ProgressTitle                  タイトル
+//            ProgressValueStringOverride    %表記から変えたいとき用(0/88等)                       
+//          　SequenceNumber                 整合性用       
+//***************************************************************************************************
 long __stdcall UpdateToastNotificationWithProgressBar(ToastNotificationParams* ToastConfigData, const wchar_t* ProgressStatus, double ProgressValue, const wchar_t* ProgressTitle, const wchar_t* ProgressValueStringOverride, long SequenceNumber) {
     // COMの初期化
     HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -570,8 +608,15 @@ long __stdcall UpdateToastNotificationWithProgressBar(ToastNotificationParams* T
     return static_cast<long>(result);
 }
 
-
-//引数で渡された値で、コレクションを使用したトースト通知のグループ化を作成します。エラーコード返却に対応します
+//***************************************************************************************************
+//* 処理名　：CreateToastCollection
+//* 機能　　：引数に渡された値から、コレクションを使用したトースト通知のグループ化を作成します。エラーコード返却に対応します
+//---------------------------------------------------------------------------------------------------
+//* 引数　　：ToastConfigData   ヘッダーファイルに定義した引数。ここから必要な値を使用する方針です
+//            displayName       コレクション名
+//            launchArgs        起動引数
+//            iconUri           アイコンパス
+//***************************************************************************************************
 long __stdcall CreateToastCollection(ToastNotificationParams* ToastConfigData, const wchar_t* displayName, const wchar_t* launchArgs, const wchar_t* iconUri) {
     // COMの初期化
     HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -621,8 +666,12 @@ long __stdcall CreateToastCollection(ToastNotificationParams* ToastConfigData, c
 
 }
 
-
-//引数で渡された値で、コレクションを使用したトースト通知のグループ化を削除します。エラーコード返却に対応します
+//***************************************************************************************************
+//* 処理名　：DeleteToastCollection
+//* 機能　　：コレクションを使用したトースト通知のグループ化を削除します。エラーコード返却に対応します
+//---------------------------------------------------------------------------------------------------
+//* 引数　　：ToastConfigData    ヘッダーファイルに定義した引数。ここから必要な値を使用する方針です
+//***************************************************************************************************
 long __stdcall DeleteToastCollection(ToastNotificationParams* ToastConfigData) {
     // COMの初期化
     HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
