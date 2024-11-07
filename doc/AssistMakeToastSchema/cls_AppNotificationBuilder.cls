@@ -125,8 +125,8 @@ Public Enum ToastActivationType
     Foreground = 1  'フォアグラウンド アプリが起動します。
     background      '対応するバックグラウンド タスクがトリガーされ、ユーザーを中断することなくバックグラウンドでコードを実行できます。
     Protocol        'プロトコルのアクティブ化を使用して別のアプリを起動します。
+    System          'Action要素でのリマインダーモード用です
 End Enum
-
 '---------------------------------------------------------------------------------------------------
 
 
@@ -552,6 +552,8 @@ Private Function ActivationMode(ByVal activationID As ToastActivationType) As St
             ActivationMode = "background"
         Case 3
             ActivationMode = "protocol"
+        Case 4
+            ActivationMode = "system"
         Case Else
             ActivationMode = vbNullString
     End Select
@@ -612,9 +614,9 @@ End Property
 '* 機能　　：toast要素のlaunch、activationType属性へ値をセット
 '---------------------------------------------------------------------------------------------------
 '* 引数　　：ArgSchema          起動スキーマ。URLやファイルパスなど
-'            ArgActivationType  このヘッダーがクリックされた場合に使用するアクティブ化の種類(VBAでは、"protocol"以外では意味をなしません)
+'            ArgActivationType  このヘッダーがクリックされた場合に使用するアクティブ化の種類(DLLを使用しない場合、"protocol"以外は機能しません)
 '***************************************************************************************************
-Public Property Let SetToastContent_Launch(Optional ByVal ArgActivationType As ToastActivationType = 3, ByVal ArgSchema As String)
+Public Property Let SetToastContent_Launch(Optional ByVal ArgActivationType As ToastActivationType = ToastActivationType.Protocol, ByVal ArgSchema As String)
     With ElementToast
         .Launch = ArgSchema
         .ActivationType = ActivationMode(ArgActivationType)
@@ -1188,7 +1190,7 @@ End Property
 '---------------------------------------------------------------------------------------------------
 '* 引数　　：ArgContent         ボタンに表示されるコンテンツ
 '            ArgArguments       起動スキーマ。URLやファイルパスなど
-'            ArgActivationType  このボタンが押下された場合に使用するアクティブ化の種類。VBAでは、基本"protocol"以外では意味をなしませんが、ここのボタンの場合、"system"にして、所々の設定を行うことで、システムの再通知と無視アクションを利用するアラーム通知を作成できます。
+'            ArgActivationType  このボタンが押下された場合に使用するアクティブ化の種類。DLLを使用しない場合、基本"protocol"以外では意味をなしませんが、ここのボタンの場合、"system"にして、所々の設定を行うことで、システムの再通知と無視アクションを利用するアラーム通知を作成できます。
 '            ArgPendingUpdate   ユーザーがトースト上のボタンをクリックすると、通知は "保留中の更新" 表示状態のままです。 この "更新の保留中" の表示状態が長時間続くことを避けるため、バックグラウンド タスクから即座にトーストを更新する必要があります。
 '            ArgContextMenu     Trueで、従来のトースト ボタンではなく、トースト通知のコンテキスト メニューに追加されたコンテキスト メニュー アクションになります。
 '            ArgIcon            トースト ボタン アイコンのイメージソース
@@ -1197,7 +1199,7 @@ End Property
 '            ArgHintToolTip     ボタンに空のコンテンツ文字列がある場合のボタンのヒント。
 '            Index              追加位置
 '***************************************************************************************************
-Public Property Let SetIToastActions(ByVal ArgContent As String, ByVal ArgArguments As String, Optional ByVal ArgActivationType As ToastActivationType = 3, Optional ArgPendingUpdate As Boolean, Optional ByVal ArgContextMenu As Boolean, Optional ByVal ArgIcon As String, Optional ByVal ArgHintInputId As String, Optional ArgHintButtonStyle As ToastButtonStyle, Optional ByVal ArgHintToolTip As String, ByVal Index As Integer)
+Public Property Let SetIToastActions(ByVal ArgContent As String, ByVal ArgArguments As String, Optional ByVal ArgActivationType As ToastActivationType = ToastActivationType.Protocol, Optional ArgPendingUpdate As Boolean, Optional ByVal ArgContextMenu As Boolean, Optional ByVal ArgIcon As String, Optional ByVal ArgHintInputId As String, Optional ArgHintButtonStyle As ToastButtonStyle, Optional ByVal ArgHintToolTip As String, ByVal Index As Integer)
     With ElementAction(Index)
 
         .Content = ArgContent
@@ -1290,7 +1292,7 @@ End Property
 '---------------------------------------------------------------------------------------------------
 '* 注意事項：VBAでは、ArgActivationType:"protocol"以外では意味をなしません
 '***************************************************************************************************
-Public Property Let SetToastHeader(Optional ByVal ArgID As String, Optional ByVal ArgArguments As String, Optional ByVal ArgActivationType As ToastActivationType = 3, ByVal ArgTitle As String)
+Public Property Let SetToastHeader(Optional ByVal ArgID As String, Optional ByVal ArgArguments As String, Optional ByVal ArgActivationType As ToastActivationType = ToastActivationType.Protocol, ByVal ArgTitle As String)
     With ElementHeader
         '省略時：このExcelのファイル名
         If StrPtr(ArgID) Then
