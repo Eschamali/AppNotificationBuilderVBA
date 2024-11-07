@@ -1801,7 +1801,7 @@ End Function
 
 
 '***************************************************************************************************
-' ■■■ [Windows.UI.Notifications]に関する動的設定 ■■■
+'               ■■■ [Windows.UI.Notifications]に関する動的設定 ■■■
 '***************************************************************************************************
 '* 機能　　：トースト通知のコンテンツ、関連するメタデータとイベント、有効期限を定義します。
 '---------------------------------------------------------------------------------------------------
@@ -1907,8 +1907,19 @@ Private Function Run__Windows_UI_Notifications__ToastNotifierUpdate(ArgTag As St
     Run__Windows_UI_Notifications__ToastNotifierUpdate = "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]::CreateToastNotifier($AppId).Update($ToastNotificationData, '" & WorksheetFunction.TextJoin("','", True, ArgTag, ArgGroup) & "')"
 End Function
 
-
-
+'***************************************************************************************************
+'* 機能　　：削除対象のToastTag等を指定して、通知をアクションセンターから削除します
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：更新対象のToastTagを指定するコマンド文字列
+'* 引数　　：ArgGroup       通知内容を更新させるToastGroup
+'            ArgTag         通知内容を更新させるToastGroup内のToastTag
+'            AppUserModelID アプリID
+'---------------------------------------------------------------------------------------------------
+'* URL     ：https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotificationhistory.remove
+'***************************************************************************************************
+Private Function Run__Windows_UI_Notifications__ToastRemove(ArgTag As String, ArgGroup As String, AppUserModelID As String) As String
+    Run__Windows_UI_Notifications__ToastRemove = "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]::History.Remove('" & WorksheetFunction.TextJoin("','", False, ArgTag, ArgGroup, AppUserModelID) & "')"
+End Function
 
 '***************************************************************************************************
 '* 機能　　：スケジュールの有無に応じて実行メソッドを変えます
@@ -1997,7 +2008,7 @@ End Property
 '---------------------------------------------------------------------------------------------------
 '* 機能説明：httpソースが使えないAppUserModelIDでも、WindowsAPI:URLDownloadToFile で擬似的にできるようにします。
 '***************************************************************************************************
-Public Function UseHttpImage(SourceURL As String, Optional SaveCurrentDir As String)
+Private Function UseHttpImage(SourceURL As String, Optional SaveCurrentDir As String)
     'URLの「/」区切りの最後の部分をファイル名として指定
     Dim SaveImageFileName As String, tmp
     tmp = Split(SourceURL, "/")
@@ -2029,7 +2040,7 @@ End Function
 
 
 '***************************************************************************************************
-' ■■■ Toast表示させるコマンド文字列を返すメソッド ■■■
+'         ■■■ コマンドプロンプトで、Toast制御させるコマンド文字列を返すメソッド ■■■
 '***************************************************************************************************
 '* 処理名　：GenerateCmd_ToastNotifierShow
 '* 機能　　：引数に渡された値で、単純なトースト通知を表示するコマンド文字列を返します。指定日時に通知するスケジュール機能も対応します
@@ -2046,8 +2057,8 @@ End Function
 Public Property Get GenerateCmd_ToastNotifierShow(ByVal ToastTag As String, Optional ByVal CollectionID As String, Optional ByVal ScheduleDate As Date, Optional ByVal ExpirationDate As Date, Optional ByVal Suppress As Boolean) As String
     With ToastConfig
         '設定値をまとめる
-        '.AppUserModelID = SetValueAppUserModelID(False)  '後続で、代入
-        'AllowUse_InternetImageFlag                     '事前に、設定済み
+        '.AppUserModelID = SetValueAppUserModelID(False)    '事前に、設定済み
+        'AllowUse_InternetImageFlag                         '事前に、設定済み
         .XmlSchema = MakeXmlToastContentBuilder(False)
         
         .Tag = ToastTag
@@ -2110,8 +2121,8 @@ Public Property Get GenerateCmd_ToastNotifierShow_Progress(ByVal ToastTag As Str
 
     With ToastConfig
         '設定値をまとめる
-        '.AppUserModelID = SetValueAppUserModelID(False)  '後続で、代入
-        'AllowUse_InternetImageFlag                     '事前に、設定済み
+        '.AppUserModelID = SetValueAppUserModelID(False)    '事前に、設定済み
+        'AllowUse_InternetImageFlag                         '事前に、設定済み
         .XmlSchema = MakeXmlToastContentBuilder(True)
 
         .Tag = ToastTag
@@ -2167,8 +2178,8 @@ Public Property Get GenerateCmd_ToastNotifierUpdate_Progress(ByVal ToastTag As S
 
     With ToastConfig
         '設定値をまとめる
-        '.AppUserModelID = SetValueAppUserModelID(False)  '後続で、代入
-        'AllowUse_InternetImageFlag                     '事前に、設定済み
+        '.AppUserModelID = SetValueAppUserModelID(False)    '事前に、設定済み
+        'AllowUse_InternetImageFlag                         '事前に、設定済み
         .XmlSchema = vbNullString
 
         .Tag = ToastTag
@@ -2214,8 +2225,8 @@ End Property
 Public Property Get GenerateCmd_ToastCollectionManagerSaveToastCollectionAsync(CollectionID As String, DisplayName As String, LaunchArgs As String, IconUri As String, Optional FixMode As Boolean) As String
     With ToastConfig
         '設定値をまとめる
-        '.AppUserModelID = SetValueAppUserModelID(False)  '後続で、代入
-        'AllowUse_InternetImageFlag                     '事前に、設定済み
+        '.AppUserModelID = SetValueAppUserModelID(False)    '事前に、設定済み
+        'AllowUse_InternetImageFlag                         '事前に、設定済み
         .XmlSchema = MakeXmlToastContentBuilder(False)
 
         .Tag = vbNullString
@@ -2297,6 +2308,27 @@ Public Property Get GenerateCmd_ToastCollectionManagerRemoveToastCollectionAsync
         SetValueAppUserModelID, _
         RemoveMode) & Chr(34)
 End Property
+
+'***************************************************************************************************
+'* 処理名　：GenerateCmd_ToastRemove
+'* 機能　　：ToastTagに紐づく通知をアクションセンターから削除します
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：ToastTagに紐づく通知をアクションセンターから削除するコマンド文字列
+'* 引数　　：ToastTag   以前通知を発行した際の通知Tag名
+'***************************************************************************************************
+Function GenerateCmd_ToastRemove(RemoveTag As String) As String
+    With ToastConfig
+        '設定値をまとめる
+        '.AppUserModelID = SetValueAppUserModelID(False)    '事前に、設定済み
+        'AllowUse_InternetImageFlag                         '事前に、設定済み
+
+        .Tag = RemoveTag
+        .Group = ThisWorkbook.Name
+
+        '削除コマンドを生成
+        GenerateCmd_ToastRemove = ActionPS & Run__Windows_UI_Notifications__ToastRemove(.Tag, .Group, .AppUserModelID) & Chr(34)
+    End With
+End Function
 
 '***************************************************************************************************
 '* 処理名　：PresetReminder
