@@ -211,7 +211,7 @@ VBAでは、起動スキーマ(https:// , ms-excel:// など)を設定するぐ�
 #### 利用可能な引数
 | 引数名            | 解説                                                                                                                                                                                                                                                                                                                                                             | 既定値   | 
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | 
-| ArgActivationType | ユーザーが特定の操作を行った際に使用されるアクティブ化の種類を決定します。<br>・ToastActivationType.foreground - フォアグラウンド アプリが起動します。<br>・ToastActivationType.background - 対応するバックグラウンド タスクがトリガーされ、ユーザーを中断することなくバックグラウンドでコードを実行できます。<br>・ToastActivationType.protocol - プロトコルのアクティブ化を使用して別のアプリを起動します。 | protocol | 
+| ArgActivationType | ユーザーが特定の操作を行った際に使用されるアクティブ化の種類を決定します。<br>・foreground - フォアグラウンド アプリが起動します。<br>・background - 対応するバックグラウンド タスクがトリガーされ、ユーザーを中断することなくバックグラウンドでコードを実行できます。<br>・protocol - プロトコルのアクティブ化を使用して別のアプリを起動します。 | protocol | 
 
 #### サンプルコード
 ```bas
@@ -310,8 +310,8 @@ Sub シナリオテスト()
         .SetIToastInput(ReminderID, True, , "選択肢から、再通知する時間を選択", 10) = 1
 
         '再通知用と、解除用を用意(解説は後述)
-        .SetIToastActions("", "snooze", "system", , , , ReminderID) = 1
-        .SetIToastActions("", "dismiss", "system") = 2
+        .SetIToastActions("", "snooze", system, , , , ReminderID) = 1
+        .SetIToastActions("", "dismiss", system) = 2
 
         'テキスト要素を用意
         .SetToastContent_TextTitle = "Hello World"
@@ -587,7 +587,7 @@ End Sub
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | 
 | ArgContent         | ボタンに表示されるコンテンツ                                                                                                                                                                                                                                                                                                                                     | ※必須項目                   | 
 | ArgArguments       | ユーザーがこのボタンをクリックした場合にアプリが後から受け取る、アプリで定義された引数の文字列です。                                                                                                                                                                                                                                                             | ※必須項目だが、空文字でもOK | 
-| ArgActivationType  | ユーザーが特定の操作を行った際に使用されるアクティブ化の種類を決定します。<br>・ToastActivationType.foreground： フォアグラウンド アプリが起動します。<br>・ToastActivationType.background：対応するバックグラウンド タスクがトリガーされ、ユーザーを中断することなくバックグラウンドでコードを実行できます。<br>・ToastActivationType.protocol：プロトコルのアクティブ化を使用して別のアプリを起動します。 <br>・・ToastActivationType.system：ArgArgumentsに特定の文字列を入れると、リマインダー機能が使えます。(後述)| protocol                     | 
+| ArgActivationType  | ユーザーが特定の操作を行った際に使用されるアクティブ化の種類を決定します。<br>・foreground： フォアグラウンド アプリが起動します。<br>・background：対応するバックグラウンド タスクがトリガーされ、ユーザーを中断することなくバックグラウンドでコードを実行できます。<br>・protocol：プロトコルのアクティブ化を使用して別のアプリを起動します。 <br>・system：ArgArgumentsに特定の文字列を入れると、リマインダー機能が使えます。(後述)| protocol                     | 
 | ArgPendingUpdate   | ・TRUE：ユーザーがトースト上のボタンをクリックすると、通知は "保留中の更新" 表示状態のままです。 この "更新の保留中" の表示状態が長時間続くことを避けるため、バックグラウンド タスクから即座にトーストを更新する必要があります。<br>・FALSE：ユーザーがトーストに対して操作を行うと、トーストが無視されます。                                                    | FALSE                        | 
 | ArgContextMenu     | ・TRUE：トースト ボタンではなく、トースト通知のコンテキスト メニューに追加されたコンテキスト メニュー アクションになります。<br>・FALSE：従来通り、トースト ボタンに配置                                                                                                                                                                                         | FALSE                        | 
 | ArgIcon            | トースト ボタン アイコンのイメージ ソースの URI。<br>ローカルパス、HTTPソースに対応します。                                                                                                                                                                                                                                                                      | vbnullstring                 | 
@@ -897,9 +897,9 @@ Sub リマインドテスト()
         '4. input要素を作成し、上記で準備したselect要素を挿入し、先ほど作成した紐付け用識別子をInput-IDにセット
         .SetIToastInput(ReminderID, True, , "選択肢から、リマインドする時間を選択", 10) = 1
 
-        '5. 再通知用と、解除用を用意("snooze", "system",ReminderID にセットされてる引数位置は、必ずこの値にする)
-        .SetIToastActions("", "snooze", "system", , , , ReminderID) = 1
-        .SetIToastActions("", "dismiss", "system") = 2
+        '5. 再通知用と、解除用を用意("snooze", system,ReminderID にセットされてる引数位置は、必ずこの値にする)
+        .SetIToastActions("", "snooze", system, , , , ReminderID) = 1
+        .SetIToastActions("", "dismiss", system) = 2
 
         '6. テキスト要素を用意(任意)
         .SetToastContent_TextTitle = "リマインダーテスト"
@@ -1402,7 +1402,7 @@ End Sub
 
 # [アクティブ化処理](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.activated)
 ユーザーがクリックまたはタッチでトースト通知をアクティブ化したとき、指定マクロを実行する事ができます。<br>
-action要素のarguments属性にマクロ名、activationType属性にToastActivationType.foregroundを設定して、"RunDll_ToastNotifierShow"関数を実行する事で、アクティブ化処理が可能です。<br>
+action要素のarguments属性にマクロ名、activationType属性にforegroundを設定して、"RunDll_ToastNotifierShow"関数を実行する事で、アクティブ化処理が可能です。<br>
 アクティブ化処理は、高度な処理を行うため、DLLファイルをインポートしてそこから"RunDll_ToastNotifierShowを使用する必要があります。
 
 ## アクティブ化準備
@@ -1411,7 +1411,7 @@ action要素のarguments属性にマクロ名、activationType属性にToastActi
 - toast要素 － [launch属性](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-toast#:~:text=%E3%81%AA%E3%81%97-,launch,-%E3%83%88%E3%83%BC%E3%82%B9%E3%83%88%E9%80%9A%E7%9F%A5%E3%81%AB%E3%82%88%E3%81%A3%E3%81%A6)
 ```bas
     With New cls_AppNotificationBuilder
-        .SetToastContent_Launch("foreground") = "[ここに実行したいマクロ名]"
+        .SetToastContent_Launch(foreground) = "[ここに実行したいマクロ名]"
         ~
     End With
 ```
@@ -1419,7 +1419,7 @@ action要素のarguments属性にマクロ名、activationType属性にToastActi
 - action要素 － [arguments属性](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-action#:~:text=%E3%81%AA%E3%81%97-,arguments,-%E3%83%A6%E3%83%BC%E3%82%B6%E3%83%BC%E3%81%8C%E3%81%93%E3%81%AE)
 ```bas
     With New cls_AppNotificationBuilder
-        .SetIToastActions("TestRun", "[ここに実行したいマクロ名]", "foreground") = 1
+        .SetIToastActions("TestRun", "[ここに実行したいマクロ名]", foreground) = 1
         ~
     End With
 ```
@@ -1469,7 +1469,7 @@ Sub ToastWithActiveShow()
         
         
         'トーストクリック時の、プロシージャ名を記載
-        .SetToastContent_Launch("foreground") = "ToastTrigger_Click"
+        .SetToastContent_Launch(foreground) = "ToastTrigger_Click"
         
         
         '選択肢を用意する
@@ -1484,8 +1484,8 @@ Sub ToastWithActiveShow()
         .SetIToastInput("冥王星とは", , , "Q2：冥王星は何惑星？", "〇惑星") = 2
         
         '各ボタンに対応するプロシージャ名を記載(接頭語等を付けて区別をつけよう)
-        .SetIToastActions("回答する", "ToastTrigger_Answer", "foreground") = 1
-        .SetIToastActions("閉じる", "ToastTrigger_Close", "foreground") = 2
+        .SetIToastActions("回答する", "ToastTrigger_Answer", foreground) = 1
+        .SetIToastActions("閉じる", "ToastTrigger_Close", foreground) = 2
         
         '通知実行
         .RunDll_ToastNotifierShow "RunMacto"
