@@ -1315,23 +1315,29 @@ Sub トースト通知削除()
     Const ToastTag As String = "deleteTest"
 
     With New cls_AppNotificationBuilder
-		'表示メッセージの設定
+        '表示メッセージの設定
         .SetToastContent_TextTitle = "Hello World"
         .SetToastContent_TextBody = "MsgBoxに反応すると、このトーストが消えます"
         .SetToastContent_TextAttribute = "削除テスト"
         .SetToastScenario = IncomingCall
 
-		'通知表示
+        '通知表示
         Shell .GenerateCmd_ToastNotifierShow(ToastTag), vbHide
         
         '続けると通知が消えます
         MsgBox "OKを押すと、通知を削除します", vbInformation, "RemoveNotice"
 
-		'削除
+        '削除
         Shell .GenerateCmd_ToastRemove(ToastTag), vbHide
 
     End With
 End Sub
+```
+#### 返り値
+このようなコマンド文字列が、返ります。1行完結です。<br>
+これをShellに介すことで、指定のトースト通知を削除できます。
+```bat
+powershell -Command "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]::History.Remove('deleteTest','Book1','Microsoft.Office.EXCEL.EXE.15')"
 ```
 
 ### RunDll_RemoveToastNotification
