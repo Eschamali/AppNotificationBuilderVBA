@@ -748,7 +748,7 @@ Sub 天気予報ライク()
 
 
         '実行コマンドを格納
-        ActionCmd = .GenerateCmd_ToastNotifierShow("sample033")
+        ActionCmd = .GenerateCmd_ToastNotifierShow("天気予報")
 
         '通知表示
         .RunDll_ToastNotifierShow "sample033"
@@ -1302,6 +1302,68 @@ End Sub
 
 RunDll_ToastNotifierUpdate_Progressの場合、列挙型[NotificationUpdateResult](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.notificationupdateresult) の返却に対応しています。これにより、前述のサンプルコードにて、ユーザーが通知を閉じた時、トースト更新プログラムの送信を停止し、無駄な処理をなくすことが出来ます。<br>
 現状、「GenerateCmd_ToastNotifierUpdate_Progress」では、上記の対応は出来ません。
+
+### GenerateCmd_ToastRemove
+タグを指定して、トーストの削除を行います。<br>
+主にプログレスバー付き通知において、処理の途中でエラーが起こって再開不可能の時、不自然に通知が残ってると不気味なので、これを呼び出して削除してあげて下さい。<br>
+因みに、通知音が鳴ってる途中で削除すると、通知音も停止します。
+
+#### サンプルコード
+次の例は、通常通り通知を呼び出し、MsgBoxに反応すると、通知が消えます。
+```bas
+Sub トースト通知削除()
+    Const ToastTag As String = "deleteTest"
+
+    With New cls_AppNotificationBuilder
+		'表示メッセージの設定
+        .SetToastContent_TextTitle = "Hello World"
+        .SetToastContent_TextBody = "MsgBoxに反応すると、このトーストが消えます"
+        .SetToastContent_TextAttribute = "削除テスト"
+        .SetToastScenario = IncomingCall
+
+		'通知表示
+        Shell .GenerateCmd_ToastNotifierShow(ToastTag), vbHide
+        
+        '続けると通知が消えます
+        MsgBox "OKを押すと、通知を削除します", vbInformation, "RemoveNotice"
+
+		'削除
+        Shell .GenerateCmd_ToastRemove(ToastTag), vbHide
+
+    End With
+End Sub
+```
+
+### RunDll_RemoveToastNotification
+GenerateCmd_ToastRemove と同様の機能です。
+先述と同様こちらも、DLLファイルを読み込んだときに使う専用メソッドです。Shellを介さない分、パフォーマンスが向上するので使える環境であればこちらがおすすめです。<br>
+引数等は、GenerateCmd_ToastRemove と同じなので省略します。
+
+#### サンプルコード
+次の例も、通常通り通知を呼び出し、MsgBoxに反応すると、通知が消えます。
+```bas
+Sub トースト通知削除()
+    Const ToastTag As String = "deleteTest"
+
+    With New cls_AppNotificationBuilder
+        '表示メッセージの設定
+        .SetToastContent_TextTitle = "Hello World"
+        .SetToastContent_TextBody = "MsgBoxに反応すると、このトーストが消えます"
+        .SetToastContent_TextAttribute = "削除テスト"
+        .SetToastScenario = IncomingCall
+
+        '通知表示
+        .RunDll_ToastNotifierShow ToastTag
+        
+        '続けると通知が消えます
+        MsgBox "OKを押すと、通知を削除します", vbInformation, "RemoveNotice"
+
+        '削除
+        .RunDll_RemoveToastNotification ToastTag
+
+    End With
+End Sub
+```
 
 ## [コレクションを使用したトースト通知のグループ化](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-collections)
 表示名とアイコンを指定したheader要素よりも高度なグループ化を提供します。<br>
