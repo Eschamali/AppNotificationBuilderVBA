@@ -799,7 +799,7 @@ End Sub
 ヘッダーをクリアしたい場合は下記のようにします
 ```bas
 With New cls_AppNotificationBuilder
-    .SetToastHeader(vbnullstring) = ""
+    .SetToastHeader = ""
 End With
 ```
 
@@ -1249,7 +1249,7 @@ End Sub
 Sub UpdateProgressBar()
     With New cls_AppNotificationBuilder
         'ヘッダー情報をクリアする
-        .SetToastHeader(vbnullstring) = ""
+        .SetToastHeader = ""
 
         'タイトル設定
         .SetToastContent_TextTitle = "ログファイル収集"
@@ -1321,7 +1321,7 @@ GenerateCmd_ToastNotifierUpdate_Progress と同様の機能です。
 Sub UpdateProgressBar()
     With New cls_AppNotificationBuilder
         'ヘッダー情報をクリアする
-        .SetToastHeader(vbNullString) = ""
+        .SetToastHeader = ""
 
         'タイトル設定
         .SetToastContent_TextTitle = "ログファイル収集"
