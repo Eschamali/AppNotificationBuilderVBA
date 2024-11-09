@@ -123,13 +123,13 @@ End Sub
 正しく表示できます。<br>
 ![alt text](doc/Ex_AppUserModelID1-2.png)<br>
 
-このHTTP上の画像ソースに関する詳しい挙動は、こちらを参照下さい。
+このHTTP上の画像ソースに関する詳しい挙動は、[こちら](#allowuse_internetimage-の挙動)を参照下さい。
 
 ### SetToastContent_AppUserModelID
 この通知をどのAppUserModelIDで出すかを設定します。<br>
 存在しない(未インストール)AppUserModelID、無効な文字列を指定すると、Toastが発行されないのでご注意ください。<br>
 指定したAppUserModelIDによっては、AllowUse_InternetImageの設定が効きません。<br>
-この仕様については、こちらを参照下さい
+この仕様については、[こちら](#AppUserModelID の仕様)を参照下さい
 
 #### 設定値
 Windows にインストールされているAppUserModelID
@@ -1611,6 +1611,31 @@ End Sub
 ```
 ![alt text](doc/ToastActived2.png)<br>
 アプリ通知で選択した選択肢や、入力テキストを扱う場合は、予め辞書型（Scripting.Dictionary）で内容をインポートして処理することをおすすめします。
+
+# httpソース画像の取り扱いについて
+## AllowUse_InternetImage の挙動
+Trueにすると、画像設定関連(SetToastContent_ImageAppLogo等)にて「http」始まりのソースを、[WindowsAPI:URLDownloadToFile](http://officetanaka.net/other/extra/tips01.htm) を介して、環境変数tmp(C:\Users\XXX\AppData\Local\Temp)に保存します。そして、保存したパスのローカルパスを返して、画像付き通知を表示させています。DLが終わるまでは通知がでないのでご注意下さい。<br>
+Tempフォルダ内は一定期間過ぎると自動で削除されますが、まだ残っている場合はDLはせず、直ぐに通知を表示させています。
+
+## AppUserModelID の仕様
+Excel等のデスクトップアプリケーションは、「非パッケージ化アプリ」扱いとなりToastの仕様上、[HTTP イメージはサポートされていません。](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/send-local-toast-desktop-cpp-wrl#step-7-send-a-notification)これを解決するべく、前述のAllowUse_InternetImage を実装しました。<br>
+ただし、マニフェストにインターネット機能があるパッケージアプリのAppUserModelIDを指定する場合、「AllowUse_InternetImage = true」をする必要なく、httpソース画像付き通知が使えます。<br>
+bat処理等でhttpソース画像付き通知を使用する場合は、対応するAppUserModelIDを指定して、「GenerateCmd_ToastNotifierShow」で返る文字列を埋め込みましょう。
+```bas
+Sub httpソースの画像付き通知()
+    With New cls_AppNotificationBuilder
+        'マニフェストにインターネット機能があるAppUserModelID
+        .SetToastContent_AppUserModelID = "Microsoft.WindowsTerminal_8wekyb3d8bbwe!App"
+
+        .SetToastContent_TextTitle = "上部に画像を表示"
+        .SetToastContent_ImageHero = "https://pad.gungho.jp/member/img/graphic/illust/6828.png"
+
+
+        Shell .GenerateCmd_ToastNotifierShow("withImageToast"), vbHide
+    End With
+End Sub
+```
+![alt text](doc/ExampleAppUserModelID.png)
 
 # Attention
 DLL側の処理は、ある程度のエラー処理を施していますが、現時点ではあまり完璧ではありません。<br>
