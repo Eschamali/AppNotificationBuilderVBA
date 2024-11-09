@@ -91,46 +91,45 @@ End Sub
 ## AppUserModelID 関連
 ### AllowUse_InternetImage
 HTTP上の画像ソースを使うか決めます。<br>
-実際は、プリセットのOffice系AppUserModelIDを切り替えます。<br>
-これは、[マニフェストにインターネット機能があるパッケージ アプリ](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/send-local-toast?tabs=uwp#:~:text=%E3%81%A8%E3%81%97%E3%81%BE%E3%81%99%E3%80%82-,%E9%87%8D%E8%A6%81,-HTTP%20%E3%82%A4%E3%83%A1%E3%83%BC%E3%82%B8%E3%81%AF)(主にStore アプリ)でないと、HTTP上の画像ソースが使えない制限があるためです。
-
-#### 設定値
-| 値            | 設定するAppUserModelID                                                                          | 
-| ------------- | ------------------------------------------------------------------------------- | 
-| True          | ![alt text](doc/Ex_AppUserModelID1-1.png)<br>Microsoft.MicrosoftOfficeHub_8wekyb3d8bbwe!Microsoft.MicrosoftOfficeHub | 
-| False(規定値) | ![Excel app](doc/Ex_AppUserModelID1-2.png)<br>Microsoft.Office.EXCEL.EXE.15                                           | 
-
-True の方を使用する場合は、[こちらから](https://www.microsoft.com/store/productId/9WZDNCRD29V9?ocid=pdpshare)インストールを行って下さい。<br>
-既定値、記述なしは、Falseです。
-
-#### サンプルコード
+例えば以下の設定で通知を表示させる際……<br>
 ```bas
-Sub TestAllowUse_InternetImage()
-    Dim ActionCmd as String
-
+Sub httpソースの画像付き通知()
     With New cls_AppNotificationBuilder
-        '切り替え
-        .AllowUse_InternetImage = True
+        .SetToastContent_TextTitle = "上部に画像を表示"
+        .SetToastContent_ImageHero = "https://pad.gungho.jp/member/img/graphic/illust/6828.png"
 
 
-
-        'タイトル設定
-        .SetToastContent_TextTitle = "Microsoft 365から"
-
-        'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
-        ActionCmd = .GenerateCmd_ToastNotifierShow("InternetImage")
-
-        '通知表示
-        .RunDll_ToastNotifierShow "InternetImage"
-        'Shell ActionCmd,vbHide
+        Shell .GenerateCmd_ToastNotifierShow("withImageToast"), vbHide
     End With
 End Sub
 ```
+次のような表示になり上手くいきません…<br>
+![alt text](doc/Ex_AppUserModelID1-1.png)<br>
+
+そこで、「.AllowUse_InternetImage = True」を加えると…
+```bas
+Sub httpソースの画像付き通知()
+    With New cls_AppNotificationBuilder
+        .AllowUse_InternetImage = True
+
+        .SetToastContent_TextTitle = "上部に画像を表示"
+        .SetToastContent_ImageHero = "https://pad.gungho.jp/member/img/graphic/illust/6828.png"
+
+
+        Shell .GenerateCmd_ToastNotifierShow("withImageToast"), vbHide
+    End With
+End Sub
+```
+正しく表示できます。<br>
+![alt text](doc/Ex_AppUserModelID1-2.png)<br>
+
+このHTTP上の画像ソースに関する詳しい挙動は、こちらを参照下さい。
 
 ### SetToastContent_AppUserModelID
 この通知をどのAppUserModelIDで出すかを設定します。<br>
 存在しない(未インストール)AppUserModelID、無効な文字列を指定すると、Toastが発行されないのでご注意ください。<br>
-このプロパティが設定されてると、AllowUse_InternetImageの設定より優先されます。
+指定したAppUserModelIDによっては、AllowUse_InternetImageの設定が効きません。<br>
+この仕様については、こちらを参照下さい
 
 #### 設定値
 Windows にインストールされているAppUserModelID
@@ -824,12 +823,12 @@ Input要素の配置順。1~5まで有効です。
 
 #### サンプルコード
 ```bas
-Sub メッセージ()
+Sub メッセ()
     Dim AppNotification As New cls_AppNotificationBuilder
     Dim ActionCmd As String
     
     With AppNotification
-        'テキスト入力要素を作成
+        'テキスト入力要素を作成("はみがきなう！"を除去すると、右のような画像になります)
         .SetIToastInput("textBox", , "reply", "テキスト入力ができます。", "はみがきなう！") = 1
 
 
