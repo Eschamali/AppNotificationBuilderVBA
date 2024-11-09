@@ -1533,7 +1533,7 @@ Sub ToastWithActiveShow()
         'synalioをリマインダーにする
         .SetToastScenario = Reminder
         'ヘッダーをクリア
-        .SetToastHeader(vbNullString) = ""
+        .SetToastHeader = ""
         
         
         'トーストクリック時の、プロシージャ名を記載
