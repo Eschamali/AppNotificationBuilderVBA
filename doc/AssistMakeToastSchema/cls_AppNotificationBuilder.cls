@@ -70,18 +70,21 @@ Private Declare PtrSafe Function URLDownloadToFile Lib "urlmon" Alias "URLDownlo
 '***************************************************************************************************
 '  機能     ：トーストが表すシナリオを指定します。数字の代わりにこの名称でも機能します。
 '---------------------------------------------------------------------------------------------------
-Public Enum ToastScenario
-    Default
-    Reminder
-    Alarm
-    IncomingCall
-    Urgent
+Public Enum EnumToastScenario
+    tsDefault
+    tsReminder
+    tsAlarm
+    tsIncomingCall
+    tsUrgent
 End Enum
 
 '===================================================================================================
 '  機能     ：トースト通知を表示するときに再生するサウンドを指定します。数字の代わりにこの名称でも機能します。
 '---------------------------------------------------------------------------------------------------
-Public Enum MsWinSoundEvent
+'Windows側で定められた通知音数
+Private Const DefNoticeSoundNum As Integer = 25
+
+Public Enum EnumMsWinSoundEvent
     NotificationDefault = 1
     NotificationIM
     NotificationMail
@@ -112,20 +115,19 @@ End Enum
 '===================================================================================================
 '  機能     ：ボタンのスタイルを指定します。数字の代わりにこの名称でも機能します。
 '---------------------------------------------------------------------------------------------------
-Public Enum ToastButtonStyle
-    NoStyle
-    Success
-    Critical
+Public Enum EnumToastButtonStyle
+    tbsSuccess = 1
+    tbsCritical
 End Enum
 
 '===================================================================================================
 '  機能     ：ユーザーが特定の操作を行った際に使用されるアクティブ化の種類を決定します。
 '---------------------------------------------------------------------------------------------------
-Public Enum ToastActivationType
-    Foreground = 1  'フォアグラウンド アプリが起動します。
-    background      '対応するバックグラウンド タスクがトリガーされ、ユーザーを中断することなくバックグラウンドでコードを実行できます。
-    Protocol        'プロトコルのアクティブ化を使用して別のアプリを起動します。
-    System          'Action要素でのリマインダーモード用です
+Public Enum EnumToastActivationType
+    taForeground = 1  'フォアグラウンド アプリが起動します。
+    tabackground      '対応するバックグラウンド タスクがトリガーされ、ユーザーを中断することなくバックグラウンドでコードを実行できます。
+    taProtocol        'プロトコルのアクティブ化を使用して別のアプリを起動します。
+    taSystem          'Action要素でのリマインダーモード用です
 End Enum
 '---------------------------------------------------------------------------------------------------
 
@@ -208,9 +210,9 @@ End Type
 '位置        ：Toast要素に付けれる属性値
 'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-toast
 '---------------------------------------------------------------------------------------------------
-Private ElementToast As AttributeToast
+Private ElementToast As ToastVisual
 
-Private Type AttributeToast
+Private Type ToastVisual
     Duration         As String    '通知の表示時間延長フラグ
     Launch           As String    'トースト自体をクリックする際のスキーマ値
     DisplayTimestamp As String    'Windows プラットフォームによって通知が受信された時刻ではなく、通知コンテンツが実際に配信された日時を表すカスタム タイムスタンプで既定のタイムスタンプをオーバーライドします。 この値は、ISO 8601 標準を使用して書式設定された文字列である必要があります。
@@ -223,9 +225,9 @@ End Type
 '位置        ：binding要素に付けれる属性値
 'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-binding
 '---------------------------------------------------------------------------------------------------
-Private ElementBinding As AttributeBinding
+Private ElementBinding As ToastBindingGeneric
 
-Private Type AttributeBinding
+Private Type ToastBindingGeneric
     Baseuri     As String   'イメージ ソース属性の相対 URI と組み合わせた既定のベース URI。
     template    As String   'この値は "ToastGeneric" に設定する必要があります
 End Type
@@ -234,7 +236,7 @@ End Type
 '位置        ：binding親要素のimage子要素で使える属性値
 'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-image
 '---------------------------------------------------------------------------------------------------
-Private ElementsImage As ElementImage
+Private ElementsImage As TopAdaptiveImage
 
 'image要素で使える属性
 Private Type AttributeImage
@@ -246,7 +248,7 @@ Private Type AttributeImage
 End Type
 
 'image要素の立ち位置(属性ノード：placement  の値ごとに分けています)
-Private Type ElementImage
+Private Type TopAdaptiveImage
     AppLogo As AttributeImage  'アイコン
     Inline  As AttributeImage  '画像はテキスト要素の後にインラインで表示され、ビジュアル領域の全幅が埋め込まれます。
     Hero    As AttributeImage  'トースト内で目立つように表示される注目のヒーロー画像を表示。常に通知上部に配置されます
@@ -256,7 +258,7 @@ End Type
 '位置        ：binding親要素のtext子要素で使える値と、属性値
 'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-text
 '----------------------------------------------------------------------------------------------------
-Private ElementsText As ElementText
+Private ElementsText As TopAdaptiveText
 
 'text要素で使える属性
 Private Type AttributeText
@@ -274,7 +276,7 @@ Private Type ParameterText
 End Type
 
 'text要素の立ち位置
-Private Type ElementText
+Private Type TopAdaptiveText
     Title       As ParameterText    'タイトル
     Body        As ParameterText    'コンテンツ
     Attribution As ParameterText    '常に下部に表示するもの
@@ -284,14 +286,14 @@ End Type
 '位置        ：subgroup要素に付けれる属性値と値
 'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-subgroup
 '----------------------------------------------------------------------------------------------------
-Private ElementsSubgroup()      As ElementSubgroup, SubgroupTotal As Long
-Private SubgroupInnerTexts()    As SubgroupInnerText, SubgroupInnerTextsTotal As Long
-Private SubgroupInnerImages()   As SubgroupInnerImage, SubgroupInnerImagesTotal As Long
+Private ElementsSubgroup()      As AdaptiveSubgroup, SubgroupTotal As Long
+Private SubgroupInnerTexts()    As SubAdaptiveText, SubgroupInnerTextsTotal As Long
+Private SubgroupInnerImages()   As SubAdaptiveImage, SubgroupInnerImagesTotal As Long
 Private SubgroupInnerOrder()    As SubgroupInnerOrder, SubgroupInnerTotal As Long
 
 'グループ/サブグループの子として配置されるテキスト要素
 'https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptivetext
-Private Type SubgroupInnerText
+Private Type SubAdaptiveText
     '各属性
     HintStyle       As String   'テキストのフォント サイズ、太さ、および不透明度を制御します。
     HintWrap        As Boolean  'true に設定すると、テキストの折り返しが有効になります。
@@ -306,7 +308,7 @@ End Type
 
 'グループ/サブグループの子として配置されるインライン画像
 'https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptiveimage
-Private Type SubgroupInnerImage
+Private Type SubAdaptiveImage
     '各属性
     src                 As String   '画像パス
     HintCrop            As String   'イメージの目的のトリミングを制御
@@ -323,7 +325,7 @@ Private Type SubgroupInnerOrder
 End Type
 
 'subgroupに付けれる属性と値、順序データ
-Private Type ElementSubgroup
+Private Type AdaptiveSubgroup
     '各属性
     HintWeight As Integer       '別のサブグループを基準として太さを指定することで、このサブグループの列の幅を制御します。
     HintTextStacking As String  'このサブグループのコンテンツの垂直方向の配置を制御します。
@@ -332,20 +334,20 @@ Private Type ElementSubgroup
     QueueOrder() As SubgroupInnerOrder
 
     '値
-    QueueText() As SubgroupInnerText
-    QueueImage() As SubgroupInnerImage
+    QueueText() As SubAdaptiveText
+    QueueImage() As SubAdaptiveImage
 End Type
 
 '<subgroup用の便利な列挙型>
 '画像トリミングを指定します。
-Public Enum AdaptiveImageCrop
+Public Enum EnumAdaptiveImageCrop
     ImageCrop_Default   '既定値です。トリミングの動作がレンダラーによって決定されます。
     ImageCrop_None      '画像がトリミングされません。
     ImageCrop_Circle    '画像が円形にトリミングされます。
 End Enum
 
 '画像の水平方向の配置を指定します。
-Public Enum AdaptiveImageAlign
+Public Enum EnumAdaptiveImageAlign
     ImageAlign_Default  '既定値です。配置の動作がレンダラーによって決定されます。
     ImageAlign_Stretch  '利用可能な幅いっぱいに画像が拡大されます (また同時に、画像が配置される位置に応じて、利用可能な高さいっぱいに拡大されることもあります)。
     ImageAlign_Left     '画像を左側に配置し、ネイディブの解像度で表示します。
@@ -354,7 +356,7 @@ Public Enum AdaptiveImageAlign
 End Enum
 
 'フォント サイズ、太さ、および不透明度を制御します。 "Subtle" の不透明度は 60% の不透明度になります。
-Public Enum AdaptiveTextStyle
+Public Enum EnumAdaptiveTextStyle
     TextStyle_Default           '既定値です。 スタイルがレンダラーによって決定されます。
     TextStyle_Caption           '段落のフォント サイズより小さいサイズです。
     TextStyle_CaptionSubtle     'Caption と同じですが、不透明度が Subtle です。
@@ -376,7 +378,7 @@ Public Enum AdaptiveTextStyle
 End Enum
 
 'テキストの水平方向の配置を制御します。
-Public Enum AdaptiveTextAlign
+Public Enum EnumAdaptiveTextAlign
     TextAlign_Default '既定値です。 配置がレンダラーによって自動的に決定されます。
     TextAlign_Auto    '配置が現在の言語とカルチャによって決定されます。
     TextAlign_Left    'テキストを左側に水平方向に配置します。
@@ -398,9 +400,9 @@ End Enum
 '位置        ：binding親要素のprogress子要素で使える属性値
 'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-progress
 '----------------------------------------------------------------------------------------------------
-Private ElementProgress As AttributeProgress
+Private ElementProgress As AdaptiveProgressBar
 
-Private Type AttributeProgress
+Private Type AdaptiveProgressBar
     Title               As String   '省略可能なタイトル文字列。
     Status              As String   '左側の進行状況バーの下に表示されるステータス文字列。 この文字列は、"ダウンロード中..." や "インストール中..." などのように、操作の状態を反映する必要があります。
     Value               As String   'プログレスバーの値。 この値には、0.0 ~ 1.0 の浮動小数点数、または読み込みアニメーションを生成する値 "Indeterminate" を指定します。
@@ -411,9 +413,9 @@ End Type
 '位置        ：Audio要素に付けれる属性値
 'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-audio
 '----------------------------------------------------------------------------------------------------
-Private ElementAudio As AttributeAudio
+Private ElementAudio As ToastAudio
 
-Private Type AttributeAudio
+Private Type ToastAudio
     loop   As Boolean   'ループフラグ
     silent As Boolean   '無音フラグ
     src    As String    '通知音名称
@@ -426,9 +428,9 @@ End Type
 '入れれる最大要素数を定数定義
 Private Const MaxElementActionNum As Integer = 5    'ボタンは最大5つ、入れれます
 
-Private ElementAction(1 To MaxElementActionNum) As AttributeAction
+Private ElementAction(1 To MaxElementActionNum) As IToastActions
 
-Private Type AttributeAction
+Private Type IToastActions
     Content                 As String   'ボタンに表示されるコンテンツ。
     Arguments               As String   'ユーザーがこのボタンをクリックした場合にアプリが後から受け取る、アプリで定義された引数の文字列です。
     ActivationType          As String   'ユーザーが特定の操作を行った際に使用されるアクティブ化の種類を決定します。
@@ -447,9 +449,9 @@ End Type
 '入れれる最大要素数を定数定義
 Private Const MaxElementSelectionNum As Integer = 5    '選択肢は最大5つ、入れれます
 
-Private ElementSelection(1 To MaxElementSelectionNum) As AttributeSelection
+Private ElementSelection(1 To MaxElementSelectionNum) As ToastSelectionBox
 
-Private Type AttributeSelection
+Private Type ToastSelectionBox
     MinuteValue As String  '再通知する時間。(単位：分)
     ChoseName   As String   '選択肢に出す名称
 End Type
@@ -461,9 +463,9 @@ End Type
 '入れれる最大要素数を定数定義
 Private Const MaxElementInputNum As Integer = 5    '入力要素は最大5つ、入れれます
 
-Private ElementInput(1 To MaxElementInputNum) As AttributeInput
+Private ElementInput(1 To MaxElementInputNum) As IToastInput
 
-Private Type AttributeInput
+Private Type IToastInput
     '属性一覧
     id                 As String    '入力に関連付けられている ID
     Type               As String    'この属性には、"text"、"selection" のいずれかの値を指定できます。
@@ -472,16 +474,16 @@ Private Type AttributeInput
     DefaultInput       As String    'デフォルトの入力値(公式にはないが、設定項目としてはあるもよう)
 
     '要素そのものの配列(Select要素が入ります)
-    Value() As AttributeSelection
+    Value() As ToastSelectionBox
 End Type
 
 '====================================================================================================
 '位置        ：header要素に付けれる属性値
 'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-header
 '----------------------------------------------------------------------------------------------------
-Private ElementHeader As AttributeHeader
+Private ElementHeader As ToastHeader
 
-Private Type AttributeHeader
+Private Type ToastHeader
     id             As String    'このヘッダーを一意に識別します。 2 つの通知が同じヘッダー ID を持つ場合、アクション センターで同じヘッダーの下に表示されます。
     Title          As String    'ヘッダーのタイトルです。
     Arguments      As String    'ユーザーがこのヘッダーをクリックするとアプリに返されます。 null にすることはできません。
@@ -524,7 +526,7 @@ End Property
 '* 機能説明：設定すると、ExcelのAppUserModelIDよりも優先して設定されます。batファイル等、VBAと直接関係なくなり、アイコンが噛み合わない時に使います。
 '* 注意事項：存在しない(未インストール)AppID、無効な文字列を指定すると、Toastが発行されないのでご注意ください。
 '---------------------------------------------------------------------------------------------------
-Public Property Let SetToastContent_AppUserModelID(ByVal ArgAppID As String)
+Public Property Let SetAppUserModelID(ByVal ArgAppID As String)
     AppUserModelID_Any = ArgAppID
 End Property
 
@@ -597,10 +599,10 @@ End Property
 '* 引数　　：ArgSchema          起動スキーマ。URLやファイルパスなど
 '            ArgActivationType  このヘッダーがクリックされた場合に使用するアクティブ化の種類(DLLを使用しない場合、"protocol"以外は機能しません)
 '***************************************************************************************************
-Public Property Let SetToastContent_Launch(Optional ByVal ArgActivationType As ToastActivationType = ToastActivationType.Protocol, ByVal ArgSchema As String)
+Public Property Let SetToastContent_Launch(Optional ByVal ArgActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, ByVal ArgSchema As String)
     With ElementToast
         .Launch = ArgSchema
-        .ActivationType = ActivationMode(ArgActivationType)
+        .ActivationType = SetToastActivationType(ArgActivationType)
     End With
 End Property
 
@@ -623,23 +625,23 @@ End Property
 '---------------------------------------------------------------------------------------------------
 '* 引数　　：ArgID    シナリオID。便宜上、数値に応じてシナリオ名を設定します
 '***************************************************************************************************
-Public Property Let SetToastScenario(ToastScenarioMode As ToastScenario)
+Public Property Let SetToastContent_Scenario(ToastScenarioMode As EnumToastScenario)
     'ArgIDから、シナリオ名を決めます。
     With ElementToast
         Select Case ToastScenarioMode
-            Case 1
+            Case EnumToastScenario.tsReminder
                 '通知を永遠に表示する。action要素がないと効果は発動しないが、任意の通知音に設定可能
                 .Synalio = "reminder"
 
-            Case 2
+            Case EnumToastScenario.tsAlarm
                 '通知を永遠に表示する。action要素がないと効果は発動しないが、応答不可になっても設定問わず、必ず表示される。通知音はアラーム系(Alarm)か、ミュートのみ設定可能
                 .Synalio = "alarm"
 
-            Case 3
+            Case EnumToastScenario.tsIncomingCall
                 '通知を永遠に表示する。action要素がなくても効果発動。最後のボタン位置のみ、Windowsのテーマ色に基づく着色が施され、位置が必ず下側になる。通知音は呼び出し系(Call)か、ミュートのみ設定可能
                 .Synalio = "incomingCall"
 
-            Case 4
+            Case EnumToastScenario.tsUrgent
                 '重要な通知として表示。応答不可にしても表示されますが、設定で表示させないようにすることが可能です。とりあえず常に表示させたい場合は、シナリオ：「アラーム」にしましょう。
                 .Synalio = "urgent"
 
@@ -653,18 +655,18 @@ End Property
 '***************************************************************************************************
 '* 機能    ：引数に応じて、アクティブ化の種類を文字列で返します
 '***************************************************************************************************
-Private Function ActivationMode(ByVal activationID As ToastActivationType) As String
+Private Function SetToastActivationType(ByVal activationID As EnumToastActivationType) As String
     Select Case activationID
-        Case 1
-            ActivationMode = "foreground"
-        Case 2
-            ActivationMode = "background"
-        Case 3
-            ActivationMode = "protocol"
-        Case 4
-            ActivationMode = "system"
+        Case EnumToastActivationType.taForeground
+            SetToastActivationType = "foreground"
+        Case EnumToastActivationType.tabackground
+            SetToastActivationType = "background"
+        Case EnumToastActivationType.taProtocol
+            SetToastActivationType = "protocol"
+        Case EnumToastActivationType.taSystem
+            SetToastActivationType = "system"
         Case Else
-            ActivationMode = vbNullString
+            SetToastActivationType = vbNullString
     End Select
 End Function
 
@@ -677,19 +679,19 @@ End Function
 '---------------------------------------------------------------------------------------------------
 '* 注意事項：この機能は、Windows 11 以降のみ機能します。
 '***************************************************************************************************
-Public Property Let AllowToastContent_UseButtonStyle(ByVal ArgUseButtonStyle As Boolean)
+Public Property Let SetToastContent_UseButtonStyle(ByVal ArgUseButtonStyle As Boolean)
     ElementToast.UseButtonStyle = ArgUseButtonStyle
 End Property
 
 '***************************************************************************************************
 '* 機能　　binding要素の各属性へ値をセット
 '---------------------------------------------------------------------------------------------------
-'* 引数　　：Baseuri    イメージ ソース属性の相対 URI と組み合わせた既定のベース URI。
-'            template   この値は "ToastGeneric" に設定する必要があります
+'* 引数　　：ArgTemp            イメージ ソース属性の相対 URI と組み合わせた既定のベース URI。
+'            ArgBaseImageURI    この値は "ToastGeneric" に設定する必要があります
 '***************************************************************************************************
-Public Property Let SetToastBinding(Optional ByVal ArgTemp As String = "ToastGeneric", ByVal ArgBaseURL As String)
+Public Property Let SetToastBindingGeneric(Optional ByVal ArgTemp As String = "ToastGeneric", ByVal ArgBaseImageURI As String)
     With ElementBinding
-        .Baseuri = ArgBaseURL
+        .Baseuri = ArgBaseImageURI
         .template = ArgTemp     '※この値は "ToastGeneric" に設定する必要があります
     End With
 End Property
@@ -705,7 +707,7 @@ End Property
 '            Flag_addImageQuery     srcのURIに、クエリ文字列を追加できるようにするには、"true"を指定します。
 '            Arg_Alt                画像の説明を記載します。
 '***************************************************************************************************
-Public Property Let SetToastContent_ImageInline(Optional ByVal Arg_InlineCircle As Integer, Optional ByVal Flag_addImageQuery As Boolean, Optional ByVal Arg_Alt As String, ByVal Arg_InlineImageSrc As String)
+Public Property Let SetToastGenericInlineImage(Optional ByVal Arg_InlineCircle As Integer, Optional ByVal Flag_addImageQuery As Boolean, Optional ByVal Arg_Alt As String, ByVal Arg_InlineImageSrc As String)
     With ElementsImage.Inline
         .src = UseHttpImageCheck(Arg_InlineImageSrc)
         .AddImageQuery = Flag_addImageQuery
@@ -722,7 +724,7 @@ End Property
 '            Flag_addImageQuery     srcのURIに、クエリ文字列を追加できるようにするには、"true"を指定します。
 '            Arg_Alt                画像の説明を記載します。
 '***************************************************************************************************
-Public Property Let SetToastContent_ImageHero(Optional ByVal Flag_addImageQuery As Boolean, Optional ByVal Arg_Alt As String, ByVal Arg_HeroImageSrc As String)
+Public Property Let SetToastGenericHeroImage(Optional ByVal Flag_addImageQuery As Boolean, Optional ByVal Arg_Alt As String, ByVal Arg_HeroImageSrc As String)
     With ElementsImage.Hero
         .src = UseHttpImageCheck(Arg_HeroImageSrc)
         .AddImageQuery = Flag_addImageQuery
@@ -743,7 +745,7 @@ End Property
 '            Flag_addImageQuery     srcのURIに、クエリ文字列を追加できるようにするには、"true"を指定します。
 '            Arg_Alt                画像の説明を記載します。
 '***************************************************************************************************
-Public Property Let SetToastContent_ImageAppLogo(Optional ByVal Arg_LogoCircle As Boolean, Optional ByVal Flag_addImageQuery As Boolean, Optional ByVal Arg_Alt As String, ByVal Arg_AppLogoSrc As String)
+Public Property Let SetToastGenericAppLogo(Optional ByVal Arg_LogoCircle As Boolean, Optional ByVal Flag_addImageQuery As Boolean, Optional ByVal Arg_Alt As String, ByVal Arg_AppLogoSrc As String)
     With ElementsImage.AppLogo
         .src = UseHttpImageCheck(Arg_AppLogoSrc)
         .AddImageQuery = Flag_addImageQuery
@@ -764,7 +766,7 @@ End Property
 '* 機能説明：1行目のタイトルにあたります
 '* 注意事項：Synalio属性値が"incomingCall"のToast要素のみ効果発動。それ以外の場合は無視されます。
 '***************************************************************************************************
-Public Property Let SetToastContent_TextTitle(Optional ByVal HintCallScenarioCenterAlign As Boolean, ByVal TextContents As String)
+Public Property Let SetToastGenericTitleText(Optional ByVal HintCallScenarioCenterAlign As Boolean, ByVal TextContents As String)
     With ElementsText.Title
         .Value = TextContents
         .Attribute.HintCallScenarioCenterAlign = HintCallScenarioCenterAlign
@@ -781,7 +783,7 @@ End Property
 '* 注意事項：Synalio属性値が"incomingCall"のToast要素のみ効果発動。それ以外の場合は無視されます。
 '            また、タイトルが未設定の場合、これがタイトル扱いになるため注意
 '***************************************************************************************************
-Public Property Let SetToastContent_TextBody(Optional ByVal HintCallScenarioCenterAlign As Boolean, ByVal TextContents As String)
+Public Property Let SetToastGenericContentsText(Optional ByVal HintCallScenarioCenterAlign As Boolean, ByVal TextContents As String)
     With ElementsText.Body
         .Value = TextContents
         .Attribute.HintCallScenarioCenterAlign = HintCallScenarioCenterAlign
@@ -798,7 +800,7 @@ End Property
 '* 注意事項：Synalio属性値が"incomingCall"のToast要素のみ効果発動。それ以外の場合は無視されます。
 '            placement属性に、"attribution"を常に付与しています
 '***************************************************************************************************
-Public Property Let SetToastContent_TextAttribute(Optional ByVal HintCallScenarioCenterAlign As Boolean, ByVal TextContents As String)
+Public Property Let SetToastGenericAttributionText(Optional ByVal HintCallScenarioCenterAlign As Boolean, ByVal TextContents As String)
     With ElementsText.Attribution
         .Value = TextContents
         .Attribute.HintCallScenarioCenterAlign = HintCallScenarioCenterAlign
@@ -815,7 +817,7 @@ End Property
 '---------------------------------------------------------------------------------------------------
 '* 注意事項：このプロパティを使用すると以前設定した、subgroup要素内のtext,image要素はリセットされます。
 '***************************************************************************************************
-Public Sub AddToastSubgroup(Optional ByVal Weight As Integer, Optional ByVal TextStacking As AdaptiveSubgroupTextStacking)
+Public Sub AddAdaptiveSubgroup(Optional ByVal Weight As Integer, Optional ByVal TextStacking As AdaptiveSubgroupTextStacking)
     '加算処理(0基準)
     SubgroupTotal = SubgroupTotal + 1
 
@@ -874,7 +876,7 @@ End Sub
 '---------------------------------------------------------------------------------------------------
 '* 機能説明：アダプティブを使用した画像をレンダリング出来ます。
 '***************************************************************************************************
-Public Property Let Add_SubgroupInnerImage(Optional ByVal Crop As AdaptiveImageCrop, Optional ByVal RemoveMargin As Boolean, Optional ByVal Align As AdaptiveImageAlign, Optional ByVal AltText As String, Optional ByVal AddImageQuery As Boolean, ImageSrc As String)
+Public Property Let AddAdaptiveSubgroupImage(Optional ByVal Crop As EnumAdaptiveImageCrop, Optional ByVal RemoveMargin As Boolean, Optional ByVal Align As EnumAdaptiveImageAlign, Optional ByVal AltText As String, Optional ByVal AddImageQuery As Boolean, ImageSrc As String)
     '加算処理(0基準)
     SubgroupInnerImagesTotal = SubgroupInnerImagesTotal + 1     '画像挿入数
     SubgroupInnerTotal = SubgroupInnerTotal + 1                 'Subgroup要素内の挿入要素数
@@ -893,10 +895,10 @@ Public Property Let Add_SubgroupInnerImage(Optional ByVal Crop As AdaptiveImageC
         .src = UseHttpImageCheck(ImageSrc)
         
         Select Case Crop
-            Case AdaptiveImageCrop.ImageCrop_Circle
+            Case EnumAdaptiveImageCrop.ImageCrop_Circle
                 .HintCrop = "circle"
             
-            Case AdaptiveImageCrop.ImageCrop_None
+            Case EnumAdaptiveImageCrop.ImageCrop_None
                 .HintCrop = "none"
             
             Case Else
@@ -906,16 +908,16 @@ Public Property Let Add_SubgroupInnerImage(Optional ByVal Crop As AdaptiveImageC
         .HintRemoveMargin = RemoveMargin
         
         Select Case Align
-            Case AdaptiveImageAlign.ImageAlign_Stretch
+            Case EnumAdaptiveImageAlign.ImageAlign_Stretch
                 .HintAlign = "stretch"
             
-            Case AdaptiveImageAlign.ImageAlign_Left
+            Case EnumAdaptiveImageAlign.ImageAlign_Left
                 .HintAlign = "left"
             
-            Case AdaptiveImageAlign.ImageAlign_Center
+            Case EnumAdaptiveImageAlign.ImageAlign_Center
                 .HintAlign = "center"
             
-            Case AdaptiveImageAlign.ImageAlign_Right
+            Case EnumAdaptiveImageAlign.ImageAlign_Right
                 .HintAlign = "right"
             
             Case Else
@@ -940,7 +942,7 @@ End Property
 '---------------------------------------------------------------------------------------------------
 '* 機能説明：アダプティブを使用したテキストをレンダリング出来ます。
 '***************************************************************************************************
-Public Property Let Add_SubgroupInnerText(Optional ByVal Style As AdaptiveTextStyle, Optional ByVal Wrap As Boolean, Optional ByVal MaxLines As Integer, Optional ByVal MinLines As Integer, Optional ByVal Align As AdaptiveTextAlign, Optional ByVal Arg_Language As String, ByVal TextContents As String)
+Public Property Let AddAdaptiveSubgroupText(Optional ByVal Style As EnumAdaptiveTextStyle, Optional ByVal Wrap As Boolean, Optional ByVal MaxLines As Integer, Optional ByVal MinLines As Integer, Optional ByVal Align As EnumAdaptiveTextAlign, Optional ByVal Arg_Language As String, ByVal TextContents As String)
     '加算処理(0基準)
     SubgroupInnerTextsTotal = SubgroupInnerTextsTotal + 1   'テキスト挿入数
     SubgroupInnerTotal = SubgroupInnerTotal + 1             'Subgroup要素内の挿入要素数
@@ -957,55 +959,55 @@ Public Property Let Add_SubgroupInnerText(Optional ByVal Style As AdaptiveTextSt
     With SubgroupInnerTexts(SubgroupInnerTextsTotal)
         '各属性
         Select Case Style
-            Case AdaptiveTextStyle.TextStyle_Caption
+            Case EnumAdaptiveTextStyle.TextStyle_Caption
                 .HintStyle = "caption"
 
-            Case AdaptiveTextStyle.TextStyle_CaptionSubtle
+            Case EnumAdaptiveTextStyle.TextStyle_CaptionSubtle
                 .HintStyle = "captionsubtle"
 
-            Case AdaptiveTextStyle.TextStyle_Body
+            Case EnumAdaptiveTextStyle.TextStyle_Body
                 .HintStyle = "body"
 
-            Case AdaptiveTextStyle.TextStyle_BodySubtle
+            Case EnumAdaptiveTextStyle.TextStyle_BodySubtle
                 .HintStyle = "bodysubtle"
 
-            Case AdaptiveTextStyle.TextStyle_Base
+            Case EnumAdaptiveTextStyle.TextStyle_Base
                 .HintStyle = "base"
 
-            Case AdaptiveTextStyle.TextStyle_BaseSubtle
+            Case EnumAdaptiveTextStyle.TextStyle_BaseSubtle
                 .HintStyle = "basesubtle"
 
-            Case AdaptiveTextStyle.TextStyle_Subtitle
+            Case EnumAdaptiveTextStyle.TextStyle_Subtitle
                 .HintStyle = "subtitle"
 
-            Case AdaptiveTextStyle.TextStyle_SubtitleSubtle
+            Case EnumAdaptiveTextStyle.TextStyle_SubtitleSubtle
                 .HintStyle = "subtitlesubtle"
 
-            Case AdaptiveTextStyle.TextStyle_Title
+            Case EnumAdaptiveTextStyle.TextStyle_Title
                 .HintStyle = "title"
 
-            Case AdaptiveTextStyle.TextStyle_TitleSubtle
+            Case EnumAdaptiveTextStyle.TextStyle_TitleSubtle
                 .HintStyle = "titlesubtle"
 
-            Case AdaptiveTextStyle.TextStyle_TitleNumeral
+            Case EnumAdaptiveTextStyle.TextStyle_TitleNumeral
                 .HintStyle = "titlenumeral"
 
-            Case AdaptiveTextStyle.TextStyle_Subheader
+            Case EnumAdaptiveTextStyle.TextStyle_Subheader
                 .HintStyle = "subheader"
 
-            Case AdaptiveTextStyle.TextStyle_SubheaderSubtle
+            Case EnumAdaptiveTextStyle.TextStyle_SubheaderSubtle
                 .HintStyle = "subheadersubtle"
 
-            Case AdaptiveTextStyle.TextStyle_SubheaderNumeral
+            Case EnumAdaptiveTextStyle.TextStyle_SubheaderNumeral
                 .HintStyle = "subheadernumeral"
 
-            Case AdaptiveTextStyle.TextStyle_Header
+            Case EnumAdaptiveTextStyle.TextStyle_Header
                 .HintStyle = "header"
 
-            Case AdaptiveTextStyle.TextStyle_HeaderSubtle
+            Case EnumAdaptiveTextStyle.TextStyle_HeaderSubtle
                 .HintStyle = "headersubtle"
 
-            Case AdaptiveTextStyle.TextStyle_HeaderNumeral
+            Case EnumAdaptiveTextStyle.TextStyle_HeaderNumeral
                 .HintStyle = "headernumeral"
             
             Case Else
@@ -1018,16 +1020,16 @@ Public Property Let Add_SubgroupInnerText(Optional ByVal Style As AdaptiveTextSt
         .HintMinLines = MinLines
         
         Select Case Align
-            Case AdaptiveTextAlign.TextAlign_Auto
+            Case EnumAdaptiveTextAlign.TextAlign_Auto
                 .HintAlign = "auto"
             
-            Case AdaptiveTextAlign.TextAlign_Left
+            Case EnumAdaptiveTextAlign.TextAlign_Left
                 .HintAlign = "left"
             
-            Case AdaptiveTextAlign.TextAlign_Center
+            Case EnumAdaptiveTextAlign.TextAlign_Center
                 .HintAlign = "center"
             
-            Case AdaptiveTextAlign.TextAlign_Right
+            Case EnumAdaptiveTextAlign.TextAlign_Right
                 .HintAlign = "right"
             
             Case Else
@@ -1051,7 +1053,7 @@ End Property
 '---------------------------------------------------------------------------------------------------
 'URL       ：https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-progress-bar
 '***************************************************************************************************
-Private Sub SetToastContent_ProgressBar(Arg_Title As String, Arg_Value As Double, Arg_ValueStringOverride As String, Arg_Status As String)
+Private Sub SetAdaptiveProgressBar(Arg_Title As String, Arg_Value As Double, Arg_ValueStringOverride As String, Arg_Status As String)
     With ElementProgress
         .Title = Arg_Title
         .Status = Arg_Status
@@ -1071,23 +1073,20 @@ End Sub
 '* 機能　　：Audio要素の属性をセット
 '---------------------------------------------------------------------------------------------------
 '* 引数　　：ArgSrcID       通知音ID。便宜上、数値に応じて通知音名を設定します
-'               0-24        Windows側で定められた通知音名を番号で指定
+'               1-25        Windows側で定められた通知音名を番号で指定
 '               上記以外    ミュートにします
 
 '            ArgLoop
 '               True  ：トーストが表示されている限りサウンドが繰り返される場合に設定
 '               False ：1回だけ再生する場合に設定
 '***************************************************************************************************
-Public Property Let SetToastAudio(Optional ByVal ArgLoop As Boolean, ArgSrcID As MsWinSoundEvent)
-    'Windows側で定められた通知音数
-    Const DefNoticeNum As Integer = 25
-
+Public Property Let SetToastAudio(Optional ByVal ArgLoop As Boolean, ArgSrcID As EnumMsWinSoundEvent)
     With ElementAudio
         'audio要素のLoop属性を設定
         .loop = ArgLoop
 
         'ArgSrcID に応じて、ミュート判定を決める
-        If 0 < ArgSrcID And ArgSrcID <= DefNoticeNum Then
+        If 0 < ArgSrcID And ArgSrcID <= DefNoticeSoundNum Then
             '存在する番号ならミュートしない
             .silent = False
         Else
@@ -1101,79 +1100,79 @@ Public Property Let SetToastAudio(Optional ByVal ArgLoop As Boolean, ArgSrcID As
             
         'ただし、toast要素のsynalio属性値によっては、この設定が効かないことがあります
         Select Case ArgSrcID
-            Case 1
+            Case EnumMsWinSoundEvent.NotificationDefault
                 .src = "ms-winsoundevent:Notification.Default"
 
-            Case 2
+            Case EnumMsWinSoundEvent.NotificationIM
                 .src = "ms-winsoundevent:Notification.IM"
                 
-            Case 3
+            Case EnumMsWinSoundEvent.NotificationMail
                 .src = "ms-winsoundevent:Notification.Mail"
 
-            Case 4
+            Case EnumMsWinSoundEvent.NotificationReminder
                 .src = "ms-winsoundevent:Notification.Reminder"
 
-            Case 5
+            Case EnumMsWinSoundEvent.NotificationSMS
                 .src = "ms-winsoundevent:Notification.SMS"
 
-            Case 6
+            Case EnumMsWinSoundEvent.NotificationLoopingAlarm01
                 .src = "ms-winsoundevent:Notification.Looping.Alarm"
 
-            Case 7
+            Case EnumMsWinSoundEvent.NotificationLoopingAlarm02
                 .src = "ms-winsoundevent:Notification.Looping.Alarm2"
 
-            Case 8
+            Case EnumMsWinSoundEvent.NotificationLoopingAlarm03
                 .src = "ms-winsoundevent:Notification.Looping.Alarm3"
 
-            Case 9
+            Case EnumMsWinSoundEvent.NotificationLoopingAlarm04
                 .src = "ms-winsoundevent:Notification.Looping.Alarm4"
 
-            Case 10
+            Case EnumMsWinSoundEvent.NotificationLoopingAlarm05
                 .src = "ms-winsoundevent:Notification.Looping.Alarm5"
 
-            Case 11
+            Case EnumMsWinSoundEvent.NotificationLoopingAlarm06
                 .src = "ms-winsoundevent:Notification.Looping.Alarm6"
 
-            Case 12
+            Case EnumMsWinSoundEvent.NotificationLoopingAlarm07
                 .src = "ms-winsoundevent:Notification.Looping.Alarm7"
 
-            Case 13
+            Case EnumMsWinSoundEvent.NotificationLoopingAlarm08
                 .src = "ms-winsoundevent:Notification.Looping.Alarm8"
 
-            Case 14
+            Case EnumMsWinSoundEvent.NotificationLoopingAlarm09
                 .src = "ms-winsoundevent:Notification.Looping.Alarm9"
 
-            Case 15
+            Case EnumMsWinSoundEvent.NotificationLoopingAlarm10
                 .src = "ms-winsoundevent:Notification.Looping.Alarm10"
 
-            Case 16
+            Case EnumMsWinSoundEvent.NotificationLoopingCall01
                 .src = "ms-winsoundevent:Notification.Looping.Call"
 
-            Case 17
+            Case EnumMsWinSoundEvent.NotificationLoopingCall02
                 .src = "ms-winsoundevent:Notification.Looping.Call2"
 
-            Case 18
+            Case EnumMsWinSoundEvent.NotificationLoopingCall03
                 .src = "ms-winsoundevent:Notification.Looping.Call3"
 
-            Case 19
+            Case EnumMsWinSoundEvent.NotificationLoopingCall04
                 .src = "ms-winsoundevent:Notification.Looping.Call4"
 
-            Case 20
+            Case EnumMsWinSoundEvent.NotificationLoopingCall05
                 .src = "ms-winsoundevent:Notification.Looping.Call5"
 
-            Case 21
+            Case EnumMsWinSoundEvent.NotificationLoopingCall06
                 .src = "ms-winsoundevent:Notification.Looping.Call6"
 
-            Case 22
+            Case EnumMsWinSoundEvent.NotificationLoopingCall07
                 .src = "ms-winsoundevent:Notification.Looping.Call7"
 
-            Case 23
+            Case EnumMsWinSoundEvent.NotificationLoopingCall08
                 .src = "ms-winsoundevent:Notification.Looping.Call8"
 
-            Case 24
+            Case EnumMsWinSoundEvent.NotificationLoopingCall09
                 .src = "ms-winsoundevent:Notification.Looping.Call9"
 
-            Case 25
+            Case EnumMsWinSoundEvent.NotificationLoopingCall10
                 .src = "ms-winsoundevent:Notification.Looping.Call10"
 
             Case Else
@@ -1198,12 +1197,12 @@ End Property
 '            ArgHintToolTip     ボタンに空のコンテンツ文字列がある場合のボタンのヒント。
 '            Index              追加位置
 '***************************************************************************************************
-Public Property Let SetIToastActions(ByVal ArgContent As String, ByVal ArgArguments As String, Optional ByVal ArgActivationType As ToastActivationType = ToastActivationType.Protocol, Optional ArgPendingUpdate As Boolean, Optional ByVal ArgContextMenu As Boolean, Optional ByVal ArgIcon As String, Optional ByVal ArgHintInputId As String, Optional ArgHintButtonStyle As ToastButtonStyle, Optional ByVal ArgHintToolTip As String, ByVal Index As Integer)
+Public Property Let SetIToastActions(ByVal ArgContent As String, ByVal ArgArguments As String, Optional ByVal ArgActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, Optional ArgPendingUpdate As Boolean, Optional ByVal ArgContextMenu As Boolean, Optional ByVal ArgIcon As String, Optional ByVal ArgHintInputId As String, Optional ArgHintButtonStyle As EnumToastButtonStyle, Optional ByVal ArgHintToolTip As String, ByVal Index As Integer)
     With ElementAction(Index)
 
         .Content = ArgContent
         .Arguments = ArgArguments
-        .ActivationType = ActivationMode(ArgActivationType)
+        .ActivationType = SetToastActivationType(ArgActivationType)
 
         If ArgPendingUpdate Then .afterActivationBehavior = "pendingUpdate" Else .afterActivationBehavior = vbNullString
         If ArgContextMenu Then .Placement = "contextMenu" Else .Placement = vbNullString
@@ -1232,7 +1231,7 @@ End Property
 '* 機能　　：input要素の各属性にセットしたものをaction要素に挿入します
 '---------------------------------------------------------------------------------------------------
 '* 引数　　：ArgID                  入力に関連付けられている ID
-'            ChoseFlag              Trueで"selection"、Falseで、"text"扱いとします
+'            ChoseFlag              Trueで"SelectionBox"、Falseで、"TextBox"扱いとします
 '            ArgPlaceHolderContent  テキスト入力用に表示されるプレースホルダー。
 '            Argtitle               入力のラベルとして表示されるテキスト
 '            ArgDefaultInput        デフォルトの入力値
@@ -1291,7 +1290,7 @@ End Property
 '---------------------------------------------------------------------------------------------------
 '* 注意事項：VBAでは、ArgActivationType:"protocol"以外では意味をなしません
 '***************************************************************************************************
-Public Property Let SetToastHeader(Optional ByVal ArgID As String, Optional ByVal ArgArguments As String, Optional ByVal ArgActivationType As ToastActivationType = ToastActivationType.Protocol, ByVal ArgTitle As String)
+Public Property Let SetToastHeader(Optional ByVal ArgID As String, Optional ByVal ArgArguments As String, Optional ByVal ArgActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, ByVal ArgTitle As String)
     With ElementHeader
         '省略時：このExcelのファイル名
         If StrPtr(ArgID) Then
@@ -1308,7 +1307,7 @@ Public Property Let SetToastHeader(Optional ByVal ArgID As String, Optional ByVa
         End If
 
         '省略時：protocol
-        .ActivationType = ActivationMode(ArgActivationType)
+        .ActivationType = SetToastActivationType(ArgActivationType)
 
         .Title = ArgTitle
     End With
@@ -1730,7 +1729,7 @@ End Function
 '* 機能説明：ネット上の画像も使用して通知を表示するかを設定します
 '* 注意事項：厳密には、Settingがc:internetを含むAppIDでないとインターネット上の画像が使えない
 '**************************************************************************************************
-Private Function SetValueAppUserModelID(Optional UseDll As Boolean) As String
+Private Function DecisionAppUserModelID(Optional UseDll As Boolean) As String
     '任意のAppIDの設定があったら、そちらを優先します。
     If StrPtr(AppUserModelID_Any) Then
         ToastConfig.AppUserModelID = AppUserModelID_Any
@@ -1744,9 +1743,9 @@ Private Function SetValueAppUserModelID(Optional UseDll As Boolean) As String
 
     'AppIDを決めるコマンド文字列を返す
     If UseDll Then
-        SetValueAppUserModelID = ToastConfig.AppUserModelID
+        DecisionAppUserModelID = ToastConfig.AppUserModelID
     Else
-        SetValueAppUserModelID = "$AppId = '" & ToastConfig.AppUserModelID & Chr(39)
+        DecisionAppUserModelID = "$AppId = '" & ToastConfig.AppUserModelID & Chr(39)
     End If
 
 End Function
@@ -1758,7 +1757,7 @@ End Function
 '* 引数　　：UpdateMode
 '               True    更新時は、これに設定
 '               False   最初に進捗Toastを発行する場合は、これを設定
-'               ※変数の格納先を変更する都合上、このフラグが必要です。
+'               ※powershell内変数の格納先を変更する都合上、このフラグが必要です。
 '***************************************************************************************************
 Private Function Binding_AdaptiveProgressBar(UpdateMode As Boolean) As String
     '「System.Collections.Generic.Dictionary」というオブジェクトを定義するコマンド文字列
@@ -2007,12 +2006,19 @@ End Property
 '---------------------------------------------------------------------------------------------------
 '* 機能説明：httpソースが使えないAppUserModelIDでも、WindowsAPI:URLDownloadToFile で擬似的にできるようにします。
 '* 注意事項：任意の保存先指定は設けません。「C:\Users\XXX\AppData\Local\Temp」固定です。
+'          ：「Windows Terminal」等のマニフェストにインターネット機能があるパッケージアプリのAppUserModelIDの場合は、ToastConfig.AllowUse_InternetImageFlag を False にしないと予期せぬ挙動を起こすかもしれません
 '***************************************************************************************************
 Private Function UseHttpImageCheck(Source As String) As String
     'ネット上の画像を使用するように設定しており尚且つ、httpソースとして指定されている場合、次の処理に移ります
     Dim BaseUriHttpSourceFlag As Boolean: BaseUriHttpSourceFlag = (Left(ElementBinding.Baseuri, 4) = "http")
     Dim HttpSourceFlag As Boolean: HttpSourceFlag = (Left(Source, 4) = "http")
     If ToastConfig.AllowUse_InternetImageFlag And (HttpSourceFlag Or BaseUriHttpSourceFlag) Then
+
+        'Sourceが空なら、即抜け
+        If Source = "" Then
+            UseHttpImageCheck = Source
+            Exit Function
+        End If
 
         'URLの「/」区切りの最後の部分をファイル名として指定
         Dim SaveImageFileName As String, tmp
@@ -2061,7 +2067,7 @@ End Function
 Public Property Get GenerateCmd_ToastNotifierShow(ByVal ToastTag As String, Optional ByVal CollectionID As String, Optional ByVal ScheduleDate As Date, Optional ByVal ExpirationDate As Date, Optional ByVal Suppress As Boolean) As String
     With ToastConfig
         '設定値をまとめる
-        '.AppUserModelID = SetValueAppUserModelID(False)    '事前に、設定済み
+        '.AppUserModelID = DecisionAppUserModelID(True)     '後続で、設定
         '.AllowUse_InternetImageFlag                        '事前に、設定済み
         .XmlSchema = MakeXmlToastContentBuilder(False)
         
@@ -2099,7 +2105,7 @@ Public Property Get GenerateCmd_ToastNotifierShow(ByVal ToastTag As String, Opti
             '6.AppIDを設定
             '7.Toast通知実行
             GenerateCmd_ToastNotifierShow = WorksheetFunction.TextJoin(";", False, GenerateCmd_ToastNotifierShow, _
-                SetValueAppUserModelID, _
+                DecisionAppUserModelID, _
                 Run__Windows_UI_Notifications__ToastNotifier(.Schedule_DeliveryTime)) & Chr(34)
         End If
     End With
@@ -2121,11 +2127,11 @@ End Property
 '***************************************************************************************************
 Public Property Get GenerateCmd_ToastNotifierShow_Progress(ByVal ToastTag As String, ByVal Arg_Status As String, Optional Arg_Value As Double = 0, Optional ByVal Arg_Title As String, Optional ByVal Arg_ValueStringOverride As String, Optional ByVal ArgSuppress As Boolean) As String
     '進捗用ユーザー定義型のメンバー変数にセット
-    SetToastContent_ProgressBar Arg_Title, Arg_Value, Arg_ValueStringOverride, Arg_Status
+    SetAdaptiveProgressBar Arg_Title, Arg_Value, Arg_ValueStringOverride, Arg_Status
 
     With ToastConfig
         '設定値をまとめる
-        '.AppUserModelID = SetValueAppUserModelID(False)    '事前に、設定済み
+        '.AppUserModelID = DecisionAppUserModelID(True)     '後続で、設定
         '.AllowUse_InternetImageFlag                        '事前に、設定済み
         .XmlSchema = MakeXmlToastContentBuilder(True)
 
@@ -2157,7 +2163,7 @@ Public Property Get GenerateCmd_ToastNotifierShow_Progress(ByVal ToastTag As Str
             Set__Windows_UI_Notifications__ToastNotificationGroup(.Group), Set__Windows_UI_Notifications__ToastNotificationTag(.Tag), _
             Set__Windows_UI_Notifications__ToastNotificationSuppressPopup(.SuppressPopup), _
             Binding_AdaptiveProgressBar(False), _
-            SetValueAppUserModelID, _
+            DecisionAppUserModelID, _
             Run__Windows_UI_Notifications__ToastNotifier(False)) & Chr(34)
     
     End With
@@ -2178,11 +2184,11 @@ End Property
 '***************************************************************************************************
 Public Property Get GenerateCmd_ToastNotifierUpdate_Progress(ByVal ToastTag As String, ByVal Arg_Status As String, Optional ByVal Arg_Value As Double = 0, Optional ByVal Arg_Title As String, Optional ByVal Arg_ValueStringOverride As String) As String
     '進捗用ユーザー定義型のメンバー変数にセット
-    SetToastContent_ProgressBar Arg_Title, Arg_Value, Arg_ValueStringOverride, Arg_Status
+    SetAdaptiveProgressBar Arg_Title, Arg_Value, Arg_ValueStringOverride, Arg_Status
 
     With ToastConfig
         '設定値をまとめる
-        '.AppUserModelID = SetValueAppUserModelID(False)    '事前に、設定済み
+        '.AppUserModelID = DecisionAppUserModelID(True)     '後続で、設定
         '.AllowUse_InternetImageFlag                        '事前に、設定済み
         .XmlSchema = vbNullString
 
@@ -2205,7 +2211,7 @@ Public Property Get GenerateCmd_ToastNotifierUpdate_Progress(ByVal ToastTag As S
         ' 3.更新用Toast通知実行
         GenerateCmd_ToastNotifierUpdate_Progress = ActionPS & WorksheetFunction.TextJoin(";", True, _
             Binding_AdaptiveProgressBar(True), _
-            SetValueAppUserModelID, _
+            DecisionAppUserModelID, _
             Run__Windows_UI_Notifications__ToastNotifierUpdate(.Tag, .Group)) & Chr(34)
     
     End With
@@ -2229,7 +2235,7 @@ End Property
 Public Property Get GenerateCmd_ToastCollectionManagerSaveToastCollectionAsync(CollectionID As String, DisplayName As String, LaunchArgs As String, IconUri As String, Optional FixMode As Boolean) As String
     With ToastConfig
         '設定値をまとめる
-        '.AppUserModelID = SetValueAppUserModelID(False)    '事前に、設定済み
+        '.AppUserModelID = DecisionAppUserModelID(True)     '後続で、設定
         '.AllowUse_InternetImageFlag                        '事前に、設定済み
         .XmlSchema = MakeXmlToastContentBuilder(False)
 
@@ -2262,7 +2268,7 @@ Public Property Get GenerateCmd_ToastCollectionManagerSaveToastCollectionAsync(C
         ' 3.指定したトースト通知グループを作成
         GenerateCmd_ToastCollectionManagerSaveToastCollectionAsync = ActionPS & WorksheetFunction.TextJoin(";", True, _
             New__Windows_UI_Notifications__ToastCollection, _
-            SetValueAppUserModelID, _
+            DecisionAppUserModelID, _
             Run__Windows_UI_Notifications__ToastCollectionManager_SaveToastCollectionAsync)
 
         'true  で不具合対応板として、動作させます。
@@ -2309,30 +2315,30 @@ Public Property Get GenerateCmd_ToastCollectionManagerRemoveToastCollectionAsync
 
     '削除コマンド文字列を生成します
     GenerateCmd_ToastCollectionManagerRemoveToastCollectionAsync = ActionPS & WorksheetFunction.TextJoin(";", False, _
-        SetValueAppUserModelID, _
+        DecisionAppUserModelID, _
         RemoveMode) & Chr(34)
 End Property
 
 '***************************************************************************************************
-'* 処理名　：GenerateCmd_ToastRemove
+'* 処理名　：GenerateCmd_ToastNotificationHistoryRemove
 '* 機能　　：ToastTagに紐づく通知をアクションセンターから削除します
 '---------------------------------------------------------------------------------------------------
 '* 返り値　：ToastTagに紐づく通知をアクションセンターから削除するコマンド文字列
 '* 引数　　：ToastTag   削除するToastTagを指定します。
 '***************************************************************************************************
-Function GenerateCmd_ToastRemove(RemoveTag As String) As String
+Public Property Get GenerateCmd_ToastNotificationHistoryRemove(RemoveTag As String) As String
     With ToastConfig
         '設定値をまとめる
-        '.AppUserModelID = SetValueAppUserModelID(False)    '事前に、設定済み
-        '.AllowUse_InternetImageFlag                        '事前に、設定済み
+        .AppUserModelID = DecisionAppUserModelID(True)
+        '.AllowUse_InternetImageFlag                      '事前に、設定済み
 
         .Tag = RemoveTag
         .Group = ThisWorkbook.Name
 
         '削除コマンドを生成
-        GenerateCmd_ToastRemove = ActionPS & Run__Windows_UI_Notifications__ToastRemove(.Tag, .Group, .AppUserModelID) & Chr(34)
+        GenerateCmd_ToastNotificationHistoryRemove = ActionPS & Run__Windows_UI_Notifications__ToastRemove(.Tag, .Group, .AppUserModelID) & Chr(34)
     End With
-End Function
+End Property
 
 '***************************************************************************************************
 '* 処理名　：PresetReminder
@@ -2391,7 +2397,7 @@ End Sub
 Public Sub RunDll_ToastNotifierShow(ByVal ToastTag As String, Optional ByVal CollectionID As String, Optional ByVal ScheduleDate As Date, Optional ByVal ExpirationDate As Date, Optional ByVal Suppress As Boolean)
     '設定値をまとめる
     With ToastConfig
-        .AppUserModelID = SetValueAppUserModelID(True)
+        .AppUserModelID = DecisionAppUserModelID(True)
         '.AllowUse_InternetImageFlag                     '事前に、設定済み
         .XmlSchema = MakeXmlToastContentBuilder(False)
         
@@ -2429,11 +2435,11 @@ End Sub
 '***************************************************************************************************
 Sub RunDll_ToastNotifierShow_Progress(ByVal ToastTag As String, ByVal Arg_Status As String, Optional Arg_Value As Double = 0, Optional ByVal Arg_Title As String = "", Optional ByVal Arg_ValueStringOverride As String, Optional ByVal ArgSuppress As Boolean)
     '進捗用ユーザー定義型のメンバー変数にセット
-    SetToastContent_ProgressBar Arg_Title, Arg_Value, Arg_ValueStringOverride, Arg_Status
+    SetAdaptiveProgressBar Arg_Title, Arg_Value, Arg_ValueStringOverride, Arg_Status
 
     '設定値をまとめる
     With ToastConfig
-        .AppUserModelID = SetValueAppUserModelID(True)
+        .AppUserModelID = DecisionAppUserModelID(True)
         '.AllowUse_InternetImageFlag                     '事前に、設定済み
         .XmlSchema = MakeXmlToastContentBuilder(True)
 
@@ -2476,11 +2482,11 @@ End Sub
 '***************************************************************************************************
 Public Property Get RunDll_ToastNotifierUpdate_Progress(ByVal ToastTag As String, ByVal Arg_Status As String, Optional ByVal Arg_Value As Double = 0, Optional ByVal Arg_Title As String = "", Optional ByVal Arg_ValueStringOverride As String, Optional SequenceNumber As Long = 2) As Long
     '進捗用ユーザー定義型のメンバー変数にセット
-    SetToastContent_ProgressBar Arg_Title, Arg_Value, Arg_ValueStringOverride, Arg_Status
+    SetAdaptiveProgressBar Arg_Title, Arg_Value, Arg_ValueStringOverride, Arg_Status
 
     '設定値をまとめる
     With ToastConfig
-        .AppUserModelID = SetValueAppUserModelID(True)
+        .AppUserModelID = DecisionAppUserModelID(True)
         '.AllowUse_InternetImageFlag                     '事前に、設定済み
         .XmlSchema = vbNullString
 
@@ -2502,17 +2508,17 @@ Public Property Get RunDll_ToastNotifierUpdate_Progress(ByVal ToastTag As String
 End Property
 
 '**************************************************************************************************
-'* 処理名　：RunDll_RemoveToastNotification
+'* 処理名　：RunDll_ToastNotificationHistoryRemove
 '* 機能　　：タグから、トースト通知を削除します
 '---------------------------------------------------------------------------------------------------
 '* 引数　　：ToastTag           削除するToastTagを指定します。
 '---------------------------------------------------------------------------------------------------
 '* 注意事項：これを実行すると、即座にDll内で処理を行います。
 '**************************************************************************************************
-Public Sub RunDll_RemoveToastNotification(ByVal ToastTag As String)
+Public Sub RunDll_ToastNotificationHistoryRemove(ByVal ToastTag As String)
     '設定値をまとめる
     With ToastConfig
-        .AppUserModelID = SetValueAppUserModelID(True)
+        .AppUserModelID = DecisionAppUserModelID(True)
         '.AllowUse_InternetImageFlag                     '事前に、設定済み
         .XmlSchema = vbNullString
 
@@ -2549,7 +2555,7 @@ End Sub
 Public Property Get RunDll_ToastCollectionManagerSaveToastCollectionAsync(ByVal CollectionID As String, ByVal DisplayName As String, ByVal LaunchArgs As String, IconUri As String) As Long
     '設定値をまとめる
     With ToastConfig
-        .AppUserModelID = SetValueAppUserModelID(True)
+        .AppUserModelID = DecisionAppUserModelID(True)
         '.AllowUse_InternetImageFlag                     '事前に、設定済み
         .XmlSchema = MakeXmlToastContentBuilder(False)
 
@@ -2582,7 +2588,7 @@ End Property
 Public Property Get RunDll_ToastCollectionManagerRemoveToastCollectionAsync(Optional ByVal CollectionID As String) As Long
     '設定値をまとめる
     With ToastConfig
-        .AppUserModelID = SetValueAppUserModelID(True)
+        .AppUserModelID = DecisionAppUserModelID(True)
         '.AllowUse_InternetImageFlag                     '事前に、設定済み
         .XmlSchema = MakeXmlToastContentBuilder(False)
 
