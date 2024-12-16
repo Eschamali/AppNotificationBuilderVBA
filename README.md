@@ -75,8 +75,8 @@ hDll の中身が、0 以外であれば読み込み、成功です。
 Sub ShowToastTest()
     With New cls_AppNotificationBuilder
         '1. プロパティ設定
-       .SetToastContent_TextTitle = "Hello World"
-       .SetToastContent_TextBody = "Test message"
+       .SetToastGenericTitleText = "Hello World"
+       .SetToastGenericContentsText = "Test message"
 
         '2. メソッド実行
        .RunDll_ToastNotifierShow "Hello World"
@@ -95,8 +95,8 @@ HTTP上の画像ソースを使うか決めます。<br>
 ```bas
 Sub httpソースの画像付き通知()
     With New cls_AppNotificationBuilder
-        .SetToastContent_TextTitle = "上部に画像を表示"
-        .SetToastContent_ImageHero = "https://pad.gungho.jp/member/img/graphic/illust/6828.png"
+        .SetToastGenericTitleText = "上部に画像を表示"
+        .SetToastGenericHeroImage = "https://pad.gungho.jp/member/img/graphic/illust/6828.png"
 
 
         Shell .GenerateCmd_ToastNotifierShow("withImageToast"), vbHide
@@ -112,8 +112,8 @@ Sub httpソースの画像付き通知()
     With New cls_AppNotificationBuilder
         .AllowUse_InternetImage = True
 
-        .SetToastContent_TextTitle = "上部に画像を表示"
-        .SetToastContent_ImageHero = "https://pad.gungho.jp/member/img/graphic/illust/6828.png"
+        .SetToastGenericTitleText = "上部に画像を表示"
+        .SetToastGenericHeroImage = "https://pad.gungho.jp/member/img/graphic/illust/6828.png"
 
 
         Shell .GenerateCmd_ToastNotifierShow("withImageToast"), vbHide
@@ -125,7 +125,7 @@ End Sub
 
 このHTTP上の画像ソースに関する詳しい挙動は、[こちら](#allowuse_internetimage-の挙動)を参照下さい。
 
-### SetToastContent_AppUserModelID
+### SetAppUserModelID
 この通知をどのAppUserModelIDで出すかを設定します。<br>
 存在しない(未インストール)AppUserModelID、無効な文字列を指定すると、Toastが発行されないのでご注意ください。<br>
 指定したAppUserModelIDによっては、AllowUse_InternetImageの設定が効きません。<br>
@@ -141,7 +141,7 @@ Sub TestSetAppUserModelID()
 
     With New cls_AppNotificationBuilder
         '任意のAppUserModelID
-        .SetToastContent_AppUserModelID = "Microsoft.WindowsTerminal_8wekyb3d8bbwe!App"
+        .SetAppUserModelID = "Microsoft.WindowsTerminal_8wekyb3d8bbwe!App"
 
 
 
@@ -149,7 +149,7 @@ Sub TestSetAppUserModelID()
         ActionCmd = .GenerateCmd_ToastNotifierShow("By Terminal")
 
         'タイトル設定
-        .SetToastContent_TextTitle = "By Terminal"
+        .SetToastGenericTitleText = "By Terminal"
 
         '通知表示
         .RunDll_ToastNotifierShow "By Terminal"
@@ -184,7 +184,7 @@ Sub 長く表示される通知()
 
 
         'タイトル設定
-        .SetToastContent_TextTitle = "25秒間、表示"
+        .SetToastGenericTitleText = "25秒間、表示"
 
         'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
@@ -225,7 +225,7 @@ Sub リンクを開く()
 
 
         'タイトル設定
-        .SetToastContent_TextTitle = "このトーストをクリックすると、指定リンクに対応するアプリが起動"
+        .SetToastGenericTitleText = "このトーストをクリックすると、指定リンクに対応するアプリが起動"
 
         'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
@@ -256,9 +256,9 @@ Sub アプリ通知のカスタムタイムスタンプ()
 
 
 
-        .SetToastContent_TextTitle = "Hello World"
-        .SetToastContent_TextBody = "このメッセージは、以前から通知されてました。"
-        .SetToastContent_TextAttribute = "カスタムタイムスタンプテスト"
+        .SetToastGenericTitleText = "Hello World"
+        .SetToastGenericContentsText = "このメッセージは、以前から通知されてました。"
+        .SetToastGenericAttributionText = "カスタムタイムスタンプテスト"
 
         'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
@@ -271,7 +271,7 @@ End Sub
 ```
 ![alt text](doc/Ex_Element-Toast3.png)
 
-### SetToastScenario
+### SetToastContent_Scenario
 トーストが使用される[シナリオ](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/adaptive-interactive-toasts?tabs=xml#scenarios)を設定します。列挙型に対応します。
 
 #### 設定値
@@ -291,7 +291,7 @@ Sub シナリオテスト()
     
     With AppNotification
         'トーストのシナリオを設定(ctrl + Space で候補を表示できます)
-        .SetToastScenario = Urgent
+        .SetToastContent_Scenario = tsUrgent
 
 
 
@@ -313,7 +313,7 @@ Sub シナリオテスト()
         .SetIToastActions("", "dismiss", system) = 2
 
         'テキスト要素を用意
-        .SetToastContent_TextTitle = "Hello World"
+        .SetToastGenericTitleText = "Hello World"
 
         'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
@@ -326,7 +326,7 @@ Sub シナリオテスト()
 End Sub
 ```
 
-### AllowToastContent_UseButtonStyle
+### SetToastContent_UseButtonStyle
 toast要素の[useButtonStyle](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-toast#:~:text=%E3%81%AA%E3%81%97-,useButtonStyle,-%E3%82%B9%E3%82%BF%E3%82%A4%E3%83%AB%E4%BB%98%E3%81%8D%E3%83%9C%E3%82%BF%E3%83%B3)属性の設定を行います。<br>
 
 #### 設定値
@@ -343,16 +343,16 @@ Sub UseButtonStyle()
     
     With AppNotification
         'スタイル付きボタンを有効化
-        .AllowToastContent_UseButtonStyle = True
+        .SetToastContent_UseButtonStyle = True
 
 
 
         'タイトル設定
-        .SetToastContent_TextTitle = "緑と赤のボタン"
+        .SetToastGenericTitleText = "緑と赤のボタン"
 
         '設定方法は後述
-        .SetIToastActions("Green", "", , , , , , Success) = 1
-        .SetIToastActions("Red", "", , , , , , Critical) = 2
+        .SetIToastActions("Green", "", , , , , , tbsSuccess) = 1
+        .SetIToastActions("Red", "", , , , , , tbsCritical) = 2
 
         'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
@@ -366,7 +366,7 @@ End Sub
 ![alt text](doc/Ex_Element-Toast5.png)
 
 ## [image要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-image)
-### SetToastContent_ImageAppLogo
+### SetToastGenericAppLogo
 image要素のうち、AppLogo(appLogoOverride)に設定する画像のパスと、丸いロゴフラグの設定を行います。<br>
 
 #### 設定値
@@ -383,21 +383,21 @@ image要素のうち、AppLogo(appLogoOverride)に設定する画像のパスと
 
 #### サンプルコード
 ```bas
-Sub 丸いロゴ画像()
+Sub ロゴ画像()
     Dim AppNotification As New cls_AppNotificationBuilder
     Dim ActionCmd As String
     
     With AppNotification
         'ロゴ画像のパスを指定します。(Arg_LogoCircle=False)
-        .SetToastContent_ImageAppLogo = "C:\Windows\SystemApps\Microsoft.XboxGameCallableUI_cw5n1h2txyewy\Assets\Logo.scale-100.png"
+        .SetToastGenericAppLogo = "C:\Windows\SystemApps\Microsoft.XboxGameCallableUI_cw5n1h2txyewy\Assets\Logo.scale-100.png"
 
         'ロゴ画像のパスを指定し、円にトリミング。(Arg_LogoCircle=True)
-        '.SetToastContent_ImageAppLogo(True) = "C:\Windows\SystemApps\Microsoft.XboxGameCallableUI_cw5n1h2txyewy\Assets\Logo.scale-100.png"
+        '.SetToastGenericAppLogo(True) = "C:\Windows\SystemApps\Microsoft.XboxGameCallableUI_cw5n1h2txyewy\Assets\Logo.scale-100.png"
 
 
 
         'タイトル設定
-        .SetToastContent_TextTitle = "ロゴ画像テスト"
+        .SetToastGenericTitleText = "ロゴ画像テスト"
 
         'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
@@ -413,7 +413,7 @@ End Sub
 | -------------------- | ------------------- | 
 | ![正方形](doc/Ex_Element-Image1-1.png)                   | ![円にトリミング](doc/Ex_Element-Image1-2.png)                  | 
 
-### SetToastContent_ImageInline
+### SetToastGenericInlineImage
 image要素のうち、テキスト要素の後に表示する画像パスと、丸いロゴフラグの設定を行います。<br>
 先ほどと同様、インライン画像のパス指定も、ローカルパス(C:\\)、HTTPソースに対応してます。<br>
 引数の内容も同様のため、省略します。
@@ -426,14 +426,14 @@ Sub インライン画像()
     
     With AppNotification
         '通常
-        .SetToastContent_ImageInline(False, , "win の壁紙") = "C:\Windows\Web\Screen\img100.jpg"
+        .SetToastGenericInlineImage(False, , "win の壁紙") = "C:\Windows\Web\Screen\img100.jpg"
         '円にトリミング
-        ''.SetToastContent_ImageInline(True, , "win の壁紙") = "C:\Windows\Web\Screen\img100.jpg"
+        ''.SetToastGenericInlineImage(True, , "win の壁紙") = "C:\Windows\Web\Screen\img100.jpg"
 
 
 
         'タイトル設定
-        .SetToastContent_TextTitle = "インライン画像テスト"
+        .SetToastGenericTitleText = "インライン画像テスト"
 
         'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
@@ -449,7 +449,7 @@ End Sub
 | -------------------- | ------------------- | 
 | ![正方形](doc/Ex_Element-Image2-1.png)                   | ![円にトリミング](doc/Ex_Element-Image2-2.png)                  | 
 
-### SetToastContent_ImageHero
+### SetToastGenericHeroImage
 ヒーローイメージとして表示させる画像を設定します。<br>
 
 #### 設定値
@@ -471,12 +471,12 @@ Sub 上部に画像()
     
     With AppNotification
         '上部に画像を配置します
-        .SetToastContent_ImageHero(, "win11壁紙") = "C:\Windows\Web\Screen\img100.jpg"
+        .SetToastGenericHeroImage(, "win11壁紙") = "C:\Windows\Web\Screen\img100.jpg"
 
 
 
         'タイトル設定
-        .SetToastContent_TextTitle = "上部に画像を配置"
+        .SetToastGenericTitleText = "上部に画像を配置"
 
         'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
@@ -497,14 +497,14 @@ End Sub
 任意の文字列。
 | プロパティ名                   | 配置位置 | 最大行数 | 
 | ----------------------------- | -------- | -------- | 
-| SetToastContent_TextTitle     | タイトル | 2行      | 
-| SetToastContent_TextBody      | 内容     | 4行      | 
-| SetToastContent_TextAttribute | 下部     | 2行      | 
+| SetToastGenericTitleText     | タイトル | 2行      | 
+| SetToastGenericContentsText      | 内容     | 4行      | 
+| SetToastGenericAttributionText | 下部     | 2行      | 
 
 ### 利用可能な引数
 | 引数名             | 説明                                                                                                           | 既定値       | 
 | ------------------ | -------------------------------------------------------------------------------------------------------------- | ------------ | 
-| HintCallScenarioCenterAlign | 横中央揃えの配置にする設定です。trueにしつつ、シナリオモードを「IncomingCall」にしないと効果ありません。 | False        | 
+| HintCallScenarioCenterAlign | 横中央揃えの配置にする設定です。trueにしつつ、シナリオモードを「tsIncomingCall」にしないと効果ありません。 | False        | 
 
 #### サンプルコード
 ```bas
@@ -514,14 +514,14 @@ Sub 最大行数テキスト()
 
     With AppNotification
         'テキスト設定
-        .SetToastContent_TextTitle(False) = "タイトル 1Line" & vbCrLf & "タイトル 2Line" & vbCrLf & "タイトル 3Line"
-        .SetToastContent_TextBody(False) = "コンテンツ 1Line" & vbCrLf & "コンテンツ 2Line" & vbCrLf & "コンテンツ 3Line" & vbCrLf & "コンテンツ 4Line" & vbCrLf & "コンテンツ 5Line"
-        .SetToastContent_TextAttribute(False) = "コンテンツソース 1Line" & vbCrLf & "コンテンツソース 2Line" & vbCrLf & "コンテンツソース 3Line"
+        .SetToastGenericTitleText(False) = "タイトル 1Line" & vbCrLf & "タイトル 2Line" & vbCrLf & "タイトル 3Line"
+        .SetToastGenericContentsText(False) = "コンテンツ 1Line" & vbCrLf & "コンテンツ 2Line" & vbCrLf & "コンテンツ 3Line" & vbCrLf & "コンテンツ 4Line" & vbCrLf & "コンテンツ 5Line"
+        .SetToastGenericAttributionText(False) = "コンテンツソース 1Line" & vbCrLf & "コンテンツソース 2Line" & vbCrLf & "コンテンツソース 3Line"
 
 
 
         '中央揃えにするとき
-        '.SetToastScenario = IncomingCall
+        '.SetToastContent_Scenario = tsIncomingCall
 
         'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
@@ -532,7 +532,7 @@ Sub 最大行数テキスト()
     End With
 ```
 
-| HintCallScenarioCenterAlign = False             | HintCallScenarioCenterAlign = True かつ、SetToastScenario = IncomingCall |
+| HintCallScenarioCenterAlign = False             | HintCallScenarioCenterAlign = True かつ、SetToastContent_Scenario = tsIncomingCall |
 | ------------------------------------------------- | --------------------------------------- |
 | ![alt text](doc/Ex_Element-text1-1.png)           | ![alt text](doc/Ex_Element-text1-2.png) |
 
@@ -563,7 +563,7 @@ Sub 通知音変更テスト()
 
 
         'タイトル設定
-        .SetToastContent_TextTitle = "通知音変更"
+        .SetToastGenericTitleText = "通知音変更"
 
         'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
@@ -591,7 +591,7 @@ End Sub
 | ArgContextMenu     | ・TRUE：トースト ボタンではなく、トースト通知のコンテキスト メニューに追加されたコンテキスト メニュー アクションになります。<br>・FALSE：従来通り、トースト ボタンに配置                                                                                                                                                                                         | FALSE                        | 
 | ArgIcon            | トースト ボタン アイコンのイメージ ソースの URI。<br>ローカルパス、HTTPソースに対応します。                                                                                                                                                                                                                                                                      | vbnullstring                 | 
 | ArgHintInputId     | 入力の横にある [位置への 入力 ] ボタンの ID に設定します。                                                                                                                                                                                                                                                                                                       | vbnullstring                 | 
-| ArgHintButtonStyle | ボタンのスタイル。<br>事前に[toast要素のuseButtonStyle属性](#AllowToastContent_UseButtonStyle)にtrue を設定する必要があります。<br><br>・Success：緑<br>・Critical：赤<br>・NoStyle：無色                                                                                                                                                                                                             | NoStyle                      | 
+| ArgHintButtonStyle | ボタンのスタイル。<br>事前に[toast要素のuseButtonStyle属性](#SetToastContent_UseButtonStyle)にtrue を設定する必要があります。<br><br>・tbsSuccess：緑<br>・tbsCritical：赤<br>・NoStyle：無色                                                                                                                                                                                                             | NoStyle                      | 
 | ArgHintToolTip     | ボタンに空のコンテンツ文字列がある場合のボタンのヒント。                                                                                                                                                                                                                                                                                                         | vbnullstring                 | 
 
 #### サンプルコード
@@ -602,7 +602,7 @@ Sub MakeActionTest()
 
     With AppNotification
         'ボタン作成
-        .SetIToastActions("Green", "", , , , , , Success) = 1
+        .SetIToastActions("Green", "", , , , , , tbsSuccess) = 1
         
         'コンテキストメニュー側に移す
         .SetIToastActions("コンテキストメニューにあります", "", , , True) = 2
@@ -611,15 +611,15 @@ Sub MakeActionTest()
         .SetIToastActions("", "ms-search://Search", , , , "C:\Windows\IdentityCRL\WLive48x48.png", , , "クリックで、検索を開く") = 3
         
         'このボタンを押下すると、Youtubeにアクセスします
-        .SetIToastActions("YouTube開く", "https://www.youtube.com/", , , , , , Critical) = 4
+        .SetIToastActions("YouTube開く", "https://www.youtube.com/", , , , , , tbsCritical) = 4
 
 
 
         'スタイル付きボタンの有効化
-        .AllowToastContent_UseButtonStyle = True
+        .SetToastContent_UseButtonStyle = True
 
         'タイトル設定
-        .SetToastContent_TextTitle = "ActionTest"
+        .SetToastGenericTitleText = "ActionTest"
 
         'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
@@ -635,7 +635,7 @@ End Sub
 
 ## [subgroup要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-subgroup)
 更に情報を追加したい場合にお使い下さい。比較的、カスタマイズ性が高いです。
-### [Add_SubgroupInnerText](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptivetext)
+### [AddAdaptiveSubgroupText](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptivetext)
 テキスト要素を追加します。ある程度の書式設定が可能です。
 
 #### 設定値
@@ -652,7 +652,7 @@ End Sub
 | [HintAlign](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptivetextalign) | テキストの水平方向の配置を指定します。             | Default | 
 | Language | "en-US" や "ja-JP" のように BCP-47 言語タグとして指定されます。 | vbnullstring | 
 
-### [Add_SubgroupInnerImage](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptiveimage)
+### [AddAdaptiveSubgroupImage](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptiveimage)
 画像要素を追加します。
 
 #### 設定値
@@ -668,8 +668,8 @@ End Sub
 | AlternateText | アクセシビリティ対応目的で使用される、画像を説明する代替テキストです。 | Default  | 
 | AddImageQuery | ・True：クエリ文字列付きURLを許可<br>・False：クエリ文字列付きURLを拒否  | False  | 
 
-### [AddToastSubgroup](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptivesubgroup)
-事前に、Add_SubgroupInnerText、Add_SubgroupInnerImage を呼び出した物に対して、Subgroup要素に挿入します。<br>
+### [AddAdaptiveSubgroup](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptivesubgroup)
+事前に、AddAdaptiveSubgroupText、AddAdaptiveSubgroupImage を呼び出した物に対して、Subgroup要素に挿入します。<br>
 なお、これを呼び出すと以前設定した、subgroup要素内のtext,image要素はリセットされます。
 #### 利用可能な引数
 | 引数名            | 説明                                                                                                                           | 
@@ -689,60 +689,60 @@ Sub 天気予報ライク()
         .AllowUse_InternetImage = True
         
         'ルートURLを設定
-        .SetToastBinding = "https://weathernews.jp/s/topics/img/wxicon/"
+        .SetToastBindingGeneric = "https://weathernews.jp/s/topics/img/wxicon/"
         
         'タイトル
-        .SetToastContent_TextTitle = "来週の天気予報"
+        .SetToastGenericTitleText = "来週の天気予報"
         .SetToastHeader(vbNullString) = ""
         
         '1subgroup
-        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "Mon"
-        .Add_SubgroupInnerImage = "100.png"
-        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "29℃"
-        .Add_SubgroupInnerText(TextStyle_CaptionSubtle, , , , TextAlign_Center) = "23℃"
-        .AddToastSubgroup (1)
+        .AddAdaptiveSubgroupText(, , , , TextAlign_Center) = "Mon"
+        .AddAdaptiveSubgroupImage = "100.png"
+        .AddAdaptiveSubgroupText(, , , , TextAlign_Center) = "29℃"
+        .AddAdaptiveSubgroupText(TextStyle_CaptionSubtle, , , , TextAlign_Center) = "23℃"
+        .AddAdaptiveSubgroup (1)
 
         '2subgroup
-        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "Tue"
-        .Add_SubgroupInnerImage = "550.png"
-        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "36℃"
-        .Add_SubgroupInnerText(TextStyle_CaptionSubtle, , , , TextAlign_Center) = "26℃"
-        .AddToastSubgroup (1)
+        .AddAdaptiveSubgroupText(, , , , TextAlign_Center) = "Tue"
+        .AddAdaptiveSubgroupImage = "550.png"
+        .AddAdaptiveSubgroupText(, , , , TextAlign_Center) = "36℃"
+        .AddAdaptiveSubgroupText(TextStyle_CaptionSubtle, , , , TextAlign_Center) = "26℃"
+        .AddAdaptiveSubgroup (1)
 
         '3subgroup
-        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "Wed"
-        .Add_SubgroupInnerImage = "200.png"
-        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "26℃"
-        .Add_SubgroupInnerText(TextStyle_CaptionSubtle, , , , TextAlign_Center) = "23℃"
-        .AddToastSubgroup (1)
+        .AddAdaptiveSubgroupText(, , , , TextAlign_Center) = "Wed"
+        .AddAdaptiveSubgroupImage = "200.png"
+        .AddAdaptiveSubgroupText(, , , , TextAlign_Center) = "26℃"
+        .AddAdaptiveSubgroupText(TextStyle_CaptionSubtle, , , , TextAlign_Center) = "23℃"
+        .AddAdaptiveSubgroup (1)
 
         '4subgroup
-        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "Thu"
-        .Add_SubgroupInnerImage = "300.png"
-        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "25℃"
-        .Add_SubgroupInnerText(TextStyle_CaptionSubtle, , , , TextAlign_Center) = "23℃"
-        .AddToastSubgroup (1)
+        .AddAdaptiveSubgroupText(, , , , TextAlign_Center) = "Thu"
+        .AddAdaptiveSubgroupImage = "300.png"
+        .AddAdaptiveSubgroupText(, , , , TextAlign_Center) = "25℃"
+        .AddAdaptiveSubgroupText(TextStyle_CaptionSubtle, , , , TextAlign_Center) = "23℃"
+        .AddAdaptiveSubgroup (1)
 
         '5subgroup
-        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "Fri"
-        .Add_SubgroupInnerImage = "850.png"
-        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "24℃"
-        .Add_SubgroupInnerText(TextStyle_CaptionSubtle, , , , TextAlign_Center) = "22℃"
-        .AddToastSubgroup (1)
+        .AddAdaptiveSubgroupText(, , , , TextAlign_Center) = "Fri"
+        .AddAdaptiveSubgroupImage = "850.png"
+        .AddAdaptiveSubgroupText(, , , , TextAlign_Center) = "24℃"
+        .AddAdaptiveSubgroupText(TextStyle_CaptionSubtle, , , , TextAlign_Center) = "22℃"
+        .AddAdaptiveSubgroup (1)
 
         '6subgroup
-        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "Sat"
-        .Add_SubgroupInnerImage = "430.png"
-        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "20℃"
-        .Add_SubgroupInnerText(TextStyle_CaptionSubtle, , , , TextAlign_Center) = "14℃"
-        .AddToastSubgroup (1)
+        .AddAdaptiveSubgroupText(, , , , TextAlign_Center) = "Sat"
+        .AddAdaptiveSubgroupImage = "430.png"
+        .AddAdaptiveSubgroupText(, , , , TextAlign_Center) = "20℃"
+        .AddAdaptiveSubgroupText(TextStyle_CaptionSubtle, , , , TextAlign_Center) = "14℃"
+        .AddAdaptiveSubgroup (1)
 
         '7subgroup
-        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "Sun"
-        .Add_SubgroupInnerImage = "411.png"
-        .Add_SubgroupInnerText(, , , , TextAlign_Center) = "21℃"
-        .Add_SubgroupInnerText(TextStyle_CaptionSubtle, , , , TextAlign_Center) = "18℃"
-        .AddToastSubgroup (1)
+        .AddAdaptiveSubgroupText(, , , , TextAlign_Center) = "Sun"
+        .AddAdaptiveSubgroupImage = "411.png"
+        .AddAdaptiveSubgroupText(, , , , TextAlign_Center) = "21℃"
+        .AddAdaptiveSubgroupText(TextStyle_CaptionSubtle, , , , TextAlign_Center) = "18℃"
+        .AddAdaptiveSubgroup (1)
 
 
 
@@ -838,10 +838,10 @@ Sub メッセ()
 
         'ネット上の画像を使用する
         .AllowUse_InternetImage = True
-        .SetToastContent_ImageAppLogo(True) = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhkdhNl7CCgOAZmjObZRRINCu9udW_Mum-_FSCEvLFULZRP_wEuO_Y1grKy28zSCw2fyBN5jM2RS1PYmE9prAk5uSI8ImDn1wcyZPy8ctGJ-vFaY36ULy_rjvrilHjXjuN0_O-p6sQi3Hc3/s857/ha_hamigaki_suit_woman.png"
-        .SetToastContent_ImageHero = "https://unsplash.it/360/180?image=1043"
+        .SetToastGenericAppLogo(True) = "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhkdhNl7CCgOAZmjObZRRINCu9udW_Mum-_FSCEvLFULZRP_wEuO_Y1grKy28zSCw2fyBN5jM2RS1PYmE9prAk5uSI8ImDn1wcyZPy8ctGJ-vFaY36ULy_rjvrilHjXjuN0_O-p6sQi3Hc3/s857/ha_hamigaki_suit_woman.png"
+        .SetToastGenericHeroImage = "https://unsplash.it/360/180?image=1043"
 
-        .SetToastContent_TextTitle = "メッセージ返信デザイン"
+        .SetToastGenericTitleText = "メッセージ返信デザイン"
 
         'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample")
@@ -881,7 +881,7 @@ Sub リマインドテスト()
     
     With AppNotification
         '1. トーストシナリオをリマインダーか、アラームにする
-        .SetToastScenario = Reminder
+        .SetToastContent_Scenario = tsReminder
 
         '2. 紐付け用識別子を設定
         Const ReminderID As String = "リマインダー"
@@ -901,8 +901,8 @@ Sub リマインドテスト()
         .SetIToastActions("", "dismiss", system) = 2
 
         '6. テキスト要素を用意(任意)
-        .SetToastContent_TextTitle = "リマインダーテスト"
-        .SetToastContent_TextBody = "「再通知」で、選択した時間で、再通知" & vbcrlf & "解除で、何もしない"
+        .SetToastGenericTitleText = "リマインダーテスト"
+        .SetToastGenericContentsText = "「再通知」で、選択した時間で、再通知" & vbcrlf & "解除で、何もしない"
 
         '7. コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("リマインド")
@@ -970,11 +970,11 @@ Sub 簡易リマインドテスト()
 
 
         'テキスト要素を用意(任意)
-        .SetToastContent_TextTitle = "簡易リマインダーテスト"
-        .SetToastContent_TextBody = "「再通知」で、選択した時間で、再通知" & vbCrLf & "解除で、何もしない"
+        .SetToastGenericTitleText = "簡易リマインダーテスト"
+        .SetToastGenericContentsText = "「再通知」で、選択した時間で、再通知" & vbCrLf & "解除で、何もしない"
 
         'リマインドモード
-        .SetToastScenario = Reminder
+        .SetToastContent_Scenario = tsReminder
 
         'コマンド文字列を生成(Windows PowerShell経由で実行する場合)
         ActionCmd = .GenerateCmd_ToastNotifierShow("簡易リマインド")
@@ -1012,9 +1012,9 @@ Sub スケジュールを設定()
 
     With AppNotification
         'メッセージ内容を設定
-        .SetToastContent_TextTitle = "Hello World"
-        .SetToastContent_TextBody = "10秒後に通知しました。"
-        .SetToastContent_TextAttribute = "スケジュールシステム Shell"
+        .SetToastGenericTitleText = "Hello World"
+        .SetToastGenericContentsText = "10秒後に通知しました。"
+        .SetToastGenericAttributionText = "スケジュールシステム Shell"
 
         '現在から、10s後に通知するコマンド文字列を生成
         ActionCmd = .GenerateCmd_ToastNotifierShow("sample", , Now() + #12:00:10 AM#)
@@ -1068,9 +1068,9 @@ Sub スケジュールを設定()
 
     With AppNotification
         'メッセージ内容を設定
-        .SetToastContent_TextTitle = "Hello World"
-        .SetToastContent_TextBody = "10秒後に通知しました。"
-        .SetToastContent_TextAttribute = "スケジュールシステム DLL"
+        .SetToastGenericTitleText = "Hello World"
+        .SetToastGenericContentsText = "10秒後に通知しました。"
+        .SetToastGenericAttributionText = "スケジュールシステム DLL"
 
 
         '現在から、10s後に通知する
@@ -1080,7 +1080,7 @@ End Sub
 ```
 
 
-### GenerateCmd_ToastRemove
+### GenerateCmd_ToastNotificationHistoryRemove
 タグを指定して、トーストの削除を行います。<br>
 主にプログレスバー付き通知において、処理の途中でエラーが起こって再開不可能の時、不自然に通知が残ってると不気味なので、これを呼び出して削除してあげて下さい。<br>
 因みに、通知音が鳴ってる途中で削除すると、通知音も停止します。
@@ -1093,10 +1093,10 @@ Sub トースト通知削除()
 
     With New cls_AppNotificationBuilder
         '表示メッセージの設定
-        .SetToastContent_TextTitle = "Hello World"
-        .SetToastContent_TextBody = "MsgBoxに反応すると、このトーストが消えます"
-        .SetToastContent_TextAttribute = "削除テスト"
-        .SetToastScenario = IncomingCall
+        .SetToastGenericTitleText = "Hello World"
+        .SetToastGenericContentsText = "MsgBoxに反応すると、このトーストが消えます"
+        .SetToastGenericAttributionText = "削除テスト"
+        .SetToastContent_Scenario = tsIncomingCall
 
         '通知表示
         Shell .GenerateCmd_ToastNotifierShow(ToastTag), vbHide
@@ -1105,7 +1105,7 @@ Sub トースト通知削除()
         MsgBox "OKを押すと、通知を削除します", vbInformation, "RemoveNotice"
 
         '削除
-        Shell .GenerateCmd_ToastRemove(ToastTag), vbHide
+        Shell .GenerateCmd_ToastNotificationHistoryRemove(ToastTag), vbHide
 
     End With
 End Sub
@@ -1117,10 +1117,10 @@ End Sub
 powershell -Command "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]::History.Remove('deleteTest','Book1','Microsoft.Office.EXCEL.EXE.15')"
 ```
 
-### RunDll_RemoveToastNotification
-GenerateCmd_ToastRemove と同様の機能です。
+### RunDll_ToastNotificationHistoryRemove
+GenerateCmd_ToastNotificationHistoryRemove と同様の機能です。
 先述と同様こちらも、DLLファイルを読み込んだときに使う専用メソッドです。Shellを介さない分、パフォーマンスが向上するので使える環境であればこちらがおすすめです。<br>
-引数等は、GenerateCmd_ToastRemove と同じなので省略します。
+引数等は、GenerateCmd_ToastNotificationHistoryRemove と同じなので省略します。
 
 #### サンプルコード
 次の例も、通常通り通知を呼び出し、MsgBoxに反応すると、通知が消えます。
@@ -1130,10 +1130,10 @@ Sub トースト通知削除()
 
     With New cls_AppNotificationBuilder
         '表示メッセージの設定
-        .SetToastContent_TextTitle = "Hello World"
-        .SetToastContent_TextBody = "MsgBoxに反応すると、このトーストが消えます"
-        .SetToastContent_TextAttribute = "削除テスト"
-        .SetToastScenario = IncomingCall
+        .SetToastGenericTitleText = "Hello World"
+        .SetToastGenericContentsText = "MsgBoxに反応すると、このトーストが消えます"
+        .SetToastGenericAttributionText = "削除テスト"
+        .SetToastContent_Scenario = tsIncomingCall
 
         '通知表示
         .RunDll_ToastNotifierShow ToastTag
@@ -1142,7 +1142,7 @@ Sub トースト通知削除()
         MsgBox "OKを押すと、通知を削除します", vbInformation, "RemoveNotice"
 
         '削除
-        .RunDll_RemoveToastNotification ToastTag
+        .RunDll_ToastNotificationHistoryRemove ToastTag
 
     End With
 End Sub
@@ -1172,7 +1172,7 @@ Sub プログレスバーを表示()
 
     With AppNotification
         'メッセージ内容を設定
-        .SetToastContent_TextTitle = "プログレスバーテスト"
+        .SetToastGenericTitleText = "プログレスバーテスト"
 
         'プログレスバー付き通知を表示するコマンド文字列を生成
         ActionCmd = .GenerateCmd_ToastNotifierShow_Progress("FirstProgressBar", "Processing...", 0.5, "進捗バーテスト")
@@ -1230,7 +1230,7 @@ Sub プログレスバーを表示()
 
     With AppNotification
         'メッセージ内容を設定
-        .SetToastContent_TextTitle = "プログレスバーテスト"
+        .SetToastGenericTitleText = "プログレスバーテスト"
 
 
 
@@ -1252,10 +1252,10 @@ Sub UpdateProgressBar()
         .SetToastHeader = ""
 
         'タイトル設定
-        .SetToastContent_TextTitle = "ログファイル収集"
+        .SetToastGenericTitleText = "ログファイル収集"
 
         '常時表示するため、シナリオを"IncomingCall"にする
-        .SetToastScenario = IncomingCall
+        .SetToastContent_Scenario = tsIncomingCall
 
         '"Indeterminate"で、準備っぽい演出をする
         Dim ToastTag As String
@@ -1279,8 +1279,8 @@ Sub UpdateProgressBar()
 
 
         'トーストのすべてのコンテンツ/レイアウトを完全に変更し、終了メッセージとして表示
-        .SetToastScenario = Default
-        .SetToastContent_TextBody = "プログレスバーの更新処理を終えました"
+        .SetToastContent_Scenario = Default
+        .SetToastGenericContentsText = "プログレスバーの更新処理を終えました"
         Shell .GenerateCmd_ToastNotifierShow(ToastTag), vbHide
     End With
 End Sub
@@ -1324,10 +1324,10 @@ Sub UpdateProgressBar()
         .SetToastHeader = ""
 
         'タイトル設定
-        .SetToastContent_TextTitle = "ログファイル収集"
+        .SetToastGenericTitleText = "ログファイル収集"
 
         '常時表示するため、シナリオを"IncomingCall"にする
-        .SetToastScenario = IncomingCall
+        .SetToastContent_Scenario = tsIncomingCall
 
         '"Indeterminate"で、準備っぽい演出をする
         Dim ToastTag As String
@@ -1354,8 +1354,8 @@ Sub UpdateProgressBar()
 
 
         'トーストのすべてのコンテンツ/レイアウトを完全に変更し、終了メッセージとして表示
-        .SetToastScenario = Default
-        .SetToastContent_TextBody = "プログレスバーの更新処理を終えました"
+        .SetToastContent_Scenario = Default
+        .SetToastGenericContentsText = "プログレスバーの更新処理を終えました"
         .RunDll_ToastNotifierShow ToastTag
     End With
 End Sub
@@ -1398,16 +1398,16 @@ Sub コレクションを使用したトースト通知のグループ化作成(
     
     With New cls_AppNotificationBuilder
         'PWA Microsoft 365 を指定
-        .AllowUse_InternetImage = True
+        .SetAppUserModelID = "Microsoft.MicrosoftOfficeHub_8wekyb3d8bbwe!Microsoft.MicrosoftOfficeHub"
 
         'コレクションの作成
         Debug.Print .RunDll_ToastCollectionManagerSaveToastCollectionAsync(CollectionID, "A社 ログ関係", "https://www.microsoft365.com/launch/excel", "C:\Program Files\WindowsApps\Microsoft.MicrosoftOfficeHub_18.2409.1051.0_x64__8wekyb3d8bbwe\Images\AppExcel32x32.png")
         Stop
 
         '通知内容を作成
-        .SetToastContent_TextTitle = "Hello World"
-        .SetToastContent_TextBody = "Collection経由で通知しました"
-        .SetToastContent_TextAttribute = "ToastCollectionTest"
+        .SetToastGenericTitleText = "Hello World"
+        .SetToastGenericContentsText = "Collection経由で通知しました"
+        .SetToastGenericAttributionText = "ToastCollectionTest"
 
         'ヘッダーをクリア
         .SetToastHeader(vbNullString) = ""
@@ -1456,7 +1456,7 @@ Sub コレクションを使用したトースト通知のグループ化削除(
     
     With New cls_AppNotificationBuilder
         'PWA Microsoft 365 を指定
-        .AllowUse_InternetImage = True
+        .SetAppUserModelID = "Microsoft.MicrosoftOfficeHub_8wekyb3d8bbwe!Microsoft.MicrosoftOfficeHub"
 
         'コレクションを削除
         Debug.Print .RunDll_ToastCollectionManagerRemoveToastCollectionAsync(CollectionID)
@@ -1525,13 +1525,13 @@ Option Explicit
 Sub ToastWithActiveShow()
     With New cls_AppNotificationBuilder
         'タイトル設定
-        .SetToastContent_TextTitle = "クイズ！"
+        .SetToastGenericTitleText = "クイズ！"
         '内容設定
-        .SetToastContent_TextBody = "正しい回答を選択、入力しよう"
+        .SetToastGenericContentsText = "正しい回答を選択、入力しよう"
         'ソース
-        .SetToastContent_TextAttribute = "トーストアクティブ化テスト"
+        .SetToastGenericAttributionText = "トーストアクティブ化テスト"
         'synalioをリマインダーにする
-        .SetToastScenario = Reminder
+        .SetToastContent_Scenario = tsReminder
         'ヘッダーをクリア
         .SetToastHeader = ""
         
@@ -1614,7 +1614,7 @@ End Sub
 
 # httpソース画像の取り扱いについて
 ## AllowUse_InternetImage の挙動
-Trueにすると、画像設定関連(SetToastContent_ImageAppLogo等)にて「http」始まりのソースを、[WindowsAPI:URLDownloadToFile](http://officetanaka.net/other/extra/tips01.htm) を介して、環境変数tmp(C:\Users\XXX\AppData\Local\Temp)に保存します。そして、保存したパスのローカルパスを返して、画像付き通知を表示させています。DLが終わるまでは通知がでないのでご注意下さい。<br>
+Trueにすると、画像設定関連(SetToastGenericAppLogo等)にて「http」始まりのソースを、[WindowsAPI:URLDownloadToFile](http://officetanaka.net/other/extra/tips01.htm) を介して、環境変数tmp(C:\Users\XXX\AppData\Local\Temp)に保存します。そして、保存したパスのローカルパスを返して、画像付き通知を表示させています。DLが終わるまでは通知がでないのでご注意下さい。<br>
 Tempフォルダ内は一定期間過ぎると自動で削除されますが、まだ残っている場合はDLはせず、直ぐに通知を表示させています。
 
 ## AppUserModelID の仕様
@@ -1625,10 +1625,10 @@ bat処理等でhttpソース画像付き通知を使用する場合は、対応�
 Sub httpソースの画像付き通知()
     With New cls_AppNotificationBuilder
         'マニフェストにインターネット機能があるAppUserModelID
-        .SetToastContent_AppUserModelID = "Microsoft.WindowsTerminal_8wekyb3d8bbwe!App"
+        .SetAppUserModelID = "Microsoft.WindowsTerminal_8wekyb3d8bbwe!App"
 
-        .SetToastContent_TextTitle = "上部に画像を表示"
-        .SetToastContent_ImageHero = "https://pad.gungho.jp/member/img/graphic/illust/6828.png"
+        .SetToastGenericTitleText = "上部に画像を表示"
+        .SetToastGenericHeroImage = "https://pad.gungho.jp/member/img/graphic/illust/6828.png"
 
 
         Shell .GenerateCmd_ToastNotifierShow("withImageToast"), vbHide
