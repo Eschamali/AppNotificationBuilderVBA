@@ -2373,8 +2373,8 @@ Public Sub PresetReminder(RemindMinute1 As LongPtr, Optional RemindMinute2 As Lo
 
 
     '----------------------------3.1,2つ目のaction要素に、それぞれプリセット----------------------------
-    SetIToastActions("", "snooze", "system", , , , ReminderID) = 1
-    SetIToastActions("", "dismiss", "system") = 2
+    SetIToastActions("", "snooze", taSystem, , , , ReminderID) = 1
+    SetIToastActions("", "dismiss", taSystem) = 2
 End Sub
 
 
