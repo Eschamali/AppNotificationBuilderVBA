@@ -56,9 +56,11 @@ Private Declare PtrSafe Function DeleteToastCollection Lib "AppNotificationBuild
 
 
 '***************************************************************************************************
-'¡¡¡ ‚æ‚­g‚¤Win32APIéŒ¾ƒZƒNƒVƒ‡ƒ“ ¡¡¡
+'¡¡¡ ’Ê’m‚ÉŠÖ˜A‚µ‚½Šg’£‹@”\ ¡¡¡
 '***************************************************************************************************
-'  ‹@”\     FWindows APIFmciSendString  ‚ğg‚Á‚Ä”CˆÓ‚ÌƒpƒX‚âURL‚Ì‰¹Œ¹ƒtƒ@ƒCƒ‹‚ğÄ¶‚³‚¹‚é‹@”\‚Å‚·
+'  ‹@”\     FWindows API ’è‹`‚Å‚·B
+'            EmciSendString            ”CˆÓ‚ÌƒpƒX‚âURL‚Ì‰¹Œ¹ƒtƒ@ƒCƒ‹‚ğ’Ê’m‰¹‚Æ‚µ‚ÄÄ¶‚³‚¹‚é‹@”\‚Ég‚¢‚Ü‚·B
+'            EURLDownloadToFile        ƒCƒ“ƒ^[ƒlƒbƒgã‚Ì‰æ‘œ‚ğ’Ê’m‚ÉÚ‚¹‚é‹@”\‚Ég‚¢‚Ü‚·B
 '---------------------------------------------------------------------------------------------------
 Private Declare PtrSafe Function mciSendString Lib "winmm.dll" Alias "mciSendStringA" (ByVal lpstrCommand As String, ByVal lpstrReturnString As String, ByVal uReturnLength As Long, ByVal hwndCallback As Long) As Long
 Private Declare PtrSafe Function URLDownloadToFile Lib "urlmon" Alias "URLDownloadToFileA" (ByVal pCaller As Long, ByVal szURL As String, ByVal szFileName As String, ByVal dwReserved As Long, ByVal lpfnCB As Long) As Long
@@ -85,7 +87,8 @@ End Enum
 Private Const DefNoticeSoundNum As Integer = 25
 
 Public Enum EnumMsWinSoundEvent
-    NotificationDefault = 1
+    NotificationMute
+    NotificationDefault
     NotificationIM
     NotificationMail
     NotificationReminder
@@ -452,7 +455,7 @@ Private Const MaxElementSelectionNum As Integer = 5    '‘I‘ğˆ‚ÍÅ‘å5‚ÂA“ü‚ê‚ê‚
 Private ElementSelection(1 To MaxElementSelectionNum) As ToastSelectionBox
 
 Private Type ToastSelectionBox
-    MinuteValue As String  'Ä’Ê’m‚·‚éŠÔB(’PˆÊF•ª)
+    SelectionID As String   '¯•Êq–¼
     ChoseName   As String   '‘I‘ğˆ‚Éo‚·–¼Ì
 End Type
 
@@ -810,12 +813,13 @@ Public Property Let SetToastGenericAttributionText(Optional ByVal HintCallScenar
 End Property
 
 '***************************************************************************************************
-'* ‹@”\@@Fsubgroup—v‘f‚É‘®«‚Æ–‘O‚É’è‹`‚µ‚½’l‚ğ‚»‚ê‚¼‚ê’Ç‰Á‚µ‚Ü‚·
+'* ‹@”\@@Fsubgroup—v‘f‚É‘®«‚ÆA–‘O‚É’è‹`‚µ‚½text,image—v‘f‚ğ‚»‚ê‚¼‚ê’Ç‰Á‚µ‚Ü‚·
 '---------------------------------------------------------------------------------------------------
 '* ˆø”@@FWeight         •Ê‚ÌƒTƒuƒOƒ‹[ƒv‚ğŠî€‚Æ‚µ‚Ä‘¾‚³‚ğw’è‚·‚é‚±‚Æ‚ÅA‚±‚ÌƒTƒuƒOƒ‹[ƒv‚Ì—ñ‚Ì•‚ğ§Œä‚µ‚Ü‚·B
 '            TextStacking   ‚±‚ÌƒTƒuƒOƒ‹[ƒv‚ÌƒRƒ“ƒeƒ“ƒc‚Ì‚’¼•ûŒü‚Ì”z’u‚ğ§Œä‚µ‚Ü‚·B
 '---------------------------------------------------------------------------------------------------
-'* ’ˆÓ–€F‚±‚ÌƒvƒƒpƒeƒB‚ğg—p‚·‚é‚ÆˆÈ‘Oİ’è‚µ‚½Asubgroup—v‘f“à‚Ìtext,image—v‘f‚ÍƒŠƒZƒbƒg‚³‚ê‚Ü‚·B
+'* ’ˆÓ–€F‚±‚ÌƒvƒƒpƒeƒB‚ğg—p‚·‚é‚ÆˆÈ‘OAuAddAdaptiveSubgroupImagevAuAddAdaptiveSubgroupTextv‚ÅŒÄ‚Ño‚µ‚Äİ’è‚µ‚½”z—ñA
+'             SubgroupInnerImages,SubgroupInnerTexts ‚Ì’†g‚ğƒŠƒZƒbƒg‚µ‚Ü‚·B
 '***************************************************************************************************
 Public Sub AddAdaptiveSubgroup(Optional ByVal Weight As Integer, Optional ByVal TextStacking As AdaptiveSubgroupTextStacking)
     '‰ÁZˆ—(0Šî€)
@@ -1237,7 +1241,8 @@ End Property
 '            ArgDefaultInput        ƒfƒtƒHƒ‹ƒg‚Ì“ü—Í’l
 '            Index                  ’Ç‰ÁˆÊ’u
 '---------------------------------------------------------------------------------------------------
-'* ’ˆÓ–€F‚±‚ÌƒvƒƒpƒeƒB‚ğg—p‚·‚é‚ÆˆÈ‘Oİ’è‚µ‚½Selection—v‘f‚ÍƒŠƒZƒbƒg‚³‚ê‚Ü‚·B
+'* ’ˆÓ–€FuChoseFlag = Truev‚Å‚±‚ÌƒvƒƒpƒeƒB‚ğg—p‚·‚é‚ÆˆÈ‘OAuSetToastSelectionBoxv‚ÅŒÄ‚Ño‚µ‚Äİ’è‚µ‚½”z—ñA
+'            ElementSelection ‚Ì’†g‚ğƒŠƒZƒbƒg‚µ‚Ü‚·B
 '***************************************************************************************************
 Public Property Let SetIToastInput(ByVal ArgID As String, Optional ByVal ChoseFlag As Boolean, Optional ByVal ArgPlaceHolderContent As String, Optional ByVal ArgTitle As String, Optional ByVal ArgDefaultInput As String, ByVal Index As Integer)
     With ElementInput(Index)
@@ -1251,7 +1256,7 @@ Public Property Let SetIToastInput(ByVal ArgID As String, Optional ByVal ChoseFl
             '‘}“üŒãA“¯‚¶•Ï”‚Åg‚¢‰ñ‚·‚½‚ßA‰Šú‰»‚·‚é
             Dim i As Long
             For i = 1 To MaxElementSelectionNum
-                ElementSelection(i).MinuteValue = vbNullString
+                ElementSelection(i).SelectionID = vbNullString
                 ElementSelection(i).ChoseName = vbNullString
             Next
         Else
@@ -1265,17 +1270,19 @@ Public Property Let SetIToastInput(ByVal ArgID As String, Optional ByVal ChoseFl
 End Property
 
 '***************************************************************************************************
-'* ‹@”\@@Finput—v‘f‚ÌŠe‘®«‚ÉƒZƒbƒg‚µ‚½‚à‚Ì‚ğaction—v‘f‚É‘}“ü‚µ‚Ü‚·
+'* ‹@”\@@Finput—v‘f‚Ìtype‘®«‚ª"selection" ‚Ì‚É‘}“ü‚·‚é"selection"—v‘f‚ğ’è‹`‚µ‚Ü‚·
 '---------------------------------------------------------------------------------------------------
-'* ˆø”@@FReminderMinute ‰½•ªŒã‚ÉƒŠƒ}ƒCƒ“ƒ_[’Ê’m‚³‚¹‚é‚©H
-'            ArgChoseName   ‘I‘ğ€–Ú‚Ì–¼Ì
-'            Index          ‘}“üˆÊ’u
+'* ˆø”@@FArgSelectionID    ¯•ÊqBuToastNotification.Activatedv‚ğ—˜—p‚·‚éê‡A‚±‚ê‚ª"UserInput"‚Ì’l‚Æ‚µ‚Ä•Ô‚³‚ê‚Ü‚·B
+'                              ‚È‚¨A”’l‚Ì‚İ‚Ìw’è‚É‚·‚é‚ÆAƒŠƒ}ƒCƒ“ƒ_[—p“r‚Æ‚µ‚Ä‚àg—p‰Â”\‚Å‚·(’PˆÊF•ª)
+'
+'            ArgChoseName      ‘I‘ğˆ–¼Ì
+'            Index             ‘}“üˆÊ’u
 '---------------------------------------------------------------------------------------------------
-'* ’ˆÓ–€FVBA‚Å‚ÍŠî–{AƒŠƒ}ƒCƒ“ƒ_[—p“r‚µ‚©g‚¢Š‚ª‚ ‚è‚Ü‚¹‚ñ
+'* ’ˆÓ–€FDLL‚ğg—p‚µ‚È‚¢ê‡AƒŠƒ}ƒCƒ“ƒ_[—p“r‚µ‚©g‚¢Š‚ª‚ ‚è‚Ü‚¹‚ñ
 '***************************************************************************************************
-Public Property Let SetToastSelectionBox(ByVal ReminderMinute As String, ByVal ArgChoseName As String, ByVal Index As Integer)
+Public Property Let SetToastSelectionBox(ByVal ArgSelectionID As String, ByVal ArgChoseName As String, ByVal Index As Integer)
     With ElementSelection(Index)
-        .MinuteValue = ReminderMinute
+        .SelectionID = ArgSelectionID
         .ChoseName = ArgChoseName
     End With
 End Property
@@ -1644,9 +1651,9 @@ Private Function MakeXmlToastContentBuilder(UseProgress As Boolean) As String
                     If ElementInput(i).Type = "selection" Then
                         For j = 1 To MaxElementSelectionNum
                             'Input—v‘f‚ÌID‘®«‚ª‚È‚¢ê‡A‘}“ü‚ğSKIP‚·‚é
-                            If StrPtr(ElementInput(i).Value(j).MinuteValue) Then
+                            If StrPtr(ElementInput(i).Value(j).SelectionID) Then
                                 With Node03_01__input.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode03_01_01__selection, "")).Attributes
-                                    .setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "id", "")).NodeValue = ElementInput(i).Value(j).MinuteValue
+                                    .setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "id", "")).NodeValue = ElementInput(i).Value(j).SelectionID
                                     .setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "content", "")).NodeValue = ElementInput(i).Value(j).ChoseName
                                 End With
                             End If
@@ -2543,7 +2550,7 @@ End Sub
 '* ˆ—–¼@FRunDll_ToastCollectionManagerSaveToastCollectionAsync
 '* ‹@”\@@Fˆø”‚Å“n‚³‚ê‚½’l‚ÅAƒRƒŒƒNƒVƒ‡ƒ“‚ğg—p‚µ‚½ƒg[ƒXƒg’Ê’m‚ÌƒOƒ‹[ƒv‰»‚ğì¬‚µ‚Ü‚·B
 '---------------------------------------------------------------------------------------------------
-'* •Ô‚è’l@Fˆø”‚É“n‚³‚ê‚½’l‚ÅAƒRƒŒƒNƒVƒ‡ƒ“‚ğg—p‚µ‚½ƒg[ƒXƒg’Ê’m‚ÌƒOƒ‹[ƒv‰»‚ğì¬‚·‚éƒRƒ}ƒ“ƒh•¶š—ñ‚ğ•Ô‚µ‚Ü‚·
+'* •Ô‚è’l@F0‚ÅA¬Œ÷ˆµ‚¢‚Å‚·B
 '* ˆø”@@FCollectionId   ƒRƒŒƒNƒVƒ‡ƒ“‚Ì IDB ID ‚ğg—p‚µ‚ÄAToastCollectionManager ‚ğg—p‚µ‚ÄƒOƒ‹[ƒv‚ğ‘€ì‚Å‚«‚Ü‚·
 '            DisplayName    ƒAƒNƒVƒ‡ƒ“ ƒZƒ“ƒ^[‚É•\¦‚·‚éƒOƒ‹[ƒv‚Ìƒ^ƒCƒgƒ‹
 '            LaunchArgs     ƒ†[ƒU[‚ªƒAƒNƒVƒ‡ƒ“ ƒZƒ“ƒ^[‚Å’Ê’mƒOƒ‹[ƒv‚Ìƒ^ƒCƒgƒ‹‚ğƒNƒŠƒbƒN‚µ‚½‚Æ‚«‚ÉƒAƒvƒŠ‚É“n‚³‚ê‚é‹N“®ˆø”B
