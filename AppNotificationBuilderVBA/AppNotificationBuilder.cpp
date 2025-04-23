@@ -1,14 +1,22 @@
-﻿#include "AppNotificationBuilder.h"
+﻿//設定がまとまってるヘッダーファイルを指定
+#include "AppNotificationBuilder.h"
 
-#include <combaseapi.h>  // CoInitializeExのために必要
-
+//よく使う名前定義を用意する
 using namespace winrt;
 using namespace Windows::UI::Notifications;
 using namespace Windows::Data::Xml::Dom;
 using namespace winrt::Windows::Foundation;
 
 
-// SYSTEMTIMEをDateTimeに変換する関数
+
+//***************************************************************************************************
+//                                 ■■■ 内部のヘルパー関数 ■■■
+//***************************************************************************************************
+//* 機能　　 ：SYSTEMTIMEをDateTimeに変換します
+//---------------------------------------------------------------------------------------------------
+//* 引数　　 ：SYSTEMTIME
+//* 返り値　 ：dateTime
+//***************************************************************************************************
 Windows::Foundation::DateTime SystemTimeToDateTime(const SYSTEMTIME& st) {
     FILETIME fileTime;
     SystemTimeToFileTime(&st, &fileTime);
@@ -24,10 +32,7 @@ Windows::Foundation::DateTime SystemTimeToDateTime(const SYSTEMTIME& st) {
     return dateTime;
 }
 
-
-
 //***************************************************************************************************
-//* 処理名　：ExecuteExcelMacro
 //* 機能　　：Excel マクロを実行する関数
 //---------------------------------------------------------------------------------------------------
 //* 引数　　：ExcelMacroPass     Action要素のarguments。マクロ名を想定してます。
@@ -97,12 +102,12 @@ void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInputs) {
     CComVariant result;
     hr = pExcelApp->Invoke(dispid, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_METHOD, &params, &result, &excepInfo, nullptr);
 
-    // 現在のExcelインスタンス内に、指定マクロがないと想定
+    //// 現在のExcelインスタンス内に、指定マクロがないと想定
     //if (FAILED(hr)) {
     //    MessageBoxW(nullptr, L"Failed to get Excel macro", L"Error", MB_OK);
     //}
 
-    //-------------以降は、デバッグ用-------------
+    ////-------------以降は、デバッグ用-------------
 
     ////MessageBoxでDISPPARAMSの内容を確認
     //std::wstring debugMessage;
@@ -125,7 +130,7 @@ void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInputs) {
     //// rgvarg の中身を確認
     //MessageBoxW(nullptr, debugMessage.c_str(), L"DISPPARAMS Debug", MB_OK);
 
-    // エラーが起こったら、エラーコードと詳細メッセージ(ある場合)を表示。
+    ////エラーが起こったら、エラーコードと詳細メッセージ(ある場合)を表示。
     //if (FAILED(hr)) {
     //    std::wstring errorMessage = L"Invoke failed. HRESULT: " + std::to_wstring(hr);
 
@@ -142,11 +147,13 @@ void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInputs) {
     //}
 }
 
-
-
 //***************************************************************************************************
-//* 処理名　：OnActivated
 //* 機能　　：トースト通知のアクティベーションを処理する関数
+//---------------------------------------------------------------------------------------------------
+//* 引数　　：※割愛します 
+//---------------------------------------------------------------------------------------------------
+//* URL     ：・https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastactivatedeventargs.arguments
+//            ・https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.activated
 //***************************************************************************************************
 void OnActivated(ToastNotification const& sender, IInspectable const& args) {
     // IInspectable から ToastActivatedEventArgs にキャストして引数情報を取得
@@ -208,13 +215,8 @@ void OnActivated(ToastNotification const& sender, IInspectable const& args) {
     }
 }
 
-
-
 //***************************************************************************************************
-//                              ■■■ CollectionToast関連処理専用 ■■■
-//***************************************************************************************************
-//* 処理名　：SendToastWithCollectionAsyncHelper
-//* 機能　　：コレクションを使用したトースト通知の表示を行います
+//* 機能　　：コレクション(CollectionToast)を使用したトースト通知の表示を行います
 //---------------------------------------------------------------------------------------------------
 //* 引数　　：ToastConfigData    ヘッダーファイルに定義した引数。ここから必要な値を使用する方針です
 //---------------------------------------------------------------------------------------------------
@@ -294,7 +296,6 @@ winrt::fire_and_forget SendToastWithCollectionAsyncHelper(ToastNotificationParam
 //***************************************************************************************************
 //                              ■■■ VBA側から呼び出せる関数 ■■■
 //***************************************************************************************************
-//* 処理名　：ShowToastNotification
 //* 機能　　：単純なトースト通知を表示します。指定日時に通知するスケジュール機能も対応します
 //---------------------------------------------------------------------------------------------------
 //* 引数　　：ToastConfigData    ヘッダーファイルに定義した引数。ここから必要な値を使用する方針です
@@ -416,7 +417,6 @@ void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData){
 }
 
 //***************************************************************************************************
-//* 処理名　：ShowToastNotificationWithProgressBar
 //* 機能　　：引数に渡された値で、最初のトーストの進行状況バーを表示します
 //---------------------------------------------------------------------------------------------------
 //* 引数　　：ToastConfigData                ヘッダーファイルに定義した引数。ここから必要な値を使用する方針です
@@ -525,7 +525,6 @@ void __stdcall ShowToastNotificationWithProgressBar(ToastNotificationParams* Toa
 }
 
 //***************************************************************************************************
-//* 処理名　：UpdateToastNotificationWithProgressBar
 //* 機能　　：引数に渡された値で、トーストの進行状況バーを更新します。
 //---------------------------------------------------------------------------------------------------
 //* 引数　　：ToastConfigData                ヘッダーファイルに定義した引数。ここから必要な値を使用する方針です
@@ -609,7 +608,6 @@ long __stdcall UpdateToastNotificationWithProgressBar(ToastNotificationParams* T
 }
 
 //***************************************************************************************************
-//* 処理名　：RemoveToastNotification
 //* 機能　　：トースト通知を削除します
 //---------------------------------------------------------------------------------------------------
 //* 引数　　：ToastConfigData    ヘッダーファイルに定義した引数。ここから必要な値を使用する方針です
@@ -646,7 +644,6 @@ void __stdcall RemoveToastNotification(ToastNotificationParams* ToastConfigData)
 }
 
 //***************************************************************************************************
-//* 処理名　：CreateToastCollection
 //* 機能　　：引数に渡された値から、コレクションを使用したトースト通知のグループ化を作成します。エラーコード返却に対応します
 //---------------------------------------------------------------------------------------------------
 //* 引数　　：ToastConfigData   ヘッダーファイルに定義した引数。ここから必要な値を使用する方針です
@@ -704,7 +701,6 @@ long __stdcall CreateToastCollection(ToastNotificationParams* ToastConfigData, c
 }
 
 //***************************************************************************************************
-//* 処理名　：DeleteToastCollection
 //* 機能　　：コレクションを使用したトースト通知のグループ化を削除します。エラーコード返却に対応します
 //---------------------------------------------------------------------------------------------------
 //* 引数　　：ToastConfigData    ヘッダーファイルに定義した引数。ここから必要な値を使用する方針です
