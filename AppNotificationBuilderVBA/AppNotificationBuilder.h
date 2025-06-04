@@ -37,11 +37,21 @@ struct ToastNotificationParams {
     double ExpirationTime;
 
 };
+
+struct ToastNotificationVariable {
+    const wchar_t* TitleText;
+    const wchar_t* ContentsText;
+    const wchar_t* AttributionText;
+    const wchar_t* ProgressTitle;
+    const wchar_t* ProgressValueStringOverride;
+    const wchar_t* ProgressStatus;
+    double ProgressValue;
+};
 #pragma pack()
 
 
 //関数宣言
-extern "C" AppNotificationBuilderVBA_API void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData);    //一般的な通知
+extern "C" AppNotificationBuilderVBA_API void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData, ToastNotificationVariable* ToastUpdata);    //通知を表示
 extern "C" AppNotificationBuilderVBA_API void __stdcall ShowToastNotificationWithProgressBar(ToastNotificationParams* ToastConfigData, const wchar_t* ProgressStatus, double ProgressValue, const wchar_t* ProgressTitle, const wchar_t* ProgressValueStringOverride);    //プログレスバー付き通知(初回用)
 extern "C" AppNotificationBuilderVBA_API long __stdcall UpdateToastNotificationWithProgressBar(ToastNotificationParams* ToastConfigData, const wchar_t* ProgressStatus, double ProgressValue, const wchar_t* ProgressTitle, const wchar_t* ProgressValueStringOverride,long SequenceNumber);    //プログレスバー付き通知(更新用)
 extern "C" AppNotificationBuilderVBA_API void __stdcall RemoveToastNotification(ToastNotificationParams* ToastConfigData);  //トーストを削除

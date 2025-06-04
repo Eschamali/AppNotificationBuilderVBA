@@ -216,6 +216,42 @@ void OnActivated(ToastNotification const& sender, IInspectable const& args) {
 }
 
 //***************************************************************************************************
+//* 機能　　：トーストのデータバインディング設定定義を行います
+//---------------------------------------------------------------------------------------------------
+//* 引数　　：ToastUpdata    データバインディング情報
+//---------------------------------------------------------------------------------------------------
+//* 機能説明：通知を表示しながら、データバインディングをサポートするプロパティ値を変更します
+//* 注意事項：null pointer だと、エラーになるため、if で存在判定を行うこと。
+//---------------------------------------------------------------------------------------------------
+//* URL：https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-progress-bar?tabs=xml
+//***************************************************************************************************
+NotificationData SetDataBinding(ToastNotificationVariable* ToastUpdata) {
+    NotificationData VariableParams;
+    auto VariableParamsValues = VariableParams.Values();         // 戻り値の型を明示的に指定
+
+    //最上位レベルの AdaptiveText 要素の Text プロパティ
+    if (ToastUpdata->TitleText) VariableParamsValues.Insert(L"TopTextTitle", ToastUpdata->TitleText);                   //タイトル
+    if (ToastUpdata->ContentsText) VariableParamsValues.Insert(L"TopTextContents", ToastUpdata->ContentsText);          //コンテンツ
+    if (ToastUpdata->AttributionText) VariableParamsValues.Insert(L"TopTextAttribution", ToastUpdata->AttributionText); //属性
+    
+    //AdaptiveProgressのすべての属性
+    if (ToastUpdata->ProgressTitle) VariableParamsValues.Insert(L"ProgressTitle", ToastUpdata->ProgressTitle);                               //タイトル
+    if (ToastUpdata->ProgressStatus) VariableParamsValues.Insert(L"ProgressStatus", ToastUpdata->ProgressStatus);                            //左下の進行状況バーの下に表示される状態文字列
+    //  進捗値の場合、負になってたら、ドットアニメーションの不確定式にします。
+    if (ToastUpdata->ProgressValue < 0) {
+        VariableParamsValues.Insert(L"ProgressValue", L"Indeterminate");                                     //進行状況バーの状態を「不確定」として、設定
+    }
+    else {
+        VariableParamsValues.Insert(L"ProgressValue", std::to_wstring(ToastUpdata->ProgressValue).c_str());  //進行状況バーの状態を設定
+    }
+    //  文字列がない場合は、バインディング処理しません
+    if (ToastUpdata->ProgressValueStringOverride) VariableParamsValues.Insert(L"ProgressValueString", ToastUpdata->ProgressValueStringOverride);           //既定のパーセンテージ文字列の代わりに表示される省略可能な文字列を取得または設定します。 これが指定されていない場合は、"70%" のようなものが表示されます。
+
+    //返却
+    return VariableParams;
+}
+
+//***************************************************************************************************
 //* 機能　　：コレクション(CollectionToast)を使用したトースト通知の表示を行います
 //---------------------------------------------------------------------------------------------------
 //* 引数　　：ToastConfigData    ヘッダーファイルに定義した引数。ここから必要な値を使用する方針です
@@ -223,7 +259,7 @@ void OnActivated(ToastNotification const& sender, IInspectable const& args) {
 //* 機能説明：非同期処理をラップするヘルパー関数。
 //            処理の流れは、ShowToastNotificationとほとんど一緒ですが、非同期処理が必要のため、このようなラッパー用関数を作成しています。
 //***************************************************************************************************
-winrt::fire_and_forget SendToastWithCollectionAsyncHelper(ToastNotificationParams* ToastConfigData)
+winrt::fire_and_forget SendToastWithCollectionAsyncHelper(ToastNotificationParams* ToastConfigData, ToastNotificationVariable* ToastUpdata)
 {
     try
     {
@@ -270,6 +306,9 @@ winrt::fire_and_forget SendToastWithCollectionAsyncHelper(ToastNotificationParam
             // 通常のトースト通知を作成
             ToastNotification toast(toastXml);
 
+            //先ほど定義したデータバインディングを適用する
+            toast.Data(SetDataBinding(ToastUpdata));
+
             // イベントハンドラーを設定
             toast.Activated(TypedEventHandler<ToastNotification, IInspectable>(OnActivated)); // OnActivated関数をハンドラーとして設定
 
@@ -298,9 +337,10 @@ winrt::fire_and_forget SendToastWithCollectionAsyncHelper(ToastNotificationParam
 //***************************************************************************************************
 //* 機能　　：単純なトースト通知を表示します。指定日時に通知するスケジュール機能も対応します
 //---------------------------------------------------------------------------------------------------
-//* 引数　　：ToastConfigData    ヘッダーファイルに定義した引数。ここから必要な値を使用する方針です
+//* 引数　　：ToastConfigData            ヘッダーファイルに定義した引数。ここから必要な値を使用する方針です
+//            ToastNotificationVariable  データバインディング用引数。後述の「UpdateToastNotification」で使用します           
 //***************************************************************************************************
-void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData){
+void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData, ToastNotificationVariable* ToastUpdata){
     // COMの初期化
     HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     if (hr == RPC_E_CHANGED_MODE) {
@@ -362,10 +402,10 @@ void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData){
         //1. CollectionIDが指定されてあったら、専用の処理に移る
         if (ToastConfigData->CollectionID) {
             // 非同期処理の呼び出し
-            SendToastWithCollectionAsyncHelper(ToastConfigData);
+            SendToastWithCollectionAsyncHelper(ToastConfigData, ToastUpdata);
         }
         
-        //2. スケジュール通知、指定時
+        //2. スケジュール通知、指定時(※この場合、データバインディング機能は使えません)
         else if (ToastConfigData->Schedule_DeliveryTime > 0) {
             // スケジュール通知の場合
             SYSTEMTIME sc;
@@ -391,6 +431,9 @@ void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData){
         else {
             // 通常のトースト通知を作成
             ToastNotification toast(toastXml);
+
+            //先ほど定義したデータバインディングを適用する
+            toast.Data(SetDataBinding(ToastUpdata));
 
             // イベントハンドラーを設定
             toast.Activated(TypedEventHandler<ToastNotification, IInspectable>(OnActivated)); // OnActivated関数をハンドラーとして設定
