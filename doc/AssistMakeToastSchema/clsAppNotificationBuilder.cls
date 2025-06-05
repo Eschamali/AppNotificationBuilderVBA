@@ -46,9 +46,8 @@ Option Explicit
 '***************************************************************************************************
 ' 機能     ：C++で書かれたDLLに、 Windows.UI.Notifications 関連の処理を埋め込ませ、Shell経由より高速に処理できます
 '---------------------------------------------------------------------------------------------------
-Private Declare PtrSafe Sub ShowToastNotification Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams, ByRef Params_Binding As ToastNotificationVariable) '一般的な通知
-Private Declare PtrSafe Sub ShowToastNotificationWithProgressBar Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams, ByVal ProgressStatus As LongPtr, ByVal ProgressValue As Double, ByVal ProgressTitle As LongPtr, ByVal ProgressValueStringOverride As LongPtr) 'プログレスバー付き通知
-Private Declare PtrSafe Function UpdateToastNotificationWithProgressBar Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams, ByVal ProgressStatus As LongPtr, ByVal ProgressValue As Double, ByVal ProgressTitle As LongPtr, ByVal ProgressValueStringOverride As LongPtr, SequenceNumber As Long) As Long 'プログレスバー付き通知の更新用
+Private Declare PtrSafe Sub ShowToastNotification Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams, ByRef Params_Binding As ToastNotificationVariable) '通知表示
+Private Declare PtrSafe Function UpdateToastNotification Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams, ByRef Params_Binding As ToastNotificationVariable) As Long  '通知更新
 Private Declare PtrSafe Sub RemoveToastNotification Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams)  '通知を削除
 Private Declare PtrSafe Function CreateToastCollection Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams, ByVal DisplayName As LongPtr, ByVal LaunchArgs As LongPtr, ByVal IconUri As LongPtr) As Long 'ToastCollectionの作成
 Private Declare PtrSafe Function DeleteToastCollection Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams) As Long 'ToastCollectionの削除
@@ -2419,7 +2418,7 @@ End Sub
 
 
 '***************************************************************************************************
-' ■■■ 専用DLL C++からWindows.UI.Notificationsを呼び出すメソッド ■■■
+'             ■■■ 専用DLL C++からWindows.UI.Notificationsを呼び出すメソッド ■■■
 '***************************************************************************************************
 '* 処理名　：RunDll_ToastNotifierShow
 '* 機能　　：引数に渡された値で、単純なトースト通知を表示します。指定日時に通知するスケジュール機能も対応します
@@ -2457,50 +2456,7 @@ Public Sub RunDll_ToastNotifierShow(ByVal ToastTag As String, Optional ByVal Col
 End Sub
 
 '***************************************************************************************************
-'* 処理名　：RunDll_ToastNotifierShow_Progress
-'* 機能　　：引数に渡された値で、トーストの進行状況バーを表示します。
-'---------------------------------------------------------------------------------------------------
-'* 返り値　：引数に渡された値で、進捗状況ゲージ込みのトーストを表示させるコマンド文字列を返します
-'* 引数　　：ToastTag                   ToastTagを指定します。以後の進捗状況を更新する際に必要です
-'            Arg_Status                 進行状況バーの下の左側に表示されるステータス文字列 (必須) を設定します。 この文字列は、"ダウンロード中..." や "インストール中..." などのように、操作の状態を反映する必要があります
-'            Arg_Value                  進行状況バーの値を取得または設定します。 既定値は 0 です。 0.0 ～ 1.0 の double型とします。負の値を指定すると、「Indeterminate」と扱います。
-'            Arg_Title                  タイトルの文字列 (オプション) を設定します
-'            Arg_ValueStringOverride    割合を示す既定の文字列に代わって表示される文字列 (オプション) を設定します。 これを指定しない場合は、"70%" などの文字が表示されます。
-'            Suppress                   「True」で、ポップアップ メッセージを表示せずに、トースト通知がアクション センターに通知されます。
-'---------------------------------------------------------------------------------------------------
-'* 機能説明：初めて、トーストの進行状況バーを表示するときはまずこちらを使います。
-'* 注意事項：これを実行すると、即座にDll内で処理を行います。また、プログレスバーの特性上、スケジュールトースト、有効期限(既定の有効期限と最大有効期限は3日間)の任意設定は設けません。
-'***************************************************************************************************
-Sub RunDll_ToastNotifierShow_Progress(ByVal ToastTag As String, ByVal Arg_Status As String, Optional Arg_Value As Double = 0, Optional ByVal Arg_Title As String = "", Optional ByVal Arg_ValueStringOverride As String, Optional ByVal ArgSuppress As Boolean)
-    '進捗用ユーザー定義型のメンバー変数にセット
-    SetAdaptiveProgressBar Arg_Title, Arg_Value, Arg_ValueStringOverride, Arg_Status
-
-    '設定値をまとめる
-    With ToastConfig
-        .AppUserModelID = DecisionAppUserModelID(True)
-        '.AllowUse_InternetImageFlag                     '事前に、設定済み
-        .XmlSchema = MakeXmlToastContentBuilder(True)
-
-        .Tag = ToastTag
-        .Group = ThisWorkbook.Name
-        .ExpiresOnReboot = False
-        .Schedule_ID = vbNullString
-        .CollectionID = vbNullString
-        
-        .ExpiresOnReboot = False
-        .SuppressPopup = ArgSuppress
-        
-        .Schedule_DeliveryTime = False
-        .ExpirationTime = False
-    End With
-
-
-    'Dll内の「ShowToastNotificationWithProgressBar」関数を実行します
-    ShowToastNotificationWithProgressBar ParamsConvertForDLL(ToastConfig), StrPtr(Arg_Status), Arg_Value, StrPtr(Arg_Title), StrPtr(Arg_ValueStringOverride)
-End Sub
-
-'***************************************************************************************************
-'* 処理名　：RunDll_ToastNotifierUpdate_Progress
+'* 処理名　：RunDll_ToastNotifierUpdate
 '* 機能　　：引数に渡された値で、トーストの進行状況バーを更新します。
 '---------------------------------------------------------------------------------------------------
 '* 返り値　：https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.notificationupdateresult
@@ -2510,18 +2466,10 @@ End Sub
 '            ※上記以外                  予期せぬエラー
 
 '* 引数　　：ToastTag                   ToastTagを指定します。以後の進捗状況を更新する際に必要です
-'            Arg_Status                 進行状況バーの下の左側に表示されるステータス文字列 (必須) を設定します。 この文字列は、"ダウンロード中..." や "インストール中..." などのように、操作の状態を反映する必要があります
-'            Arg_Value                  進行状況バーの値を取得または設定します。 既定値は 0 です。 0.0 ～ 1.0 の double型とします。負の値を指定すると、「Indeterminate」と扱います。
-'            Arg_Title                  タイトルの文字列 (オプション) を設定します
-'            Arg_ValueStringOverride    割合を示す既定の文字列に代わって表示される文字列 (オプション) を設定します。 これを指定しない場合は、"70%" などの文字が表示されます。
-'            SequenceNumber             順序外の更新を防ぐための、シーケンス番号を指定します。
 '---------------------------------------------------------------------------------------------------
 '* 機能説明：既にトーストの進行状況バーを表示しているとき、その時に指定したタグを指定することで、更新が可能です。Dllの場合、返り値に対応し、これに応じた分岐処理も可能です。
 '***************************************************************************************************
-Public Property Get RunDll_ToastNotifierUpdate_Progress(ByVal ToastTag As String, ByVal Arg_Status As String, Optional ByVal Arg_Value As Double = 0, Optional ByVal Arg_Title As String = "", Optional ByVal Arg_ValueStringOverride As String, Optional SequenceNumber As Long = 2) As Long
-    '進捗用ユーザー定義型のメンバー変数にセット
-    SetAdaptiveProgressBar Arg_Title, Arg_Value, Arg_ValueStringOverride, Arg_Status
-
+Public Property Get RunDll_ToastNotifierUpdate(ByVal ToastTag As String, Optional ByVal CollectionID As String) As Long
     '設定値をまとめる
     With ToastConfig
         .AppUserModelID = DecisionAppUserModelID(True)
@@ -2531,7 +2479,7 @@ Public Property Get RunDll_ToastNotifierUpdate_Progress(ByVal ToastTag As String
         .Tag = ToastTag
         .Group = ThisWorkbook.Name
         .Schedule_ID = vbNullString
-        .CollectionID = vbNullString
+        .CollectionID = CollectionID
         
         .ExpiresOnReboot = False
         .SuppressPopup = False
@@ -2539,10 +2487,10 @@ Public Property Get RunDll_ToastNotifierUpdate_Progress(ByVal ToastTag As String
         .Schedule_DeliveryTime = False
         .ExpirationTime = False
     End With
-     
-     
-    'Dll内の「UpdateToastNotificationWithProgressBar」関数を実行します
-    RunDll_ToastNotifierUpdate_Progress = UpdateToastNotificationWithProgressBar(ParamsConvertForDLL(ToastConfig), StrPtr(Arg_Status), Arg_Value, StrPtr(Arg_Title), StrPtr(Arg_ValueStringOverride), SequenceNumber)
+
+
+    'Dll内の「UpdateToastNotification」関数を実行します
+    RunDll_ToastNotifierUpdate = UpdateToastNotification(ParamsConvertForDLL(ToastConfig), ReturnDataBinding)
 End Property
 
 '**************************************************************************************************
@@ -2553,7 +2501,7 @@ End Property
 '---------------------------------------------------------------------------------------------------
 '* 注意事項：これを実行すると、即座にDll内で処理を行います。
 '**************************************************************************************************
-Public Sub RunDll_ToastNotificationHistoryRemove(ByVal ToastTag As String)
+Public Sub RunDll_ToastNotificationHistoryRemove(ByVal ToastTag As String, Optional ByVal CollectionID As String)
     '設定値をまとめる
     With ToastConfig
         .AppUserModelID = DecisionAppUserModelID(True)
@@ -2563,7 +2511,7 @@ Public Sub RunDll_ToastNotificationHistoryRemove(ByVal ToastTag As String)
         .Tag = ToastTag
         .Group = ThisWorkbook.Name
         .Schedule_ID = vbNullString
-        .CollectionID = vbNullString
+        .CollectionID = CollectionID
         
         .ExpiresOnReboot = False
         .SuppressPopup = False
@@ -2595,7 +2543,7 @@ Public Property Get RunDll_ToastCollectionManagerSaveToastCollectionAsync(ByVal 
     With ToastConfig
         .AppUserModelID = DecisionAppUserModelID(True)
         '.AllowUse_InternetImageFlag                     '事前に、設定済み
-        .XmlSchema = MakeXmlToastContentBuilder(False)
+        .XmlSchema = vbNullString
 
         .Tag = vbNullString
         .Group = vbNullString
