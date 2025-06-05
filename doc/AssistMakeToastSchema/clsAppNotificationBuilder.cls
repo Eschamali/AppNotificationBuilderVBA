@@ -1623,8 +1623,8 @@ Private Function MakeXmlToastContentBuilder(ScheduleMode As Boolean) As String
 
 
     '-------------------------------------------------------progress要素関係の設定-------------------------------------------------------
-    '属性ノード：status  に値を設定してあったら「progress」ノードを追加します(Microsoft ドキュメント準拠)
-    If StrPtr(ElementProgress.Status) Then
+    'スケジュール通知じゃないかつ、属性ノード：status  に値を設定してあったら「progress」ノードを追加します(Microsoft ドキュメント準拠)
+    If StrPtr(ElementProgress.Status) And Not (ScheduleMode) Then
         With Node01_01__binding.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_03__progress, ""))
             '属性ノード：title  にバインディング設定したのを、先ほどのノード：progress  の属性に追加します
             .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "title", "")).NodeValue = "{ProgressTitle}"
@@ -2112,7 +2112,7 @@ Public Property Get GenerateCmd_ToastNotifierShow(ByVal ToastTag As String, Opti
         '設定値をまとめる
         '.AppUserModelID = DecisionAppUserModelID(True)     '後続で、設定
         '.AllowUse_InternetImageFlag                        '事前に、設定済み
-        .XmlSchema = MakeXmlToastContentBuilder(False)
+        .XmlSchema = MakeXmlToastContentBuilder(CBool(ScheduleDate))
         
         .Tag = ToastTag
         .Group = ThisWorkbook.Name
@@ -2176,7 +2176,7 @@ Public Property Get GenerateCmd_ToastNotifierShow_Progress(ByVal ToastTag As Str
         '設定値をまとめる
         '.AppUserModelID = DecisionAppUserModelID(True)     '後続で、設定
         '.AllowUse_InternetImageFlag                        '事前に、設定済み
-        .XmlSchema = MakeXmlToastContentBuilder(True)
+        .XmlSchema = MakeXmlToastContentBuilder(CBool(ScheduleDate))
 
         .Tag = ToastTag
         .Group = ThisWorkbook.Name
