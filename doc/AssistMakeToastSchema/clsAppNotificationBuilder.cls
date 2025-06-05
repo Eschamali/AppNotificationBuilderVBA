@@ -1358,11 +1358,13 @@ End Property
 ' ■■■ Toastを構成するスキーマ情報を、メンバ変数を基に、動的生成します ■■■
 '***************************************************************************************************
 '* 返り値　 ：トースト スキーマのxmlContentsが返る
+'* 引数　　 ：ScheduleMode  True ：スケジュールされた通知
+'*                          False：即日通知
 '---------------------------------------------------------------------------------------------------
 '* 注意事項 ：「Microsoft XML. v6.0」の参照設定が必要です
 '* URL      ：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/schema-root
 '***************************************************************************************************
-Private Function MakeXmlToastContentBuilder() As String
+Private Function MakeXmlToastContentBuilder(ScheduleMode As Boolean) As String
     'IXMLDOMNodeオブジェクトを宣言
     Dim ToastContents As MSXML2.DOMDocument60
 
@@ -1524,7 +1526,8 @@ Private Function MakeXmlToastContentBuilder() As String
         If StrPtr(ElementsText.Title.Value) Then
             With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_02__text, ""))
                 '先ほどのノード：text  にバインディング名を設定します
-                .Text = "{TopTextTitle}"
+                '※スケジュール通知の場合は、バインディング機能が使えないため、そのまま記入します
+                If ScheduleMode Then .Text = ElementsText.Title.Value Else .Text = "{TopTextTitle}"
                 
                  '属性ノード：hint-callScenarioCenterAlign  に値を設定してあったら、先ほどのノード：text  の属性に追加します
                 If ElementsText.Title.Attribute.HintCallScenarioCenterAlign Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-callScenarioCenterAlign", "")).NodeValue = LCase(ElementsText.Title.Attribute.HintCallScenarioCenterAlign)
@@ -1535,7 +1538,8 @@ Private Function MakeXmlToastContentBuilder() As String
         If StrPtr(ElementsText.Body.Value) Then
             With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_02__text, ""))
                 '先ほどのノード：text  にバインディング名を設定します
-                .Text = "{TopTextContents}"
+                '※スケジュール通知の場合は、バインディング機能が使えないため、そのまま記入します
+                If ScheduleMode Then .Text = ElementsText.Body.Value Else .Text = "{TopTextContents}"
 
                  '属性ノード：hint-callScenarioCenterAlign  に値を設定してあったら、先ほどのノード：text  の属性に追加します
                 If ElementsText.Body.Attribute.HintCallScenarioCenterAlign Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-callScenarioCenterAlign", "")).NodeValue = LCase(ElementsText.Body.Attribute.HintCallScenarioCenterAlign)
@@ -1546,7 +1550,8 @@ Private Function MakeXmlToastContentBuilder() As String
         If StrPtr(ElementsText.Attribution.Value) Then
             With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_02__text, ""))
                 '先ほどのノード：text  にバインディング名を設定します
-                .Text = "{TopTextAttribution}"
+                '※スケジュール通知の場合は、バインディング機能が使えないため、そのまま記入します
+                If ScheduleMode Then .Text = ElementsText.Attribution.Value Else .Text = "{TopTextAttribution}"
 
                 '属性ノード：placement  に値を設定したのを、先ほどのノード：text  の属性に追加します
                 .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "placement", "")).NodeValue = ElementsText.Attribution.Attribute.Placement
@@ -2437,7 +2442,7 @@ Public Sub RunDll_ToastNotifierShow(ByVal ToastTag As String, Optional ByVal Col
     With ToastConfig
         .AppUserModelID = DecisionAppUserModelID(True)
         '.AllowUse_InternetImageFlag                     '事前に、設定済み
-        .XmlSchema = MakeXmlToastContentBuilder
+        .XmlSchema = MakeXmlToastContentBuilder(CBool(ScheduleDate))
         
         .Tag = ToastTag
         .Group = ThisWorkbook.Name
@@ -2576,7 +2581,7 @@ Public Property Get RunDll_ToastCollectionManagerRemoveToastCollectionAsync(Opti
     With ToastConfig
         .AppUserModelID = DecisionAppUserModelID(True)
         '.AllowUse_InternetImageFlag                     '事前に、設定済み
-        .XmlSchema = MakeXmlToastContentBuilder(False)
+        .XmlSchema = vbNullString
 
         .Tag = vbNullString
         .Group = vbNullString
