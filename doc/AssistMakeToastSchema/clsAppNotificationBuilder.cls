@@ -9,7 +9,7 @@ Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
 '***************************************************************************************************
 '   VBAから、Windows PowerShell を経由して、デスクトップ通知【トースト通知】を表示させます
-'   また、DLLファイルを経由した通知手段も提供します。
+'   また、DLLファイルを経由した通知手段も提供します。Ver1.4.0
 
 ' MIT License
 '
@@ -41,6 +41,8 @@ Attribute VB_Exposed = False
 '***************************************************************************************************
 Option Explicit
 
+
+
 '***************************************************************************************************
 '■■■ VBA用にカスタマイズした専用DLL 内部関数宣言セクション ■■■
 '***************************************************************************************************
@@ -51,6 +53,13 @@ Private Declare PtrSafe Function UpdateToastNotification Lib "AppNotificationBui
 Private Declare PtrSafe Sub RemoveToastNotification Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams)  '通知を削除
 Private Declare PtrSafe Function CreateToastCollection Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams, ByVal DisplayName As LongPtr, ByVal LaunchArgs As LongPtr, ByVal IconUri As LongPtr) As Long 'ToastCollectionの作成
 Private Declare PtrSafe Function DeleteToastCollection Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams) As Long 'ToastCollectionの削除
+
+
+
+'***************************************************************************************************
+'                           ■■■ ユーザー定義エラー番号文言 ■■■
+'***************************************************************************************************
+Private Const vbObjectErrorID_0001 As String = "設定したスケジュールは、現在のシステム日時に対して過去の日時に設定されてます。" & vbCrLf & "設定したスケジュール通知日時が、未来であることを確認してください。 "
 
 
 
@@ -1860,7 +1869,7 @@ Private Function CreateObject__Windows_UI_Notifications(ArgScheduleDate As Date,
     '引数が有効なら、スケジュールとしてClassを定義します
     If ArgScheduleDate Then
         'スケジュールを設定しているが過去になっている場合、VBAエラーを起こして、処理を停止させます
-        If Now() >= ArgScheduleDate Then Err.Raise Number:=513, Description:="設定したスケジュールは、現在のシステム日時に対して過去の日時に設定されます。" & vbCrLf & "設定したスケジュール通知日時が、将来であることを確認してください。 "
+        If Now() >= ArgScheduleDate Then Err.Raise Number:=vbObjectError + 1, Description:=vbObjectErrorID_0001
 
         'スケジュールされた時刻に表示されるトースト通知を定義する XML が含まれます。更に識別子も付与します
         '→https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.scheduledtoastnotification
@@ -2438,6 +2447,9 @@ End Sub
 '* 注意事項：これを実行すると、即座にDll内で処理を行います。また、日時系データを扱う場合は、UTC基準になるので注意
 '**************************************************************************************************
 Public Sub RunDll_ToastNotifierShow(ByVal ToastTag As String, Optional ByVal CollectionID As String, Optional ByVal ScheduleDate As Date, Optional ByVal ExpirationDate As Date, Optional ByVal Suppress As Boolean)
+    'スケジュールを設定しているが過去になっている場合、VBAエラーを起こして、処理を停止させます
+    If (Now() >= ScheduleDate) And ScheduleDate > 0 Then Err.Raise Number:=vbObjectError + 1, Description:=vbObjectErrorID_0001
+
     '設定値をまとめる
     With ToastConfig
         .AppUserModelID = DecisionAppUserModelID(True)
