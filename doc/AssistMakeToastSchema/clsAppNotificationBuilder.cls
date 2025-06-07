@@ -64,6 +64,14 @@ Private Const vbObjectErrorID_0001 As String = "設定したスケジュールは、現在のシ
 
 
 '***************************************************************************************************
+'                       ■■■ システムで使える特別なaction要素引数名 ■■■
+'***************************************************************************************************
+Const ActionArguments再通知 As String = "snooze"
+Const ActionArguments解除   As String = "dismiss"
+
+
+
+'***************************************************************************************************
 '                           ■■■ データバインディング名 ■■■
 '***************************************************************************************************
 '最上位テキスト要素
@@ -1383,13 +1391,13 @@ End Property
 ' ■■■ Toastを構成するスキーマ情報を、メンバ変数を基に、動的生成します ■■■
 '***************************************************************************************************
 '* 返り値　 ：トースト スキーマのxmlContentsが返る
-'* 引数　　 ：ScheduleMode  True ：スケジュールされた通知
-'*                          False：即日通知
+'* 引数　　 ：DataBindingMode   True ：トーストの更新ができるような値の指定を行います(例：{UpdateParameter})
+'*                              False：値を直接記入します。スケジュール通知や、リマインド通知といった更新処理が使えないシチュエーションに指定します
 '---------------------------------------------------------------------------------------------------
 '* 注意事項 ：「Microsoft XML. v6.0」の参照設定が必要です
 '* URL      ：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/schema-root
 '***************************************************************************************************
-Private Function MakeXmlToastContentBuilder(ScheduleMode As Boolean) As String
+Private Function MakeXmlToastContentBuilder(DataBindingMode As Boolean) As String
     'IXMLDOMNodeオブジェクトを宣言
     Dim ToastContents As MSXML2.DOMDocument60
 
@@ -1552,7 +1560,7 @@ Private Function MakeXmlToastContentBuilder(ScheduleMode As Boolean) As String
             With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_02__text, ""))
                 '先ほどのノード：text  にバインディング名を設定します
                 '※スケジュール通知の場合は、バインディング機能が使えないため、そのまま記入します
-                If ScheduleMode Then .Text = ElementsText.Title.Value Else .Text = DataBindingTopText_Title
+                If DataBindingMode Then .Text = DataBindingTopText_Title Else .Text = ElementsText.Title.Value
                 
                  '属性ノード：hint-callScenarioCenterAlign  に値を設定してあったら、先ほどのノード：text  の属性に追加します
                 If ElementsText.Title.Attribute.HintCallScenarioCenterAlign Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-callScenarioCenterAlign", "")).NodeValue = LCase(ElementsText.Title.Attribute.HintCallScenarioCenterAlign)
@@ -1564,7 +1572,7 @@ Private Function MakeXmlToastContentBuilder(ScheduleMode As Boolean) As String
             With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_02__text, ""))
                 '先ほどのノード：text  にバインディング名を設定します
                 '※スケジュール通知の場合は、バインディング機能が使えないため、そのまま記入します
-                If ScheduleMode Then .Text = ElementsText.Body.Value Else .Text = DataBindingTopText_Contents
+                If DataBindingMode Then .Text = DataBindingTopText_Contents Else .Text = ElementsText.Body.Value
 
                  '属性ノード：hint-callScenarioCenterAlign  に値を設定してあったら、先ほどのノード：text  の属性に追加します
                 If ElementsText.Body.Attribute.HintCallScenarioCenterAlign Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-callScenarioCenterAlign", "")).NodeValue = LCase(ElementsText.Body.Attribute.HintCallScenarioCenterAlign)
@@ -1576,7 +1584,7 @@ Private Function MakeXmlToastContentBuilder(ScheduleMode As Boolean) As String
             With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_02__text, ""))
                 '先ほどのノード：text  にバインディング名を設定します
                 '※スケジュール通知の場合は、バインディング機能が使えないため、そのまま記入します
-                If ScheduleMode Then .Text = ElementsText.Attribution.Value Else .Text = DataBindingTopText_Attribute
+                If DataBindingMode Then .Text = DataBindingTopText_Attribute Else .Text = ElementsText.Attribution.Value
 
                 '属性ノード：placement  に値を設定したのを、先ほどのノード：text  の属性に追加します
                 .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "placement", "")).NodeValue = ElementsText.Attribution.Attribute.Placement
@@ -1649,7 +1657,7 @@ Private Function MakeXmlToastContentBuilder(ScheduleMode As Boolean) As String
 
     '-------------------------------------------------------progress要素関係の設定-------------------------------------------------------
     'スケジュール通知じゃないかつ、属性ノード：status  に値を設定してあったら「progress」ノードを追加します(Microsoft ドキュメント準拠)
-    If StrPtr(ElementProgress.Status) And Not (ScheduleMode) Then
+    If StrPtr(ElementProgress.Status) And DataBindingMode Then
         With Node01_01__binding.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_03__progress, ""))
             '属性ノード：title  にバインディング設定したのを、先ほどのノード：progress  の属性に追加します
             .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "title", "")).NodeValue = DataBindingProgress_Title
@@ -1890,9 +1898,6 @@ End Function
 Private Function CreateObject__Windows_UI_Notifications(ArgScheduleDate As Date, ArgScheduleID As String) As String
     '引数が有効なら、スケジュールとしてClassを定義します
     If ArgScheduleDate Then
-        'スケジュールを設定しているが過去になっている場合、VBAエラーを起こして、処理を停止させます
-        If Now() >= ArgScheduleDate Then Err.Raise Number:=vbObjectError + 1, Description:=vbObjectErrorID_0001
-
         'スケジュールされた時刻に表示されるトースト通知を定義する XML が含まれます。更に識別子も付与します
         '→https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.scheduledtoastnotification
         CreateObject__Windows_UI_Notifications = WorksheetFunction.TextJoin(";", False, _
@@ -2139,11 +2144,34 @@ End Function
 '* 注意事項：あくまで「コマンド実行の文字列」を返すだけで、呼び出すだけでは実行されません。別途、Shell関数や「Windows Script Host Object Model」を参照設定してRUNコマンドを実行することで、Toastを発行できます。
 '**************************************************************************************************
 Public Property Get GenerateCmd_ToastNotifierShow(ByVal ToastTag As String, Optional ByVal CollectionID As String, Optional ByVal ScheduleDate As Date, Optional ByVal ExpirationDate As Date, Optional ByVal Suppress As Boolean) As String
+    'データバインディングを使用するか判定する
+    Dim UseDataBinding As Boolean, i As Long
+    
+    'スケジュール設定：あり
+    If ScheduleDate > 0 Then
+        'データバインディングを、無効化する
+        UseDataBinding = False
+            
+        '過去になっている場合、VBAエラーを起こして、処理を停止させます
+        If Now() >= ScheduleDate Then Err.Raise Number:=vbObjectError + 1, Description:=vbObjectErrorID_0001
+    
+    'スケジュール設定：なし
+    Else
+        'データバインディングを、有効化する
+        UseDataBinding = True
+        
+        'ただし、action要素に特定の組み合わせを検知したら、データバインディングを、無効化する
+        For i = 1 To MaxElementActionNum
+            If ElementAction(i).ActivationType = SetToastActivationType(taSystem) And ElementAction(i).Arguments = ActionArguments再通知 Then UseDataBinding = False: Exit For
+        Next
+    End If
+    
+    
     With ToastConfig
         '設定値をまとめる
         '.AppUserModelID = DecisionAppUserModelID(True)     '後続で、設定
         '.AllowUse_InternetImageFlag                        '事前に、設定済み
-        .XmlSchema = MakeXmlToastContentBuilder(CBool(ScheduleDate))
+        .XmlSchema = MakeXmlToastContentBuilder(UseDataBinding)
         
         .Tag = ToastTag
         .Group = ThisWorkbook.Name
@@ -2384,8 +2412,8 @@ Public Sub PresetReminder(RemindMinute1 As LongPtr, Optional RemindMinute2 As Lo
 
 
     '----------------------------3.1,2つ目のaction要素に、それぞれプリセット----------------------------
-    SetIToastActions("", "snooze", taSystem, , , , ReminderID) = 1
-    SetIToastActions("", "dismiss", taSystem) = 2
+    SetIToastActions("", ActionArguments再通知, taSystem, , , , ReminderID) = 1
+    SetIToastActions("", ActionArguments解除, taSystem) = 2
 End Sub
 
 
@@ -2406,14 +2434,33 @@ End Sub
 '* 注意事項：これを実行すると、即座にDll内で処理を行います。また、日時系データを扱う場合は、UTC基準になるので注意
 '**************************************************************************************************
 Public Sub RunDll_ToastNotifierShow(ByVal ToastTag As String, Optional ByVal CollectionID As String, Optional ByVal ScheduleDate As Date, Optional ByVal ExpirationDate As Date, Optional ByVal Suppress As Boolean)
-    'スケジュールを設定しているが過去になっている場合、VBAエラーを起こして、処理を停止させます
-    If (Now() >= ScheduleDate) And ScheduleDate > 0 Then Err.Raise Number:=vbObjectError + 1, Description:=vbObjectErrorID_0001
+    'データバインディングを使用するか判定する
+    Dim UseDataBinding As Boolean, i As Long
+    
+    'スケジュール設定：あり
+    If ScheduleDate > 0 Then
+        'データバインディングを、無効化する
+        UseDataBinding = False
+            
+        '過去になっている場合、VBAエラーを起こして、処理を停止させます
+        If Now() >= ScheduleDate Then Err.Raise Number:=vbObjectError + 1, Description:=vbObjectErrorID_0001
+    
+    'スケジュール設定：なし
+    Else
+        'データバインディングを、有効化する
+        UseDataBinding = True
+        
+        'ただし、action要素に特定の組み合わせを検知したら、データバインディングを、無効化する
+        For i = 1 To MaxElementActionNum
+            If ElementAction(i).ActivationType = SetToastActivationType(taSystem) And ElementAction(i).Arguments = ActionArguments再通知 Then UseDataBinding = False: Exit For
+        Next
+    End If
 
     '設定値をまとめる
     With ToastConfig
         .AppUserModelID = DecisionAppUserModelID(True)
         '.AllowUse_InternetImageFlag                     '事前に、設定済み
-        .XmlSchema = MakeXmlToastContentBuilder(CBool(ScheduleDate))
+        .XmlSchema = MakeXmlToastContentBuilder(UseDataBinding)
         
         .Tag = ToastTag
         .Group = ThisWorkbook.Name
