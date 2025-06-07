@@ -152,7 +152,7 @@ End Enum
 '---------------------------------------------------------------------------------------------------
 Public Enum EnumToastActivationType
     taForeground = 1  'フォアグラウンド アプリが起動します。
-    tabackground      '対応するバックグラウンド タスクがトリガーされ、ユーザーを中断することなくバックグラウンドでコードを実行できます。
+    taBackground      '対応するバックグラウンド タスクがトリガーされ、ユーザーを中断することなくバックグラウンドでコードを実行できます。
     taProtocol        'プロトコルのアクティブ化を使用して別のアプリを起動します。
     taSystem          'Action要素でのリマインダーモード用です
 End Enum
@@ -726,7 +726,7 @@ Private Function SetToastActivationType(ByVal activationID As EnumToastActivatio
     Select Case activationID
         Case EnumToastActivationType.taForeground
             SetToastActivationType = "foreground"
-        Case EnumToastActivationType.tabackground
+        Case EnumToastActivationType.taBackground
             SetToastActivationType = "background"
         Case EnumToastActivationType.taProtocol
             SetToastActivationType = "protocol"
