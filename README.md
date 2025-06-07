@@ -837,16 +837,19 @@ End Sub
 ```
 ![alt text](doc/Ex_Element-header.png)<br>
 
-ヘッダーをクリアしたい場合は下記のようにします
-```bas
-With New clsAppNotificationBuilder
-    .SetToastHeader = ""
-End With
-```
-
+> [!TIP]
+> ヘッダーをクリアしたい場合は下記のようにします。<br>
+> これにより、Header要素自体をなくします。
+> ```bas
+> With New clsAppNotificationBuilder
+>     .SetToastHeader = ""
+> End With
+>```
 
 ## [input要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-input)
+
 ### SetIToastInput
+
 トースト通知に表示される入力 (テキスト ボックスまたは選択メニュー) を指定します。<br>
 
 #### 設定値
@@ -1243,11 +1246,11 @@ End Sub
 ![alt text](doc/ExampleMethod2.png)<br>
 プログレスバーの色は、Windowsのテーマ色に基づきます。容易に色を変えることは出来ません。
 
-### GenerateCmd_ToastNotifierUpdate_Progress
+### GenerateCmd_ToastNotifierUpdate
 
 この状態ではプログレスバーの意味をなさないので、上記のメソッドで、更新処理を行います。<br>
 これを呼び出す前に、`SetAdaptiveProgressBar` で再度値を更新して呼び出すといいでしょう。<br>
-引数は、`ToastID`のみです。
+引数は、`ToastID,CollectionID` です。基本は、`ToastID`のみでOKです。
 
 #### サンプルコード
 次の例は、「データ準備→処理→完了」という一連の演出処理を行います。最初にお見せした4つ目のDEMOとほぼ同じ演出になります。
@@ -1305,11 +1308,11 @@ End Sub
 実行すると分かりますが、かなりCPUに負荷がかかるため、実際に運用する際は、一定ループ毎に1度のUpdate処理を流すのが望ましいです。<br>
 実際、Application.StatusBar も[毎回呼び出す](https://qiita.com/OldCity/items/8b24d4c45da17165fa4e)と、負荷がかかります。
 
-### RunDll_ToastNotifierUpdate_Progress
+### RunDll_ToastNotifierUpdate
 
 `GenerateCmd_ToastNotifierUpdate` と同様の機能です。
 先述と同様こちらも、DLLファイルを読み込んだときに使う専用メソッドです。Shellを介さない分、パフォーマンスが向上するので使える環境であればこちらがおすすめです。<br>
-引数等は、GenerateCmd_ToastNotifierUpdate_Progress と同じなので省略します。
+引数等は、GenerateCmd_ToastNotifierUpdate と同じなので省略します。
 
 #### サンプルコード
 次の例も、「データ準備→処理→完了」という一連の演出処理を行います。最初にお見せした4つ目のDEMOとほぼ同じ演出になります。
@@ -1431,6 +1434,7 @@ End Sub
 ```
 
 #### 通知の比較
+
 |       経由   | トースト       | アクションセンター                                                                                                             | 
 | ------------ | ------------ | ---------------------------------------------------------------------------------------------------------------- | 
 | Collection   | ![alt text](doc/Ex_Collection1-1.png) | ![alt text](doc/Ex_Collection1-2.png) |
@@ -1440,18 +1444,19 @@ End Sub
 対して、「Collection」は任意のグループ名称で設定が可能です。<br>
 アイコン画像については、Microsoft 365 (PWA)を[インストール](https://www.microsoft.com/store/productId/9WZDNCRD29V9?ocid=pdpshare)することで、基本的なOfficeアイコンのセットがついてきます。
 
-#### 注意事項
-AppUserModelIDは、デスクトップアプリ系以外のを指定することを推奨します。
-「.AllowUse_InternetImage = True」をコメントアウトして、デスクトップアプリとして同じ内容を実行すると、下記のように変な挙動を起こします。
-
-![alt text](doc/Ex_Collection2.png)<br>
-- DisplayName ,IconUri が無視されます
-- CollectionId が DisplayName扱いになります。
+> [!CAUTION]
+> この機能はUWP版を前提に設計している影響で、DeskTop版でも使えなくはないですが下記画像のように正しく設定できません。
+>
+> ![alt text](doc/Ex_Collection2.png)<br>
+> - DisplayName ,IconUri が無視されます
+> - CollectionId が DisplayName扱いになります。
 
 ### RunRunDll_ToastCollectionManagerRemoveToastCollectionAsync
+
 「RunDll_ToastCollectionManagerSaveToastCollectionAsync」等で作成したCollectionIDのグループ化を削除します。
 
 #### 利用可能な引数
+
 | 引数名       | 説明                                                                                                             | 
 | ------------ | ---------------------------------------------------------------------------------------------------------------- | 
 | CollectionId | 削除したいコレクション通知の ID を設定します。<br><br>・指定時、[そのCollectionIDのみ削除](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastcollectionmanager.removetoastcollectionasync)<br>・省略時、[全てのCollectionIDを削除](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastcollectionmanager.removealltoastcollectionsasync)                                                                         | 
@@ -1461,6 +1466,7 @@ AppUserModelIDは、デスクトップアプリ系以外のを指定すること
 
 #### サンプルコード
 次の例は、Microsoft 365 (PWA)として、前述の例で作成したCollectionIDを指定し、削除します
+
 ```bas
 Sub コレクションを使用したトースト通知のグループ化削除()
     'CollectionIDをセット
@@ -1476,17 +1482,22 @@ Sub コレクションを使用したトースト通知のグループ化削除(
 End Sub
 ```
 
-#### 使い道
-無闇にCollectionIDを作成しまくると、[通知設定](ms-settings:notifications)に、赤枠のような欄が増殖してしまうので、必要に応じて削除を行って下さい。<br>
-![alt text](doc/Ex_Collection3.png)
+> [!TIP]
+> 無闇にCollectionIDを作成しまくると、[通知設定](ms-settings:notifications)に、赤枠のような欄が増殖してしまうので、`RunRunDll_ToastCollectionManagerRemoveToastCollectionAsync` で、必要に応じて削除を行って下さい。<br>
+> ![alt text](doc/Ex_Collection3.png)
 
 # [アクティブ化処理](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.activated)
 ユーザーがクリックまたはタッチでトースト通知をアクティブ化したとき、指定マクロを実行する事ができます。<br>
-action要素のarguments属性にマクロ名、activationType属性にforegroundを設定して、"RunDll_ToastNotifierShow"関数を実行する事で、アクティブ化処理が可能です。<br>
-アクティブ化処理は、高度な処理を行うため、DLLファイルをインポートしてそこから"RunDll_ToastNotifierShowを使用する必要があります。
+action要素のarguments属性にマクロ名、activationType属性に`foreground`を設定して、`RunDll_ToastNotifierShow`関数を実行する事で、アクティブ化処理が可能です。<br>
+アクティブ化処理は、DLL経由による`RunDll_ToastNotifierShow`での実行が必要です。
+
+> [!CAUTION]
+> スケジュール通知で発行したアプリ通知の場合は、上記のアクティブ化処理はできません。
 
 ## アクティブ化準備
+
 ### アクティブ化できる箇所
+
 下記の要素と属性に、実行したいマクロ名を記述することができます。
 - toast要素 － [launch属性](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-toast#:~:text=%E3%81%AA%E3%81%97-,launch,-%E3%83%88%E3%83%BC%E3%82%B9%E3%83%88%E9%80%9A%E7%9F%A5%E3%81%AB%E3%82%88%E3%81%A3%E3%81%A6)
 ```bas
@@ -1504,13 +1515,17 @@ action要素のarguments属性にマクロ名、activationType属性にforegroun
     End With
 ```
 
+> [!NOTE]
+> header要素も同じような意味の属性がありますが現時点では、機能しません🥺
+
+
 ### アクティブ化時のプロシージャ記述
 下記の要件に合うように記述すること
 
 #### 引数
 | 順番 | 型      | 説明                                                                            | 
 | ---- | ------- | ------------------------------------------------------------------------------- | 
-| 1    | Variant | 2次元配列<br>・行数：入力フィールドの数。最大5つ<br>・列数：2（キーと値のペア） | 
+| 1    | Variant | 2次元配列<br>・行数：入力フィールド(Input要素)の数。最大5つ<br>・列数：2（キーと値のペア） | 
 
 #### 配列の構造について
 ![alt text](doc/ToastActived1.png)
@@ -1549,7 +1564,7 @@ Sub ToastWithActiveShow()
         
         
         'トーストクリック時の、プロシージャ名を記載
-        .SetToastContent_Launch(foreground) = "ToastTrigger_Click"
+        .SetToastContent_Launch(taForeground) = "ToastTrigger_Click"
         
         
         '選択肢を用意する
@@ -1564,8 +1579,8 @@ Sub ToastWithActiveShow()
         .SetIToastInput("冥王星とは", , , "Q2：冥王星は何惑星？", "〇惑星") = 2
         
         '各ボタンに対応するプロシージャ名を記載(接頭語等を付けて区別をつけよう)
-        .SetIToastActions("回答する", "ToastTrigger_Answer", foreground) = 1
-        .SetIToastActions("閉じる", "ToastTrigger_Close", foreground) = 2
+        .SetIToastActions("回答する", "ToastTrigger_Answer", taForeground) = 1
+        .SetIToastActions("閉じる", "ToastTrigger_Close", taForeground) = 2
         
         '通知実行
         .RunDll_ToastNotifierShow "RunMacto"
