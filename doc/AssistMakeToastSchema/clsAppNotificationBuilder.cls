@@ -44,7 +44,7 @@ Option Explicit
 
 
 '***************************************************************************************************
-'■■■ VBA用にカスタマイズした専用DLL 内部関数宣言セクション ■■■
+'               ■■■ VBA用にカスタマイズした専用DLL 内部関数宣言セクション ■■■
 '***************************************************************************************************
 ' 機能     ：C++で書かれたDLLに、 Windows.UI.Notifications 関連の処理を埋め込ませ、Shell経由より高速に処理できます
 '---------------------------------------------------------------------------------------------------
@@ -64,7 +64,23 @@ Private Const vbObjectErrorID_0001 As String = "設定したスケジュールは、現在のシ
 
 
 '***************************************************************************************************
-'■■■ 通知に関連した拡張機能 ■■■
+'                           ■■■ データバインディング名 ■■■
+'***************************************************************************************************
+'最上位テキスト要素
+Private Const DataBindingTopText_Title     As String = "{TopTextTitle}"
+Private Const DataBindingTopText_Contents  As String = "{TopTextContents}"
+Private Const DataBindingTopText_Attribute As String = "{TopTextAttribution}"
+
+'Progress要素
+Private Const DataBindingProgress_Title         As String = "{ProgressTitle}"
+Private Const DataBindingProgress_Status        As String = "{ProgressStatus}"
+Private Const DataBindingProgress_Value         As String = "{ProgressValue}"
+Private Const DataBindingProgress_ValueString   As String = "{ProgressValueString}"
+
+
+
+'***************************************************************************************************
+'                               ■■■ 通知に関連した拡張機能 ■■■
 '***************************************************************************************************
 '  機能     ：Windows API 定義です。
 '            ・mciSendString            任意のパスやURLの音源ファイルを通知音として再生させる機能に使います。
@@ -1536,7 +1552,7 @@ Private Function MakeXmlToastContentBuilder(ScheduleMode As Boolean) As String
             With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_02__text, ""))
                 '先ほどのノード：text  にバインディング名を設定します
                 '※スケジュール通知の場合は、バインディング機能が使えないため、そのまま記入します
-                If ScheduleMode Then .Text = ElementsText.Title.Value Else .Text = "{TopTextTitle}"
+                If ScheduleMode Then .Text = ElementsText.Title.Value Else .Text = DataBindingTopText_Title
                 
                  '属性ノード：hint-callScenarioCenterAlign  に値を設定してあったら、先ほどのノード：text  の属性に追加します
                 If ElementsText.Title.Attribute.HintCallScenarioCenterAlign Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-callScenarioCenterAlign", "")).NodeValue = LCase(ElementsText.Title.Attribute.HintCallScenarioCenterAlign)
@@ -1548,7 +1564,7 @@ Private Function MakeXmlToastContentBuilder(ScheduleMode As Boolean) As String
             With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_02__text, ""))
                 '先ほどのノード：text  にバインディング名を設定します
                 '※スケジュール通知の場合は、バインディング機能が使えないため、そのまま記入します
-                If ScheduleMode Then .Text = ElementsText.Body.Value Else .Text = "{TopTextContents}"
+                If ScheduleMode Then .Text = ElementsText.Body.Value Else .Text = DataBindingTopText_Contents
 
                  '属性ノード：hint-callScenarioCenterAlign  に値を設定してあったら、先ほどのノード：text  の属性に追加します
                 If ElementsText.Body.Attribute.HintCallScenarioCenterAlign Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-callScenarioCenterAlign", "")).NodeValue = LCase(ElementsText.Body.Attribute.HintCallScenarioCenterAlign)
@@ -1560,7 +1576,7 @@ Private Function MakeXmlToastContentBuilder(ScheduleMode As Boolean) As String
             With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_02__text, ""))
                 '先ほどのノード：text  にバインディング名を設定します
                 '※スケジュール通知の場合は、バインディング機能が使えないため、そのまま記入します
-                If ScheduleMode Then .Text = ElementsText.Attribution.Value Else .Text = "{TopTextAttribution}"
+                If ScheduleMode Then .Text = ElementsText.Attribution.Value Else .Text = DataBindingTopText_Attribute
 
                 '属性ノード：placement  に値を設定したのを、先ほどのノード：text  の属性に追加します
                 .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "placement", "")).NodeValue = ElementsText.Attribution.Attribute.Placement
@@ -1636,16 +1652,16 @@ Private Function MakeXmlToastContentBuilder(ScheduleMode As Boolean) As String
     If StrPtr(ElementProgress.Status) And Not (ScheduleMode) Then
         With Node01_01__binding.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_03__progress, ""))
             '属性ノード：title  にバインディング設定したのを、先ほどのノード：progress  の属性に追加します
-            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "title", "")).NodeValue = "{ProgressTitle}"
+            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "title", "")).NodeValue = DataBindingProgress_Title
 
             '属性ノード：status  にバインディング設定したのを、先ほどのノード：progress  の属性に追加します
-            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "status", "")).NodeValue = "{ProgressStatus}"
+            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "status", "")).NodeValue = DataBindingProgress_Status
 
             '属性ノード：value  にバインディング設定したのを、先ほどのノード：progress  の属性に追加します
-            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "value", "")).NodeValue = "{ProgressValue}"
+            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "value", "")).NodeValue = DataBindingProgress_Value
 
             '属性ノード：valueStringOverride  に値を設定してあったら、先ほどのノード：progress  の属性に追加します
-            If StrPtr(ElementProgress.ValueStringOverride) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "valueStringOverride", "")).NodeValue = "{ProgressValueString}"
+            If StrPtr(ElementProgress.ValueStringOverride) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "valueStringOverride", "")).NodeValue = DataBindingProgress_ValueString
         End With
     End If
 
@@ -1695,7 +1711,7 @@ Private Function MakeXmlToastContentBuilder(ScheduleMode As Boolean) As String
                     '現在のInput要素にて、type属性が"selection"なら、要素番号に対応するSelection要素配列を挿入する
                     If ElementInput(i).Type = "selection" Then
                         For j = 1 To MaxElementSelectionNum
-                            'Input要素のID属性がない場合、挿入をSKIPする
+                            'Selection要素のID属性がない場合、挿入をSKIPする
                             If StrPtr(ElementInput(i).Value(j).SelectionID) Then
                                 With Node03_01__input.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode03_01_01__selection, "")).Attributes
                                     .setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "id", "")).NodeValue = ElementInput(i).Value(j).SelectionID
@@ -1824,28 +1840,34 @@ Private Function Binding_AdaptiveProgressBar(UpdateMode As Boolean) As String
         Set__Windows_UI_Notifications__ToastNotificationData = "$ToastNotification.Data = [Windows.UI.Notifications.NotificationData]::New($Dictionary)"
     End If
 
-
+    'Progress要素
     With ElementProgress
         'タイトル属性を設定するコマンド文字列
-        Dim SetProgressBar_Title               As String: SetProgressBar_Title = "$Dictionary.Add('ProgressTitle', '" & .Title & "')"
+        Dim SetDataBindingProgressBar_Title               As String: SetDataBindingProgressBar_Title = "$Dictionary.Add('" & Mid(DataBindingProgress_Title, 2, Len(DataBindingProgress_Title) - 2) & "', '" & .Title & "')"
 
         '進行状況バーの値属性を設定するコマンド文字列
         '※0未満になってると、「Indeterminate」扱いとなります。
-        Dim SetProgressBar_Value               As String: SetProgressBar_Value = "$Dictionary.Add('ProgressValue', '" & .Value & "')"
+        Dim SetDataBindingProgressBar_Value               As String: SetDataBindingProgressBar_Value = "$Dictionary.Add('" & Mid(DataBindingProgress_Value, 2, Len(DataBindingProgress_Value) - 2) & "', '" & .Value & "')"
 
         '割合を示す文字列属性を設定するコマンド文字列
         '  Null文字として渡された場合、「progress」要素に「valueStringOverride」属性自体を挿入しないようにします。これにより規定の"70%" などの文字が表示されます。
         '  ただし、更新時に改めて、「valueStringOverride」属性を指定しても、無視されます。
-        Dim SetProgressBar_ValueStringOverride As String
-        If StrPtr(.ValueStringOverride) Then SetProgressBar_ValueStringOverride = "$Dictionary.Add('ProgressValueString', '" & .ValueStringOverride & "')"
+        Dim SetDataBindingProgressBar_ValueStringOverride As String
+        If StrPtr(.ValueStringOverride) Then SetDataBindingProgressBar_ValueStringOverride = "$Dictionary.Add('" & Mid(DataBindingProgress_ValueString, 2, Len(DataBindingProgress_ValueString) - 2) & "', '" & .ValueStringOverride & "')"
 
         '進行状況バーの下の左側に表示されるステータス文字列属性を設定するコマンド文字列
-        Dim SetProgressBar_Status              As String: SetProgressBar_Status = "$Dictionary.Add('ProgressStatus', '" & .Status & "')"
+        Dim SetDataBindingProgressBar_Status              As String: SetDataBindingProgressBar_Status = "$Dictionary.Add('" & Mid(DataBindingProgress_Status, 2, Len(DataBindingProgress_Status) - 2) & "', '" & .Status & "')"
     End With
 
+    '最上位テキスト
+    With ElementsText
+        Dim SetDataBindingTopText_Title     As String: SetDataBindingTopText_Title = "$Dictionary.Add('" & Mid(DataBindingTopText_Title, 2, Len(DataBindingTopText_Title) - 2) & "', '" & .Title.Value & "')"
+        Dim SetDataBindingTopText_Contents  As String: SetDataBindingTopText_Contents = "$Dictionary.Add('" & Mid(DataBindingTopText_Contents, 2, Len(DataBindingTopText_Contents) - 2) & "', '" & .Body.Value & "')"
+        Dim SetDataBindingTopText_Attribute As String: SetDataBindingTopText_Attribute = "$Dictionary.Add('" & Mid(DataBindingTopText_Attribute, 2, Len(DataBindingTopText_Attribute) - 2) & "', '" & .Attribution.Value & "')"
+    End With
 
     '「$Dictionary」をAddするコマンド文字列を返す
-    Binding_AdaptiveProgressBar = WorksheetFunction.TextJoin(";", True, New__System_Collections_Generic__Dictionary, SetProgressBar_Title, SetProgressBar_Value, SetProgressBar_ValueStringOverride, SetProgressBar_Status, Set__Windows_UI_Notifications__ToastNotificationData)
+    Binding_AdaptiveProgressBar = WorksheetFunction.TextJoin(";", True, New__System_Collections_Generic__Dictionary, SetDataBindingProgressBar_Title, SetDataBindingProgressBar_Value, SetDataBindingProgressBar_ValueStringOverride, SetDataBindingProgressBar_Status, SetDataBindingTopText_Title, SetDataBindingTopText_Contents, SetDataBindingTopText_Attribute, Set__Windows_UI_Notifications__ToastNotificationData)
 End Function
 
 
@@ -2105,7 +2127,7 @@ End Function
 '         ■■■ コマンドプロンプトで、Toast制御させるコマンド文字列を返すメソッド ■■■
 '***************************************************************************************************
 '* 処理名　：GenerateCmd_ToastNotifierShow
-'* 機能　　：引数に渡された値で、単純なトースト通知を表示するコマンド文字列を返します。指定日時に通知するスケジュール機能も対応します
+'* 機能　　：引数に渡された値で、トースト通知を表示するコマンド文字列を返します。指定日時に通知するスケジュール機能も対応します
 '---------------------------------------------------------------------------------------------------
 '* 返り値　：引数に渡された値で、トーストを表示させるコマンド文字列を返します
 '* 引数　　：ToastTag       ToastTagを指定します。複数通知を提供する際に必要です
@@ -2140,12 +2162,14 @@ Public Property Get GenerateCmd_ToastNotifierShow(ByVal ToastTag As String, Opti
         ' 3.サイレント通知フラグを設定
         ' 4.有効期限を設定
         ' 5.識別Group,Tagを設定
+        ' 6.データバインディングを設定
         GenerateCmd_ToastNotifierShow = ActionPS & WorksheetFunction.TextJoin(";", True, _
             SetToastShemaXml(.XmlSchema), ReadXml, _
             CreateObject__Windows_UI_Notifications(.Schedule_DeliveryTime, .Schedule_ID), _
             Set__Windows_UI_Notifications__ToastNotificationSuppressPopup(.SuppressPopup), _
             Set__Windows_UI_Notifications__ToastNotificationExpirationTime(.ExpirationTime, .Schedule_DeliveryTime), _
-            Set__Windows_UI_Notifications__ToastNotificationGroup(.Group), Set__Windows_UI_Notifications__ToastNotificationTag(.Tag))
+            Set__Windows_UI_Notifications__ToastNotificationGroup(.Group), Set__Windows_UI_Notifications__ToastNotificationTag(.Tag), _
+            Binding_AdaptiveProgressBar(False))
 
 
         'コレクションIDの有無に応じで、設定コマンドを切り替える
@@ -2164,80 +2188,16 @@ Public Property Get GenerateCmd_ToastNotifierShow(ByVal ToastTag As String, Opti
 End Property
 
 '***************************************************************************************************
-'* 処理名　：GenerateCmd_ToastNotifierShow_Progress
-'* 機能　　：引数に渡された値で、トーストの進行状況バーを表示するコマンド文字列を返します。
-'---------------------------------------------------------------------------------------------------
-'* 返り値　：引数に渡された値で、進捗状況ゲージ込みのトーストを表示させるコマンド文字列を返します
-'* 引数　　：ToastTag                   ToastTagを指定します。以後の進捗状況を更新する際に必要です
-'            Arg_Status                 進行状況バーの下の左側に表示されるステータス文字列 (必須) を設定します。 この文字列は、"ダウンロード中..." や "インストール中..." などのように、操作の状態を反映する必要があります
-'            Arg_Value                  進行状況バーの値を取得または設定します。 既定値は 0 です。 0.0 ～ 1.0 の double型とします。負の値を指定すると、「Indeterminate」と扱います。
-'            Arg_Title                  タイトルの文字列 (オプション) を設定します
-'            Arg_ValueStringOverride    割合を示す既定の文字列に代わって表示される文字列 (オプション) を設定します。 これを指定しない場合は、"70%" などの文字が表示されます。
-'            Suppress                   「True」で、ポップアップ メッセージを表示せずに、トースト通知がアクション センターに通知されます。
-'---------------------------------------------------------------------------------------------------
-'* 機能説明：初めて、トーストの進行状況バーを表示するときはまずこちらを使います。
-'***************************************************************************************************
-Public Property Get GenerateCmd_ToastNotifierShow_Progress(ByVal ToastTag As String, ByVal Arg_Status As String, Optional Arg_Value As Double = 0, Optional ByVal Arg_Title As String, Optional ByVal Arg_ValueStringOverride As String, Optional ByVal ArgSuppress As Boolean) As String
-    '進捗用ユーザー定義型のメンバー変数にセット
-    SetAdaptiveProgressBar Arg_Title, Arg_Value, Arg_ValueStringOverride, Arg_Status
-
-    With ToastConfig
-        '設定値をまとめる
-        '.AppUserModelID = DecisionAppUserModelID(True)     '後続で、設定
-        '.AllowUse_InternetImageFlag                        '事前に、設定済み
-        .XmlSchema = MakeXmlToastContentBuilder(CBool(ScheduleDate))
-
-        .Tag = ToastTag
-        .Group = ThisWorkbook.Name
-        .ExpiresOnReboot = False
-        .Schedule_ID = vbNullString
-        .CollectionID = vbNullString
-        
-        .ExpiresOnReboot = False
-        .SuppressPopup = ArgSuppress
-        
-        .Schedule_DeliveryTime = False
-        .ExpirationTime = False
-
-
-
-        'トーストの進行状況バーを表示させるコマンド文字列を生成
-        ' 1.事前に設定したメンバ変数から、xmlコンテンツを生成し、それを読み込む。
-        ' 2.読み込んだxmlコンテンツから、ToastNotificationの構造を設定
-        ' 3.識別Group,Tagを設定
-        ' 4.サイレント通知フラグを設定
-        ' 5.進捗Toastパラメーターを設定
-        ' 6.AppIDを設定
-        ' 7.Toast通知実行
-        GenerateCmd_ToastNotifierShow_Progress = ActionPS & WorksheetFunction.TextJoin(";", True, _
-            SetToastShemaXml(.XmlSchema), ReadXml, _
-            CreateObject__Windows_UI_Notifications(False, vbNullString), _
-            Set__Windows_UI_Notifications__ToastNotificationGroup(.Group), Set__Windows_UI_Notifications__ToastNotificationTag(.Tag), _
-            Set__Windows_UI_Notifications__ToastNotificationSuppressPopup(.SuppressPopup), _
-            Binding_AdaptiveProgressBar(False), _
-            DecisionAppUserModelID, _
-            Run__Windows_UI_Notifications__ToastNotifier(False)) & Chr(34)
-    
-    End With
-End Property
-
-'***************************************************************************************************
-'* 処理名　：GenerateCmd_ToastNotifierUpdate_Progress
-'* 機能　　：引数に渡された値で、トーストの進行状況バーを更新します。
+'* 処理名　：GenerateCmd_ToastNotifierUpdate
+'* 機能　　：引数に渡された値で、データバインディングを使った更新をします。
 '---------------------------------------------------------------------------------------------------
 '* 返り値　：引数に渡された値で、既存の進捗状況ゲージ込みのトーストを更新させるコマンド文字列を返します
-'* 引数　　：ToastTag                   ToastTagを指定します。以後の進捗状況を更新する際に必要です
-'            Arg_Status                 進行状況バーの下の左側に表示されるステータス文字列 (必須) を設定します。 この文字列は、"ダウンロード中..." や "インストール中..." などのように、操作の状態を反映する必要があります
-'            Arg_Value                  進行状況バーの値を取得または設定します。 既定値は 0 です。 0.0 ～ 1.0 の double型とします。負の値を指定すると、「Indeterminate」と扱います。
-'            Arg_Title                  タイトルの文字列 (オプション) を設定します
-'            Arg_ValueStringOverride    割合を示す既定の文字列に代わって表示される文字列 (オプション) を設定します。 これを指定しない場合は、"70%" などの文字が表示されます。
+'* 引数　　：ToastTag       ToastTagを指定します。複数通知を提供する際に必要です
 '---------------------------------------------------------------------------------------------------
 '* 機能説明：既にトーストの進行状況バーを表示しているとき、その時に指定したタグを指定することで、更新が可能です。
+'* 注意事項：コレクションIDによる更新は、ここでは非対応です(ﾂｸﾙﾉﾒﾝﾄﾞｲ)
 '***************************************************************************************************
-Public Property Get GenerateCmd_ToastNotifierUpdate_Progress(ByVal ToastTag As String, ByVal Arg_Status As String, Optional ByVal Arg_Value As Double = 0, Optional ByVal Arg_Title As String, Optional ByVal Arg_ValueStringOverride As String) As String
-    '進捗用ユーザー定義型のメンバー変数にセット
-    SetAdaptiveProgressBar Arg_Title, Arg_Value, Arg_ValueStringOverride, Arg_Status
-
+Public Property Get GenerateCmd_ToastNotifierUpdate(ByVal ToastTag As String) As String
     With ToastConfig
         '設定値をまとめる
         '.AppUserModelID = DecisionAppUserModelID(True)     '後続で、設定
@@ -2256,12 +2216,11 @@ Public Property Get GenerateCmd_ToastNotifierUpdate_Progress(ByVal ToastTag As S
         .ExpirationTime = False
        
 
-
         'トーストの進行状況バーを更新させるコマンド文字列を生成
-        ' 1.進捗Toastを更新するパラメータを設定
+        ' 1.データバインディングを設定
         ' 2.AppIDを設定
         ' 3.更新用Toast通知実行
-        GenerateCmd_ToastNotifierUpdate_Progress = ActionPS & WorksheetFunction.TextJoin(";", True, _
+        GenerateCmd_ToastNotifierUpdate = ActionPS & WorksheetFunction.TextJoin(";", True, _
             Binding_AdaptiveProgressBar(True), _
             DecisionAppUserModelID, _
             Run__Windows_UI_Notifications__ToastNotifierUpdate(.Tag, .Group)) & Chr(34)
