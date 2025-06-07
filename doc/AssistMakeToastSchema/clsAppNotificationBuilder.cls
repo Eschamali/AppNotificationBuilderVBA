@@ -1131,7 +1131,7 @@ End Property
 '***************************************************************************************************
 Public Property Let SetAdaptiveProgressBar(Optional Arg_Value As Double, Optional Arg_Title As String, Optional Arg_ValueStringOverride As String, Arg_Status As String)
     With ElementProgress
-        .Title = Arg_Title
+        .Title = Arg_Title & ""
         .Status = Arg_Status
         .Value = Arg_Value
         .ValueStringOverride = Arg_ValueStringOverride
@@ -1855,7 +1855,12 @@ Private Function Binding_AdaptiveProgressBar(UpdateMode As Boolean) As String
 
         '進行状況バーの値属性を設定するコマンド文字列
         '※0未満になってると、「Indeterminate」扱いとなります。
-        Dim SetDataBindingProgressBar_Value               As String: SetDataBindingProgressBar_Value = "$Dictionary.Add('" & Mid(DataBindingProgress_Value, 2, Len(DataBindingProgress_Value) - 2) & "', '" & .Value & "')"
+        Dim SetDataBindingProgressBar_Value               As String:
+        If .Value >= 0 Then
+            SetDataBindingProgressBar_Value = "$Dictionary.Add('" & Mid(DataBindingProgress_Value, 2, Len(DataBindingProgress_Value) - 2) & "', '" & .Value & "')"
+        Else
+            SetDataBindingProgressBar_Value = "$Dictionary.Add('" & Mid(DataBindingProgress_Value, 2, Len(DataBindingProgress_Value) - 2) & "', 'Indeterminate')"
+        End If
 
         '割合を示す文字列属性を設定するコマンド文字列
         '  Null文字として渡された場合、「progress」要素に「valueStringOverride」属性自体を挿入しないようにします。これにより規定の"70%" などの文字が表示されます。
