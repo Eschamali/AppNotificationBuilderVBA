@@ -1297,7 +1297,7 @@ Sub UpdateProgressBar()
 
         'トーストのすべてのコンテンツ/レイアウトを完全に変更し、終了メッセージとして表示
         .SetToastContent_Scenario = Default     'シナリオを通常に
-        .SetAdaptiveProgressBar = vbNullString  'Progress要素を除外する
+        .SetAdaptiveProgressBar = ""            'Progress要素を除外する
     
         .SetToastGenericContentsText = "プログレスバーの更新処理を終えました"
         Shell .GenerateCmd_ToastNotifierShow(ToastTag), vbHide
@@ -1361,7 +1361,7 @@ Sub UpdateProgressBar()
 
         'トーストのすべてのコンテンツ/レイアウトを完全に変更し、終了メッセージとして表示
         .SetToastContent_Scenario = Default     'シナリオを通常に
-        .SetAdaptiveProgressBar = vbNullString  'Progress要素を除外する
+        .SetAdaptiveProgressBar = ""            'Progress要素を除外する
     
         .SetToastGenericContentsText = "プログレスバーの更新処理を終えました"
         .RunDll_ToastNotifierShow ToastTag
