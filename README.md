@@ -1,4 +1,5 @@
 # AppNotificationBuilderVBA
+
 VBAから、[アプリ通知(トースト通知)](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/adaptive-interactive-toasts)を表示する機能を提供します。
 
 # DEMO
@@ -13,12 +14,14 @@ VBAから、[アプリ通知(トースト通知)](https://learn.microsoft.com/ja
 他にも様々なアプリ通知の外観を設定できます。設定方法等は後述します。
 
 # Features
+
 - DLLインポートと専用に用意されたクラスファイルをインポートすることにより、数行で手軽にアプリ通知の表示が可能です。
 - DLLインポートが使用できない環境でも、WindowsPowerShellを経由したアプリ通知の表示が可能です。
 - [「自動的に閉じるMsgBox」](http://officetanaka.net/excel/vba/tips/tips21.htm)の代わりに使用することが可能です。
 - 昔ながらの通知手法：[Shell_NotifyIconA](https://learn.microsoft.com/ja-jp/windows/win32/api/shellapi/nf-shellapi-shell_notifyicona)ではなく、WinRT APIを使った通知手法なので、カスタマイズ性が高いです。
 
 # Development History
+
 「自動的に閉じるMsgBox」という機能に一定のニーズを感じ、その代替として作ってみました。<br>
 この機能は、vbsで実現しておりそのvbsがもうすぐで最新OSでは、搭載しなくなるとのことで色々と試行錯誤して作成してみました。<br>
 モダンなWindows との親和性を高めるためにも、使ってみてはいかがでしょうか？
@@ -63,7 +66,7 @@ hDll の中身が、0 以外であれば読み込み、成功です。
 
 # Usage
 
-1. [このクラスファイル](doc/AssistMakeToastSchema/cls_AppNotificationBuilder.cls)をVisual Basic Editorのプロジェクトにインポートして下さい。<br>
+1. [このクラスファイル](doc/AssistMakeToastSchema/clsAppNotificationBuilder.cls)をVisual Basic Editorのプロジェクトにインポートして下さい。<br>
 
 2. Visual Basic Editorを開きメニューバーの「ツール」→「参照設定」→「Microsoft XML v6.0」にCheckをいれOKを押下して下さい。<br>
 ![alt text](doc/Usage1.png)<br>
@@ -71,9 +74,10 @@ hDll の中身が、0 以外であれば読み込み、成功です。
 これは、クラスファイルで[トースト コンテンツ スキーマ](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/schema-root)の作成に使います。
 
 3. 標準モジュールを作成し、下記のように簡単なコードを記述してみましょう
+
 ```bas
 Sub ShowToastTest()
-    With New cls_AppNotificationBuilder
+    With New clsAppNotificationBuilder
         '1. プロパティ設定
        .SetToastGenericTitleText = "Hello World"
        .SetToastGenericContentsText = "Test message"
@@ -83,18 +87,23 @@ Sub ShowToastTest()
     End With
 End Sub
 ```
+
 実行結果は、下記のとおりです<br>
 ![alt text](doc/Usage3.png)<br>
 この「Book1」は、Excelのブック名と連動しています。
 
 # プロパティ説明
+
 ## AppUserModelID 関連
+
 ### AllowUse_InternetImage
+
 HTTP上の画像ソースを使うか決めます。<br>
 例えば以下の設定で通知を表示させる際……<br>
+
 ```bas
 Sub httpソースの画像付き通知()
-    With New cls_AppNotificationBuilder
+    With New clsAppNotificationBuilder
         .SetToastGenericTitleText = "上部に画像を表示"
         .SetToastGenericHeroImage = "https://pad.gungho.jp/member/img/graphic/illust/6828.png"
 
@@ -103,13 +112,15 @@ Sub httpソースの画像付き通知()
     End With
 End Sub
 ```
+
 次のような表示になり上手くいきません…<br>
 ![alt text](doc/Ex_AppUserModelID1-1.png)<br>
 
 そこで、「.AllowUse_InternetImage = True」を加えると…
+
 ```bas
 Sub httpソースの画像付き通知()
-    With New cls_AppNotificationBuilder
+    With New clsAppNotificationBuilder
         .AllowUse_InternetImage = True
 
         .SetToastGenericTitleText = "上部に画像を表示"
@@ -120,26 +131,30 @@ Sub httpソースの画像付き通知()
     End With
 End Sub
 ```
+
 正しく表示できます。<br>
 ![alt text](doc/Ex_AppUserModelID1-2.png)<br>
 
 このHTTP上の画像ソースに関する詳しい挙動は、[こちら](#allowuse_internetimage-の挙動)を参照下さい。
 
 ### SetAppUserModelID
+
 この通知をどのAppUserModelIDで出すかを設定します。<br>
 存在しない(未インストール)AppUserModelID、無効な文字列を指定すると、Toastが発行されないのでご注意ください。<br>
 指定したAppUserModelIDによっては、AllowUse_InternetImageの設定が効きません。<br>
-この仕様については、[こちら](#AppUserModelID の仕様)を参照下さい
+この仕様については、[こちら](#AppUserModelID-の仕様)を参照下さい
 
 #### 設定値
+
 Windows にインストールされているAppUserModelID
 
 #### サンプルコード
+
 ```bas
 Sub TestSetAppUserModelID()
     Dim ActionCmd as String
 
-    With New cls_AppNotificationBuilder
+    With New clsAppNotificationBuilder
         '任意のAppUserModelID
         .SetAppUserModelID = "Microsoft.WindowsTerminal_8wekyb3d8bbwe!App"
 
@@ -162,19 +177,21 @@ End Sub
 既定値、記述なしは、vbnullstringです。
 
 ## [toast要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-toast)
+
 ### SetToastContent_Duration
+
 トーストが[表示される時間](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-toast#:~:text=%E6%97%A2%E5%AE%9A%E5%80%A4-,duration,-%E3%83%88%E3%83%BC%E3%82%B9%E3%83%88%E3%81%8C%E8%A1%A8%E7%A4%BA)を設定します。
 
 #### 設定値
 | 値            | 説明                            | 
 | ------------- | ------------------------------- | 
-| False(既定値) | shortと同等                     | 
-| True          | longと同等<br>25s、表示できます | 
+| False(既定値) | `short` と同等                     | 
+| True          | `long` と同等<br>25s、表示できます | 
 
 #### サンプルコード
 ```bas
 Sub 長く表示される通知()
-    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim AppNotification As New clsAppNotificationBuilder
     Dim ActionCmd As String
     
     With AppNotification
@@ -195,9 +212,11 @@ Sub 長く表示される通知()
     End With
 End Sub
 ```
+
 ![alt text](doc/Ex_Element-Toast1.png)
 
 ### SetToastContent_Launch
+
 [トースト通知自体のクリック](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-toast#:~:text=%E3%81%AA%E3%81%97-,launch,-%E3%83%88%E3%83%BC%E3%82%B9%E3%83%88%E9%80%9A%E7%9F%A5%E3%81%AB%E3%82%88%E3%81%A3%E3%81%A6)によって、アプリケーションがアクティブ化されるときにアプリケーションに渡される文字列です。
 VBAでは、起動スキーマ(https:// , ms-excel:// など)を設定するぐらいの役目です。
 #### 設定値
@@ -210,17 +229,20 @@ VBAでは、起動スキーマ(https:// , ms-excel:// など)を設定するぐ�
 #### 利用可能な引数
 | 引数名            | 解説                                                                                                                                                                                                                                                                                                                                                             | 既定値   | 
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | 
-| ArgActivationType | ユーザーが特定の操作を行った際に使用されるアクティブ化の種類を決定します。<br>・foreground - フォアグラウンド アプリが起動します。<br>・background - 対応するバックグラウンド タスクがトリガーされ、ユーザーを中断することなくバックグラウンドでコードを実行できます。<br>・protocol - プロトコルのアクティブ化を使用して別のアプリを起動します。 | protocol | 
+| ArgActivationType | ユーザーが特定の操作を行った際に使用されるアクティブ化の種類を決定します。<br>`taForeground` - フォアグラウンド アプリが起動します。<br>`taBackground` - 対応するバックグラウンド タスクがトリガーされ、ユーザーを中断することなくバックグラウンドでコードを実行できます。<br>`taProtocol` - プロトコルのアクティブ化を使用して別のアプリを起動します。 | protocol | 
+
+> [!CAUTION]
+> `taSystem` も選択可能ですが、意味をなしません。
 
 #### サンプルコード
 ```bas
 Sub リンクを開く()
-    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim AppNotification As New clsAppNotificationBuilder
     Dim ActionCmd As String
     
     With AppNotification
         'URL等を指定
-        .SetToastContent_Launch = "https://www.google.com/"
+        .SetToastContent_Launch(taProtocol) = "https://www.google.com/"
 
 
 
@@ -236,9 +258,11 @@ Sub リンクを開く()
     End With
 End Sub
 ```
+
 ![alt text](doc/Ex_Element-Toast2.png)
 
 ### SetToastContent_DisplayTimestamp
+
 Windows プラットフォームによって通知が受信された時刻ではなく、通知コンテンツが実際に配信された日時を表すカスタム タイムスタンプで既定の[タイムスタンプをオーバーライド](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/custom-timestamps-on-toasts?tabs=xml)します。
 
 #### 設定値
@@ -247,7 +271,7 @@ Excelのシリアル値
 #### サンプルコード
 ```bas
 Sub アプリ通知のカスタムタイムスタンプ()
-    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim AppNotification As New clsAppNotificationBuilder
     Dim ActionCmd As String
     
     With AppNotification
@@ -269,9 +293,14 @@ Sub アプリ通知のカスタムタイムスタンプ()
     End With
 End Sub
 ```
+
 ![alt text](doc/Ex_Element-Toast3.png)
 
+> [!NOTE]
+> 過去の度合いによって、`hh:mm` → 曜日表記 → `mm/dd` 表記になります。
+
 ### SetToastContent_Scenario
+
 トーストが使用される[シナリオ](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/adaptive-interactive-toasts?tabs=xml#scenarios)を設定します。列挙型に対応します。
 
 #### 設定値
@@ -286,12 +315,12 @@ End Sub
 #### サンプルコード
 ```bas
 Sub シナリオテスト()
-    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim AppNotification As New clsAppNotificationBuilder
     Dim ActionCmd As String
     
     With AppNotification
         'トーストのシナリオを設定(ctrl + Space で候補を表示できます)
-        .SetToastContent_Scenario = tsUrgent
+        .SetToastContent_Scenario = tsAlarm
 
 
 
@@ -332,13 +361,13 @@ toast要素の[useButtonStyle](https://learn.microsoft.com/ja-jp/uwp/schemas/til
 #### 設定値
 | 値            | 説明                            | 
 | ------------- | ------------------------------- | 
-| False(既定値) | スタイル付きボタンを使用できないようにします。後述の[action 要素](#SetIToastActions)の 「hint-buttonStyle」 属性に影響しません。 | 
-| True          | スタイル付きボタンを使用できるようにします。後述の[action 要素](#SetIToastActions)の 「hint-buttonStyle」 属性に影響します。 | 
+| False(既定値) | スタイル付きボタンを使用できないようにします。後述の[action 要素](#SetIToastActions)の `hint-buttonStyle` 属性に影響しません。 | 
+| True          | スタイル付きボタンを使用できるようにします。後述の[action 要素](#SetIToastActions)の `hint-buttonStyle` 属性に影響します。 | 
 
 #### サンプルコード
 ```bas
 Sub UseButtonStyle()
-    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim AppNotification As New clsAppNotificationBuilder
     Dim ActionCmd As String
     
     With AppNotification
@@ -377,14 +406,14 @@ image要素のうち、AppLogo(appLogoOverride)に設定する画像のパスと
 #### 利用可能な引数
 | 引数名             | 説明                                                                                                           | 既定値       | 
 | ------------------ | -------------------------------------------------------------------------------------------------------------- | ------------ | 
-| Arg_LogoCircle     | True：画像は円にトリミングされます。<br>False：画像はトリミングされず、正方形として表示されます。              | False        | 
+| Arg_LogoCircle     | `True` 画像は円にトリミングされます。<br>`False` 画像はトリミングされず、正方形として表示されます。              | False        | 
 | Flag_addImageQuery | Windows がトースト通知で指定されたイメージ URI にクエリ文字列を追加できるようにするには、"true" に設定します。 | False        | 
 | Arg_Alt            | 支援技術のユーザー向けの画像の説明。                                                                      | vbnullstring | 
 
 #### サンプルコード
 ```bas
 Sub ロゴ画像()
-    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim AppNotification As New clsAppNotificationBuilder
     Dim ActionCmd As String
     
     With AppNotification
@@ -421,7 +450,7 @@ image要素のうち、テキスト要素の後に表示する画像パスと、
 #### サンプルコード
 ```bas
 Sub インライン画像()
-    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim AppNotification As New clsAppNotificationBuilder
     Dim ActionCmd As String
     
     With AppNotification
@@ -466,7 +495,7 @@ End Sub
 #### サンプルコード
 ```bas
 Sub 上部に画像()
-    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim AppNotification As New clsAppNotificationBuilder
     Dim ActionCmd As String
     
     With AppNotification
@@ -504,19 +533,19 @@ End Sub
 ### 利用可能な引数
 | 引数名             | 説明                                                                                                           | 既定値       | 
 | ------------------ | -------------------------------------------------------------------------------------------------------------- | ------------ | 
-| HintCallScenarioCenterAlign | 横中央揃えの配置にする設定です。trueにしつつ、シナリオモードを「tsIncomingCall」にしないと効果ありません。 | False        | 
+| HintCallScenarioCenterAlign | 横中央揃えの配置にする設定です。`True` にしつつ、シナリオモードを `tsIncomingCall` にしないと効果ありません。 | False        | 
 
 #### サンプルコード
 ```bas
 Sub 最大行数テキスト()
-    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim AppNotification As New clsAppNotificationBuilder
     Dim ActionCmd As String
 
     With AppNotification
         'テキスト設定
-        .SetToastGenericTitleText(False) = "タイトル 1Line" & vbCrLf & "タイトル 2Line" & vbCrLf & "タイトル 3Line"
-        .SetToastGenericContentsText(False) = "コンテンツ 1Line" & vbCrLf & "コンテンツ 2Line" & vbCrLf & "コンテンツ 3Line" & vbCrLf & "コンテンツ 4Line" & vbCrLf & "コンテンツ 5Line"
-        .SetToastGenericAttributionText(False) = "コンテンツソース 1Line" & vbCrLf & "コンテンツソース 2Line" & vbCrLf & "コンテンツソース 3Line"
+        .SetToastGenericTitleText(True) = "タイトル 1Line" & vbCrLf & "タイトル 2Line" & vbCrLf & "タイトル 3Line"
+        .SetToastGenericContentsText(True) = "コンテンツ 1Line" & vbCrLf & "コンテンツ 2Line" & vbCrLf & "コンテンツ 3Line" & vbCrLf & "コンテンツ 4Line" & vbCrLf & "コンテンツ 5Line"
+        .SetToastGenericAttributionText(True) = "コンテンツソース 1Line" & vbCrLf & "コンテンツソース 2Line" & vbCrLf & "コンテンツソース 3Line"
 
 
 
@@ -530,6 +559,7 @@ Sub 最大行数テキスト()
         'Shell ActionCmd, vbHide
         .RunDll_ToastNotifierShow "sample"
     End With
+end sub
 ```
 
 | HintCallScenarioCenterAlign = False             | HintCallScenarioCenterAlign = True かつ、SetToastContent_Scenario = tsIncomingCall |
@@ -548,12 +578,12 @@ Sub 最大行数テキスト()
 #### 利用可能な引数
 | 引数名             | 説明                                                                                                           | 既定値       | 
 | ------------------ | -------------------------------------------------------------------------------------------------------------- | ------------ | 
-| ArgLoop            | トーストが表示されている限り、サウンドを繰り返す場合は true に設定します。<br> 1 回だけ再生する場合は false。  | False        | 
+| ArgLoop            | トーストが表示されている限り、サウンドを繰り返す場合は `true` に設定します。<br> 1 回だけ再生する場合は `false`  | False        | 
 
 #### サンプルコード
 ```bas
 Sub 通知音変更テスト()
-    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim AppNotification As New clsAppNotificationBuilder
     Dim ActionCmd As String
 
     With AppNotification
@@ -586,18 +616,18 @@ End Sub
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | 
 | ArgContent         | ボタンに表示されるコンテンツ                                                                                                                                                                                                                                                                                                                                     | ※必須項目                   | 
 | ArgArguments       | ユーザーがこのボタンをクリックした場合にアプリが後から受け取る、アプリで定義された引数の文字列です。                                                                                                                                                                                                                                                             | ※必須項目だが、空文字でもOK | 
-| ArgActivationType  | ユーザーが特定の操作を行った際に使用されるアクティブ化の種類を決定します。<br>・foreground： フォアグラウンド アプリが起動します。<br>・background：対応するバックグラウンド タスクがトリガーされ、ユーザーを中断することなくバックグラウンドでコードを実行できます。<br>・protocol：プロトコルのアクティブ化を使用して別のアプリを起動します。 <br>・system：ArgArgumentsに特定の文字列を入れると、リマインダー機能が使えます。(後述)| protocol                     | 
+| ArgActivationType  | ユーザーが特定の操作を行った際に使用されるアクティブ化の種類を決定します。<br>`tsForeground` フォアグラウンド アプリが起動します。<br>`tsBackground` 対応するバックグラウンド タスクがトリガーされ、ユーザーを中断することなくバックグラウンドでコードを実行できます。<br>`tsProtocol`プロトコルのアクティブ化を使用して別のアプリを起動します。 <br>`tsSystem` ArgArgumentsに特定の文字列を入れると、リマインダー機能が使えます。(後述)| protocol                     | 
 | ArgPendingUpdate   | ・TRUE：ユーザーがトースト上のボタンをクリックすると、通知は "保留中の更新" 表示状態のままです。 この "更新の保留中" の表示状態が長時間続くことを避けるため、バックグラウンド タスクから即座にトーストを更新する必要があります。<br>・FALSE：ユーザーがトーストに対して操作を行うと、トーストが無視されます。                                                    | FALSE                        | 
-| ArgContextMenu     | ・TRUE：トースト ボタンではなく、トースト通知のコンテキスト メニューに追加されたコンテキスト メニュー アクションになります。<br>・FALSE：従来通り、トースト ボタンに配置                                                                                                                                                                                         | FALSE                        | 
+| ArgContextMenu     | `TRUE` トースト ボタンではなく、トースト通知のコンテキスト メニューに追加されたコンテキスト メニュー アクションになります。<br>`FALSE` 従来通り、トースト ボタンに配置                                                                                                                                                                                         | FALSE                        | 
 | ArgIcon            | トースト ボタン アイコンのイメージ ソースの URI。<br>ローカルパス、HTTPソースに対応します。                                                                                                                                                                                                                                                                      | vbnullstring                 | 
-| ArgHintInputId     | 入力の横にある [位置への 入力 ] ボタンの ID に設定します。                                                                                                                                                                                                                                                                                                       | vbnullstring                 | 
-| ArgHintButtonStyle | ボタンのスタイル。<br>事前に[toast要素のuseButtonStyle属性](#SetToastContent_UseButtonStyle)にtrue を設定する必要があります。<br><br>・tbsSuccess：緑<br>・tbsCritical：赤<br>・NoStyle：無色                                                                                                                                                                                                             | NoStyle                      | 
+| ArgHintInputId     | 後述の Input要素のID属性を指定すると、そのInput要素の横にボタンが配置されます。                                                                                                                                                                                                                                                                                                       | vbnullstring                 | 
+| ArgHintButtonStyle | ボタンのスタイル。<br>事前に[toast要素のuseButtonStyle属性](#SetToastContent_UseButtonStyle)にtrue を設定する必要があります。<br><br>`tbsSuccess` 緑<br>`tbsCritical` 赤<br>`NoStyle` 色なし                                                                                                                                                                                                             | NoStyle                      | 
 | ArgHintToolTip     | ボタンに空のコンテンツ文字列がある場合のボタンのヒント。                                                                                                                                                                                                                                                                                                         | vbnullstring                 | 
 
 #### サンプルコード
 ```bas
 Sub MakeActionTest()
-    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim AppNotification As New clsAppNotificationBuilder
     Dim ActionCmd As String
 
     With AppNotification
@@ -634,8 +664,12 @@ End Sub
 ![alt text](doc/Ex_Element-Action1-1.png) ![alt text](doc/Ex_Element-Action1-2.png)
 
 ## [subgroup要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-subgroup)
-更に情報を追加したい場合にお使い下さい。比較的、カスタマイズ性が高いです。
+
+高度な通知の表現を行うことが出来ます。<br>
+そのため、他の設定とは複雑な方式での設定となります。サンプルコードを見ればおおよそ、把握できると思います。
+
 ### [AddAdaptiveSubgroupText](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptivetext)
+
 テキスト要素を追加します。ある程度の書式設定が可能です。
 
 #### 設定値
@@ -679,9 +713,13 @@ End Sub
 
 #### サンプルコード
 次のコードは、週間天気予報っぽい通知を作成します
+
+> [!TIP]
+> `AddAdaptiveSubgroupText` か `AddAdaptiveSubgroupImage` を順番に書き、`AddAdaptiveSubgroup` で、1つのグループが出来上がるイメージです。
+
 ```bas
 Sub 天気予報ライク()
-    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim AppNotification As New clsAppNotificationBuilder
     Dim ActionCmd As String
     
     With AppNotification
@@ -773,10 +811,13 @@ End Sub
 | ArgArguments      | ユーザーがこのヘッダーをクリックするとアプリに返されます。 null にすることはできません。                                       | ThisWorkbook.Path | 
 | ArgActivationType | このヘッダーがクリックされた場合に使用するアクティブ化の種類。                                                                 | protocol          | 
 
+> [!TIP]
+> アクションセンターのヘッダー部分をクリックするとこのExcelブックのあるカレントパスをエクスプローラーで開くことが可能です
+
 #### サンプルコード
 ```bas
 Sub ヘッダーテスト()
-    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim AppNotification As New clsAppNotificationBuilder
     Dim ActionCmd As String
 
     With AppNotification
@@ -798,7 +839,7 @@ End Sub
 
 ヘッダーをクリアしたい場合は下記のようにします
 ```bas
-With New cls_AppNotificationBuilder
+With New clsAppNotificationBuilder
     .SetToastHeader = ""
 End With
 ```
@@ -807,7 +848,6 @@ End With
 ## [input要素](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-input)
 ### SetIToastInput
 トースト通知に表示される入力 (テキスト ボックスまたは選択メニュー) を指定します。<br>
-VBAでは基本、リマインダー用途でしか使い所がないと思います。
 
 #### 設定値
 Input要素の配置順。1~5まで有効です。
@@ -816,7 +856,7 @@ Input要素の配置順。1~5まで有効です。
 | 引数名                | 説明                                                                    | 既定値       | 
 | --------------------- | ----------------------------------------------------------------------- | ------------ | 
 | ArgID                 | 入力に関連付けられている ID                                             | ※必須項目     | 
-| ChoseFlag             | ・True："selection"<br>・False："text"                                  | False        | 
+| ChoseFlag             | `True` "selection"<br>`False` "text"                                  | False        | 
 | ArgPlaceHolderContent | テキスト入力用に表示されるプレースホルダー。<br>ChoseFlag=False時、有効 | vbnullstring | 
 | ArgTitle              | 入力のラベルとして表示されるテキスト                                    | vbnullstring | 
 | ArgDefaultInput       | デフォルトの入力値                                                      | vbnullstring | 
@@ -824,7 +864,7 @@ Input要素の配置順。1~5まで有効です。
 #### サンプルコード
 ```bas
 Sub メッセ()
-    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim AppNotification As New clsAppNotificationBuilder
     Dim ActionCmd As String
     
     With AppNotification
@@ -876,7 +916,7 @@ Input要素と、selection要素を使ったリマインダー方法を紹介し
 #### サンプルコード
 ```bas
 Sub リマインドテスト()
-    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim AppNotification As New clsAppNotificationBuilder
     Dim ActionCmd As String
     
     With AppNotification
@@ -896,9 +936,9 @@ Sub リマインドテスト()
         '4. input要素を作成し、上記で準備したselect要素を挿入し、先ほど作成した紐付け用識別子をInput-IDにセット
         .SetIToastInput(ReminderID, True, , "選択肢から、リマインドする時間を選択", 10) = 1
 
-        '5. 再通知用と、解除用を用意("snooze", system,ReminderID にセットされてる引数位置は、必ずこの値にする)
-        .SetIToastActions("", "snooze", system, , , , ReminderID) = 1
-        .SetIToastActions("", "dismiss", system) = 2
+        '5. 再通知用と、解除用を用意("snooze", taSystem,ReminderID にセットされてる引数位置は、必ずこの値にする)
+        .SetIToastActions("", "snooze", taSystem, , , , ReminderID) = 1
+        .SetIToastActions("", "dismiss", taSystem) = 2
 
         '6. テキスト要素を用意(任意)
         .SetToastGenericTitleText = "リマインダーテスト"
@@ -944,7 +984,7 @@ End Sub
 ```
 
 ### PresetReminder
-この1行を記述することで、簡単にリマインド機能を作成できます。1箇所のみです。<br>
+この1行を記述することで、簡単にリマインド機能を作成できます。<br>
 このプロパティを呼び出す前に定義した下記の要素は、上書きされますのでご注意ください。
 - 1,2つ目のaction要素
 - 1つ目のinput要素
@@ -955,12 +995,13 @@ End Sub
 | RemindMinute1~5 | 何分後に再通知するか数値で指定。最大5つ分<br>1つ目のみ必須。他は省略可。 | 
 | Message         | 入力のラベルとして表示されるテキスト。                                   | 
 
-制限事項として、選択肢の表記は全て"分"です。
+> [!CAUTION]
+> 制限事項として、選択肢の表記は全て`分`です。
 
 #### サンプルコード
 ```bas
 Sub 簡易リマインドテスト()
-    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim AppNotification As New clsAppNotificationBuilder
     Dim ActionCmd As String
     
     With AppNotification
@@ -1007,7 +1048,7 @@ End Sub
 次の例では、10秒後に通知が来ます。
 ```bas
 Sub スケジュールを設定()
-    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim AppNotification As New clsAppNotificationBuilder
     Dim ActionCmd As String
 
     With AppNotification
@@ -1063,7 +1104,7 @@ GenerateCmd_ToastNotifierShow と同様の機能です。
 次の例でも、10秒後に通知が来ます。
 ```bas
 Sub スケジュールを設定()
-    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim AppNotification As New clsAppNotificationBuilder
     Dim ActionCmd As String
 
     With AppNotification
@@ -1091,7 +1132,7 @@ End Sub
 Sub トースト通知削除()
     Const ToastTag As String = "deleteTest"
 
-    With New cls_AppNotificationBuilder
+    With New clsAppNotificationBuilder
         '表示メッセージの設定
         .SetToastGenericTitleText = "Hello World"
         .SetToastGenericContentsText = "MsgBoxに反応すると、このトーストが消えます"
@@ -1128,7 +1169,7 @@ GenerateCmd_ToastNotificationHistoryRemove と同様の機能です。
 Sub トースト通知削除()
     Const ToastTag As String = "deleteTest"
 
-    With New cls_AppNotificationBuilder
+    With New clsAppNotificationBuilder
         '表示メッセージの設定
         .SetToastGenericTitleText = "Hello World"
         .SetToastGenericContentsText = "MsgBoxに反応すると、このトーストが消えます"
@@ -1148,34 +1189,46 @@ Sub トースト通知削除()
 End Sub
 ```
 
-## [プログレスバー付き通知](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-progress-bar)
-### GenerateCmd_ToastNotifierShow_Progress
-引数に渡された値で、トーストの進行状況バーを表示するコマンド文字列を返します。<br>
-プログレスバーの特性上、スケジュール、有効期限等の細かな挙動設定は設けません。
+## [プログレスバー付き通知について](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-progress-bar)
+
+`SetAdaptiveProgressBar` と `〇〇_ToastNotifierShow` を組み合わせて表示した後、`〇〇_ToastNotifierUpdate` を実行することで、通知を表示しながら更新処理を行うことが出来ます。
+
+### SetAdaptiveProgressBar
+
+このメソッドで、Progress要素の属性値を変更/設定します。
+
+![alt text](doc/Ex_Element-Progress.png)
+
+#### 設定値
+`Status` を設定します。文字列で必須項目となります。
+
+> [!TIP]
+> Progress要素を設定し表示後、完了通知みたいにProgress要素自体をなくすには、`〇〇_ToastNotifierShow` を行う手前に `.SetAdaptiveProgressBar = vbNullString` と記述することで、なくすことが出来ます。
 
 #### 利用可能な引数
 | 引数名                  | 説明                                                                                                                                                                               | 既定値       | 
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | 
-| ToastTag                | グループ内のこの通知の一意識別子を設定します。                                                                                                                                     | ※必須項目   | 
-| Arg_Status              | 左側の進行状況バーの下に表示される状態文字列 (必須) を設定します。<br>この文字列は、"Downloading..."または "Installing..." のような操作の状態を反映している必要があります。 | ※必須項目   | 
-| Arg_Value               | 進行値を設定します。<br>0.0~1.0のDoubleで指定しないといけません。<br>ただし、負の値にすると、"Indeterminate" となり、アニメーションドットで示す特定の値が表示されない、処理中を示す状態になります。                                                                                                                   | 0            | 
+| Arg_Value               | 進行値を設定します。<br>基本は、0.0~1.0のDoubleで指定です。<br>ただし、負の値にすると、"Indeterminate" となり、アニメーションドットによる、処理中を示す状態になります。| 0            | 
 | Arg_Title               | タイトル文字列を設定します。                                                                                                                                                       | 空文字       | 
-| Arg_ValueStringOverride | 割合を示す既定の文字列に代わって表示される文字列 (オプション) を設定します。<br>これを指定しない場合は、"70%" などの文字が表示されます。                                              | vbnullstring | 
-| Suppress                | トーストのポップアップ UI をユーザーの画面に表示するかどうかを取得または設定します。                                                                                               | False        | 
+| Arg_ValueStringOverride | 割合を示す既定の文字列に代わって表示される文字列 (オプション) を設定します。<br>これを指定しない場合は、"70%" という書式になります。                                              | vbnullstring | 
 
 #### サンプルコード
 次の例では、50%として、プログレスバー付き通知を表示します。
+
 ```bas
 Sub プログレスバーを表示()
-    Dim AppNotification As New cls_AppNotificationBuilder
+    Dim AppNotification As New clsAppNotificationBuilder
     Dim ActionCmd As String
 
     With AppNotification
         'メッセージ内容を設定
         .SetToastGenericTitleText = "プログレスバーテスト"
 
+        'Progress要素を構成
+        .SetAdaptiveProgressBar(0.5, "進捗バーテスト") = "Processing..."
+
         'プログレスバー付き通知を表示するコマンド文字列を生成
-        ActionCmd = .GenerateCmd_ToastNotifierShow_Progress("FirstProgressBar", "Processing...", 0.5, "進捗バーテスト")
+        ActionCmd = .GenerateCmd_ToastNotifierShow("FirstProgressBar")
 
         '実行コマンド確認
         Debug.Print ActionCmd
@@ -1186,68 +1239,22 @@ Sub プログレスバーを表示()
     End With
 End Sub
 ```
+
 ![alt text](doc/ExampleMethod2.png)<br>
-プログレスバーの色は、Windowsのテーマ色に基づきます。容易に色を変えることは出来ないでしょう。
-
-#### 返り値
-このようなコマンド文字列が、返ります。<br>
-これをShellに介すことで、プログレスバー付き通知を表示出来ます。サンプルコードなら、Stop部分で確認可能です。
-```bat
-powershell -Command "$xml = '<toast><visual><binding template=\"ToastGeneric\"><text>プログレスバーテスト</text><progress title=\"{progressTitle}\" status=\"{progressStatus}\" value=\"{progressValue}\"/></binding></visual><header id=\"Book1\" title=\"Book1\" arguments=\"\" activationType=\"protocol\"/></toast>';$XmlDocument = [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime]::New();$XmlDocument.loadXml($xml);$ToastNotification = [Windows.UI.Notifications.ToastNotification, Windows.UI.Notifications, ContentType = WindowsRuntime]::New($XmlDocument);$ToastNotification.Group = 'Book1';$ToastNotification.Tag = 'FirstProgressBar';$Dictionary = [System.Collections.Generic.Dictionary[String, String]]::New();$Dictionary.Add('progressTitle', '進捗バーテスト');$Dictionary.Add('progressValue', '0.5');$Dictionary.Add('progressStatus', 'Processing...');$ToastNotification.Data = [Windows.UI.Notifications.NotificationData]::New($Dictionary);$AppId = 'Microsoft.Office.EXCEL.EXE.15';[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]::CreateToastNotifier($AppId).Show($ToastNotification)"
-```
-整形するとこんな感じです。
-```ps1
-powershell -Command "
-$xml = '<toast><visual><binding template=\"ToastGeneric\"><text>プログレスバーテスト</text><progress title=\"{progressTitle}\" status=\"{progressStatus}\" value=\"{progressValue}\"/></binding></visual><header id=\"Book1\" title=\"Book1\" arguments=\"\" activationType=\"protocol\"/></toast>';
-$XmlDocument = [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime]::New();
-$XmlDocument.loadXml($xml);
-$ToastNotification = [Windows.UI.Notifications.ToastNotification, Windows.UI.Notifications, ContentType = WindowsRuntime]::New($XmlDocument);
-$ToastNotification.Group = 'Book1';
-$ToastNotification.Tag = 'FirstProgressBar';
-$Dictionary = [System.Collections.Generic.Dictionary[String, String]]::New();
-$Dictionary.Add('progressTitle', '進捗バーテスト');
-$Dictionary.Add('progressValue', '0.5');
-$Dictionary.Add('progressStatus', 'Processing...');
-$ToastNotification.Data = [Windows.UI.Notifications.NotificationData]::New($Dictionary);
-$AppId = 'Microsoft.Office.EXCEL.EXE.15';
-[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]::CreateToastNotifier($AppId).Show($ToastNotification)
-"
-```
-データ バインディングを使用したトースト更新に備えるため、「System.Collections.Generic.Dictionary」を使用しています。
-
-
-### RunDll_ToastNotifierShow_Progress
-GenerateCmd_ToastNotifierShow_Progress と同様の機能です。
-先述と同様こちらも、DLLファイルを読み込んだときに使う専用メソッドです。Shellを介さない分、パフォーマンスが向上するので使える環境であればこちらがおすすめです。<br>
-引数等は、GenerateCmd_ToastNotifierShow_Progress と同じなので省略します。
-
-#### サンプルコード
-次の例も、50%として、プログレスバー付き通知を表示します。
-```bas
-Sub プログレスバーを表示()
-    Dim AppNotification As New cls_AppNotificationBuilder
-    Dim ActionCmd As String
-
-    With AppNotification
-        'メッセージ内容を設定
-        .SetToastGenericTitleText = "プログレスバーテスト"
-
-
-
-        'プログレスバー付き通知を表示する通知を表示
-        .RunDll_ToastNotifierShow_Progress "FirstProgressBar", "Processing...", 0.5, "進捗バーテスト"
-    End With
-End Sub
-```
+プログレスバーの色は、Windowsのテーマ色に基づきます。容易に色を変えることは出来ません。
 
 ### GenerateCmd_ToastNotifierUpdate_Progress
-引数に渡された値で、トーストの進行状況バーを更新します。既にGenerateCmd_ToastNotifierShow_Progress等でトーストの進行状況バーを表示しているとき、その時に指定したタグを指定することで、更新が可能です。
+
+この状態ではプログレスバーの意味をなさないので、上記のメソッドで、更新処理を行います。<br>
+これを呼び出す前に、`SetAdaptiveProgressBar` で再度値を更新して呼び出すといいでしょう。<br>
+引数は、`ToastID`のみです。
 
 #### サンプルコード
 次の例は、「データ準備→処理→完了」という一連の演出処理を行います。最初にお見せした4つ目のDEMOとほぼ同じ演出になります。
+
 ```bas
 Sub UpdateProgressBar()
-    With New cls_AppNotificationBuilder
+    With New clsAppNotificationBuilder
         'ヘッダー情報をクリアする
         .SetToastHeader = ""
 
@@ -1260,26 +1267,35 @@ Sub UpdateProgressBar()
         '"Indeterminate"で、準備っぽい演出をする
         Dim ToastTag As String
         ToastTag = "ProgressUpdate"
-        shell .GenerateCmd_ToastNotifierShow_Progress(ToastTag, "Ready...", True), vbHide
+        
+        .SetAdaptiveProgressBar(True) = "Ready..."
+        
+        Shell .GenerateCmd_ToastNotifierShow(ToastTag), vbHide
 
         '5s待機
-        Application.Wait(Now() + TimeValue("0:00:05"))
+        Application.Wait (Now() + TimeValue("0:00:05"))
 
 
 
         'Updateで、一部分の内容を置き換えるようにする
         Dim currentProgress As Long
-        For currentProgress = 0 To 1000
-            DoEvents	'フリーズ対策
-            Shell .GenerateCmd_ToastNotifierUpdate_Progress(ToastTag, "処理中...", currentProgress / 1000, "プログレスバーを更新"), vbHide
-
+        For currentProgress = 0 To 100
+            DoEvents    'フリーズ対策
+            
             '何かの処理
+            
+            'プログレスバー更新
+            .SetAdaptiveProgressBar(currentProgress / 100, "プログレスバーを更新") = "処理中..."
+            Shell .GenerateCmd_ToastNotifierUpdate(ToastTag), vbHide
+
         Next
 
 
 
         'トーストのすべてのコンテンツ/レイアウトを完全に変更し、終了メッセージとして表示
-        .SetToastContent_Scenario = Default
+        .SetToastContent_Scenario = Default     'シナリオを通常に
+        .SetAdaptiveProgressBar = vbNullString  'Progress要素を除外する
+    
         .SetToastGenericContentsText = "プログレスバーの更新処理を終えました"
         Shell .GenerateCmd_ToastNotifierShow(ToastTag), vbHide
     End With
@@ -1289,29 +1305,9 @@ End Sub
 実行すると分かりますが、かなりCPUに負荷がかかるため、実際に運用する際は、一定ループ毎に1度のUpdate処理を流すのが望ましいです。<br>
 実際、Application.StatusBar も[毎回呼び出す](https://qiita.com/OldCity/items/8b24d4c45da17165fa4e)と、負荷がかかります。
 
-#### 返り値
-このようなコマンド文字列が、返ります。<br>
-これをShellに介すことで、既存のプログレスバー付き通知に、更新内容を反映出来ます。
-```bat
-powershell -Command "$Dictionary = [System.Collections.Generic.Dictionary[String, String]]::New();$Dictionary.Add('progressTitle', 'プログレスバーを更新');$Dictionary.Add('progressValue', '0');$Dictionary.Add('progressStatus', '処理中...');$ToastNotificationData = [Windows.UI.Notifications.NotificationData]::New($Dictionary);$AppId = 'Microsoft.Office.EXCEL.EXE.15';[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]::CreateToastNotifier($AppId).Update($ToastNotificationData, 'ProgressUpdate','Book1')"
-```
-整形するとこんな感じです。
-```ps1
-powershell -Command "
-$Dictionary = [System.Collections.Generic.Dictionary[String, String]]::New();
-$Dictionary.Add('progressTitle', 'プログレスバーを更新');
-$Dictionary.Add('progressValue', '0');
-$Dictionary.Add('progressStatus', '処理中...');
-$ToastNotificationData = [Windows.UI.Notifications.NotificationData]::New($Dictionary);
-$AppId = 'Microsoft.Office.EXCEL.EXE.15';
-[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]::CreateToastNotifier($AppId).Update($ToastNotificationData, 'ProgressUpdate','Book1')
-"
-```
-データ バインディングを使用したトースト更新を行うため、「System.Collections.Generic.Dictionary」を使用しています。
-
-
 ### RunDll_ToastNotifierUpdate_Progress
-GenerateCmd_ToastNotifierUpdate_Progress と同様の機能です。
+
+`GenerateCmd_ToastNotifierUpdate` と同様の機能です。
 先述と同様こちらも、DLLファイルを読み込んだときに使う専用メソッドです。Shellを介さない分、パフォーマンスが向上するので使える環境であればこちらがおすすめです。<br>
 引数等は、GenerateCmd_ToastNotifierUpdate_Progress と同じなので省略します。
 
@@ -1319,7 +1315,7 @@ GenerateCmd_ToastNotifierUpdate_Progress と同様の機能です。
 次の例も、「データ準備→処理→完了」という一連の演出処理を行います。最初にお見せした4つ目のDEMOとほぼ同じ演出になります。
 ```bas
 Sub UpdateProgressBar()
-    With New cls_AppNotificationBuilder
+    With New clsAppNotificationBuilder
         'ヘッダー情報をクリアする
         .SetToastHeader = ""
 
@@ -1332,7 +1328,10 @@ Sub UpdateProgressBar()
         '"Indeterminate"で、準備っぽい演出をする
         Dim ToastTag As String
         ToastTag = "ProgressUpdate"
-        .RunDll_ToastNotifierShow_Progress ToastTag, "Ready...", True
+        
+        .SetAdaptiveProgressBar(True) = "Ready..."
+        
+        .RunDll_ToastNotifierShow ToastTag
 
         '5s待機
         Application.Wait (Now() + TimeValue("0:00:05"))
@@ -1341,20 +1340,26 @@ Sub UpdateProgressBar()
 
         'Updateで、一部分の内容を置き換えるようにする
         Dim currentProgress As Long
-        Dim ResultCode As Long
-        For currentProgress = 0 To 1000
-            '該当のトーストを閉じた場合、更新送信の処理を停止します。
-            If ResultCode = 0 Then
-                ResultCode = .RunDll_ToastNotifierUpdate_Progress(ToastTag, "処理中...", currentProgress / 1000, "プログレスバーを更新")
-            End If
-
+        For currentProgress = 0 To 100
+            DoEvents    'フリーズ対策
+            
             '何かの処理
+            
+            'プログレスバー更新
+            .SetAdaptiveProgressBar(currentProgress / 100, "プログレスバーを更新") = "処理中..."
+            Debug.Print .RunDll_ToastNotifierUpdate(ToastTag)
+            
+            '1s待機
+            Application.Wait (Now() + TimeValue("0:00:01"))
+
         Next
 
 
 
         'トーストのすべてのコンテンツ/レイアウトを完全に変更し、終了メッセージとして表示
-        .SetToastContent_Scenario = Default
+        .SetToastContent_Scenario = Default     'シナリオを通常に
+        .SetAdaptiveProgressBar = vbNullString  'Progress要素を除外する
+    
         .SetToastGenericContentsText = "プログレスバーの更新処理を終えました"
         .RunDll_ToastNotifierShow ToastTag
     End With
@@ -1368,12 +1373,15 @@ End Sub
 | 1      | Failed<br>通知の更新に失敗しました。                         | 
 | 2      | NotificationNotFound<br>指定した通知が見つかりませんでした。 | 
 
-RunDll_ToastNotifierUpdate_Progressの場合、列挙型[NotificationUpdateResult](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.notificationupdateresult) の返却に対応しています。これにより、前述のサンプルコードにて、ユーザーが通知を閉じた時、トースト更新プログラムの送信を停止し、無駄な処理をなくすことが出来ます。<br>
-現状、「GenerateCmd_ToastNotifierUpdate_Progress」では、上記の対応は出来ません。
+`RunDll_ToastNotifierUpdate` の場合、列挙型[NotificationUpdateResult](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.notificationupdateresult) の返却に対応しています。これにより、前述のサンプルコードにて、ユーザーが通知を閉じた時、トースト更新プログラムの送信を停止し、無駄な処理をなくすことが出来ます。<br>
+現状、「GenerateCmd_ToastNotifierUpdate」では、上記の対応は出来ません。
 
 ## [コレクションを使用したトースト通知のグループ化](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-collections)
 表示名とアイコンを指定したheader要素よりも高度なグループ化を提供します。<br>
-非同期処理を行わないと出来ない機能のため、これらの機能の利用にはDLLのインポートから利用することを推奨します。
+
+> [!CAUTION]
+> 一応、PowerShell経由版もありますが、安定性の観点からDLL経由版のメソッドに使用を推奨します。<br>
+> 以降は、DLL経由版のみの説明とします。
 
 ### [RunDll_ToastCollectionManagerSaveToastCollectionAsync](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastcollectionmanager.savetoastcollectionasync)
 指定したCollectionIDでグループを作成します。
@@ -1390,18 +1398,22 @@ RunDll_ToastNotifierUpdate_Progressの場合、列挙型[NotificationUpdateResul
 作成に成功すると、0 を返します。
 
 #### サンプルコード
-次の例は、Microsoft 365 (PWA)として、CollectionIDを作成し、そこの中で通知を表示します。
+次の例は、[Microsoft 365 Copilot (PWA)](https://apps.microsoft.com/detail/9WZDNCRD29V9?hl=ja&gl=JP&ocid=pdpshare)として、CollectionIDを作成し、そこの中で通知を表示します。
+
+> [!WARNING]
+> IconPath ですが、アプリバージョンによってはサンプルコードが機能しないため、その際は適宜修正して下さい。
+
 ```bas
 Sub コレクションを使用したトースト通知のグループ化作成()
     'CollectionIDをセット
     Const CollectionID As String = "TestGroup"
     
-    With New cls_AppNotificationBuilder
+    With New clsAppNotificationBuilder
         'PWA Microsoft 365 を指定
         .SetAppUserModelID = "Microsoft.MicrosoftOfficeHub_8wekyb3d8bbwe!Microsoft.MicrosoftOfficeHub"
 
         'コレクションの作成
-        Debug.Print .RunDll_ToastCollectionManagerSaveToastCollectionAsync(CollectionID, "A社 ログ関係", "https://www.microsoft365.com/launch/excel", "C:\Program Files\WindowsApps\Microsoft.MicrosoftOfficeHub_18.2409.1051.0_x64__8wekyb3d8bbwe\Images\AppExcel32x32.png")
+        Debug.Print .RunDll_ToastCollectionManagerSaveToastCollectionAsync(CollectionID, "A社 ログ関係", "https://www.microsoft365.com/launch/excel", "C:\Program Files\WindowsApps\Microsoft.MicrosoftOfficeHub_19.2506.33061.0_x64__8wekyb3d8bbwe\Images\AppExcel32x32.png")
         Stop
 
         '通知内容を作成
@@ -1454,7 +1466,7 @@ Sub コレクションを使用したトースト通知のグループ化削除(
     'CollectionIDをセット
     Const CollectionID As String = "TestGroup"
     
-    With New cls_AppNotificationBuilder
+    With New clsAppNotificationBuilder
         'PWA Microsoft 365 を指定
         .SetAppUserModelID = "Microsoft.MicrosoftOfficeHub_8wekyb3d8bbwe!Microsoft.MicrosoftOfficeHub"
 
@@ -1478,7 +1490,7 @@ action要素のarguments属性にマクロ名、activationType属性にforegroun
 下記の要素と属性に、実行したいマクロ名を記述することができます。
 - toast要素 － [launch属性](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-toast#:~:text=%E3%81%AA%E3%81%97-,launch,-%E3%83%88%E3%83%BC%E3%82%B9%E3%83%88%E9%80%9A%E7%9F%A5%E3%81%AB%E3%82%88%E3%81%A3%E3%81%A6)
 ```bas
-    With New cls_AppNotificationBuilder
+    With New clsAppNotificationBuilder
         .SetToastContent_Launch(foreground) = "[ここに実行したいマクロ名]"
         ~
     End With
@@ -1486,7 +1498,7 @@ action要素のarguments属性にマクロ名、activationType属性にforegroun
 
 - action要素 － [arguments属性](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-action#:~:text=%E3%81%AA%E3%81%97-,arguments,-%E3%83%A6%E3%83%BC%E3%82%B6%E3%83%BC%E3%81%8C%E3%81%93%E3%81%AE)
 ```bas
-    With New cls_AppNotificationBuilder
+    With New clsAppNotificationBuilder
         .SetIToastActions("TestRun", "[ここに実行したいマクロ名]", foreground) = 1
         ~
     End With
@@ -1523,7 +1535,7 @@ Option Explicit
 
 'トーストのアクティブ化テスト
 Sub ToastWithActiveShow()
-    With New cls_AppNotificationBuilder
+    With New clsAppNotificationBuilder
         'タイトル設定
         .SetToastGenericTitleText = "クイズ！"
         '内容設定
@@ -1623,7 +1635,7 @@ Excel等のデスクトップアプリケーションは、「非パッケージ
 bat処理等でhttpソース画像付き通知を使用する場合は、対応するAppUserModelIDを指定して、「GenerateCmd_ToastNotifierShow」で返る文字列を埋め込みましょう。
 ```bas
 Sub httpソースの画像付き通知()
-    With New cls_AppNotificationBuilder
+    With New clsAppNotificationBuilder
         'マニフェストにインターネット機能があるAppUserModelID
         .SetAppUserModelID = "Microsoft.WindowsTerminal_8wekyb3d8bbwe!App"
 
