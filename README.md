@@ -1,6 +1,17 @@
-# AppNotificationBuilderVBA
+# ✅ トースト通知を、VBAで！
 
-VBAから、[アプリ通知(トースト通知)](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/adaptive-interactive-toasts)を表示する機能を提供します。
+「Excelから通知を出せたら便利なのに…」  
+そんな願い、**VBA × C++ DLLの連携**で実現しました。
+
+Windows 10/11で標準搭載されている**トースト通知**を、  
+VBAから簡単に使えるようにした拡張モジュールです。
+
+📢 リマインダーに！  
+📊 レポート完了の通知に！  
+🎯 入力ミスや完了メッセージに！  
+⚙️ ボタン押下で指定マクロを実行！
+
+**VBAの限界を超えて、モダンなUI通知をあなたのExcelに。**
 
 # DEMO
 
