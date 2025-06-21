@@ -1500,9 +1500,9 @@ End Sub
 # [アクティブ化処理](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.activated)
 ユーザーがクリックまたはタッチでトースト通知をアクティブ化したとき、指定マクロを実行する事ができます。<br>
 action要素のarguments属性にマクロ名、activationType属性に`taForeground`を設定して、`RunDll_ToastNotifierShow`関数を実行する事で、アクティブ化処理が可能です。<br>
-アクティブ化処理は、DLL経由による`RunDll_ToastNotifierShow`での実行が必要です。
 
 > [!CAUTION]
+> アクティブ化処理は、DLL経由による`RunDll_ToastNotifierShow`での実行が必要です。  
 > スケジュール通知で発行したアプリ通知の場合は、上記のアクティブ化処理はできません。
 
 ## アクティブ化準備
