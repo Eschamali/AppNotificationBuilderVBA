@@ -1499,7 +1499,7 @@ End Sub
 
 # [アクティブ化処理](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.activated)
 ユーザーがクリックまたはタッチでトースト通知をアクティブ化したとき、指定マクロを実行する事ができます。<br>
-action要素のarguments属性にマクロ名、activationType属性に`foreground`を設定して、`RunDll_ToastNotifierShow`関数を実行する事で、アクティブ化処理が可能です。<br>
+action要素のarguments属性にマクロ名、activationType属性に`taForeground`を設定して、`RunDll_ToastNotifierShow`関数を実行する事で、アクティブ化処理が可能です。<br>
 アクティブ化処理は、DLL経由による`RunDll_ToastNotifierShow`での実行が必要です。
 
 > [!CAUTION]
@@ -1513,7 +1513,7 @@ action要素のarguments属性にマクロ名、activationType属性に`foregrou
 - toast要素 － [launch属性](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-toast#:~:text=%E3%81%AA%E3%81%97-,launch,-%E3%83%88%E3%83%BC%E3%82%B9%E3%83%88%E9%80%9A%E7%9F%A5%E3%81%AB%E3%82%88%E3%81%A3%E3%81%A6)
 ```bas
     With New clsAppNotificationBuilder
-        .SetToastContent_Launch(foreground) = "[ここに実行したいマクロ名]"
+        .SetToastContent_Launch(taForeground) = "[ここに実行したいマクロ名]"
         ~
     End With
 ```
@@ -1521,7 +1521,7 @@ action要素のarguments属性にマクロ名、activationType属性に`foregrou
 - action要素 － [arguments属性](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-action#:~:text=%E3%81%AA%E3%81%97-,arguments,-%E3%83%A6%E3%83%BC%E3%82%B6%E3%83%BC%E3%81%8C%E3%81%93%E3%81%AE)
 ```bas
     With New clsAppNotificationBuilder
-        .SetIToastActions("TestRun", "[ここに実行したいマクロ名]", foreground) = 1
+        .SetIToastActions("TestRun", "[ここに実行したいマクロ名]", taForeground) = 1
         ~
     End With
 ```
