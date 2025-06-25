@@ -1657,7 +1657,7 @@ Private Function MakeXmlToastContentBuilder(DataBindingMode As Boolean) As Strin
 
     '-------------------------------------------------------progress要素関係の設定-------------------------------------------------------
     'スケジュール通知じゃないかつ、属性ノード：status  に値を設定してあったら「progress」ノードを追加します(Microsoft ドキュメント準拠)
-    If ElementProgress.Status <> "" And DataBindingMode Then
+    If StrPtr(ElementProgress.Status) And DataBindingMode Then
         With Node01_01__binding.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_03__progress, ""))
             '属性ノード：title  にバインディング設定したのを、先ほどのノード：progress  の属性に追加します
             .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "title", "")).NodeValue = DataBindingProgress_Title
