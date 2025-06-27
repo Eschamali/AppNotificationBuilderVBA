@@ -11,6 +11,12 @@
 #include <atlbase.h>                                    //Excelインスタンス制御関連
 #include <comdef.h>                                     //デバッグによるエラーチェック用
 
+//名前定義を用意
+using namespace winrt;
+using namespace Windows::UI::Notifications;
+using namespace Windows::Data::Xml::Dom;
+using namespace winrt::Windows::Foundation;
+
 
 //外部参照設定つまりはVBAからでもアクセスできるようにする設定。おまじないと思ってください。
 //詳細→https://liclog.net/vba-dll-create-1/
@@ -48,6 +54,10 @@ struct ToastNotificationVariable {
     double ProgressValue;
 };
 #pragma pack()
+
+
+//このプロジェクト用パブリック関数を宣言
+void OnActivated(ToastNotification const& sender, IInspectable const& args);    //ToastNotification.Activated イベント
 
 
 //関数宣言

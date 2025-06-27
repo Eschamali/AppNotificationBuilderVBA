@@ -20,7 +20,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="AppNotificationBuilder.cpp" />
+    <ClCompile Include="EventNotice.cpp" />
+    <ClCompile Include="CollectionNotice.cpp" />
+    <ClCompile Include="GeneralNotice.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
