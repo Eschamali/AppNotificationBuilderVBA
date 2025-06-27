@@ -6,14 +6,14 @@
  *      通知へのアクション(ボタン押下など)で、指定VBAマクロの実行
  * 　   →入力値、ドロップダウンリストで選択したIDも取得可能
  *
- * 
+ *
  * URL
  * https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification#events
  ***************************************************************************************************/
 
 
 
-//設定がまとまってるヘッダーファイルを指定
+ //設定がまとまってるヘッダーファイルを指定
 #include "AppNotificationBuilder.h"
 
 
@@ -46,7 +46,7 @@ static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInpu
     // 起動中のExcelがない場合
     if (FAILED(hr)) {
         MessageBoxW(nullptr, L"Failed to get active Excel instance", L"Error", MB_OK);
-        return ;
+        return;
     }
 
     // 3. IUnknownからIDispatchへのキャスト
@@ -56,7 +56,7 @@ static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInpu
     //キャストに失敗した場合
     if (FAILED(hr)) {
         MessageBoxW(nullptr, L"Failed to get IDispatch from Excel instance", L"Error", MB_OK);
-        return ;
+        return;
     }
 
     // 4. DISPIDの取得
@@ -67,7 +67,7 @@ static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInpu
     //Runメソッドの取得に失敗した場合
     if (FAILED(hr)) {
         MessageBoxW(nullptr, L"Failed to get DISPID for Run method", L"Error", MB_OK);
-        return ;
+        return;
     }
 
     // 5. Application.Run メソッドの引数を設定
@@ -176,7 +176,7 @@ void OnActivated(ToastNotification const& sender, IInspectable const& args) {
                 indices[0] = rowIndex;  //現時点のInput要素位置
                 indices[1] = 0;  // キーは0列目に
                 CComBSTR bstrKey(key.c_str()); //Input要素のID属性を取得
-                
+
                 //上記の設定で配列にキーを追加
                 SafeArrayPutElement(InputElementsArray, indices, bstrKey);
 
