@@ -10,6 +10,7 @@
 #include <winrt/Windows.Foundation.Collections.h>       //NotificationDataを扱うためのモジュール
 #include <atlbase.h>                                    //Excelインスタンス制御関連
 #include <comdef.h>                                     //デバッグによるエラーチェック用
+#include <oleacc.h>                                     //AccessibleObjectFromWindow の使用に必要
 
 //名前定義を用意
 using namespace winrt;

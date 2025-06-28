@@ -676,7 +676,7 @@ End Property
 '***************************************************************************************************
 Public Property Let SetToastContent_Launch(Optional ByVal ArgActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, ByVal ArgSchema As String)
     With ElementToast
-        .Launch = ArgSchema
+        .Launch = ArgSchema & "-" & Application.hwnd
         .ActivationType = SetToastActivationType(ArgActivationType)
     End With
 End Property
@@ -1270,7 +1270,7 @@ Public Property Let SetIToastActions(ByVal ArgContent As String, ByVal ArgArgume
     With ElementAction(Index)
 
         .Content = ArgContent
-        .Arguments = ArgArguments
+        .Arguments = ArgArguments & "-" & Application.hwnd
         .ActivationType = SetToastActivationType(ArgActivationType)
 
         If ArgPendingUpdate Then .afterActivationBehavior = "pendingUpdate" Else .afterActivationBehavior = vbNullString

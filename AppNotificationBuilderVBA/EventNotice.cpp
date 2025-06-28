@@ -19,41 +19,130 @@
 
 
 //***************************************************************************************************
+//                                  ■■■ 静的定数 ■■■
+//***************************************************************************************************
+constexpr const wchar_t* EXCEL_DESK_CLASS_NAME = L"XLDESK";                 //"XLMAIN"ウィンドウの子名称
+constexpr const wchar_t* EXCEL_SHEET_CLASS_NAME = L"EXCEL7";                //"XLDESK"の子名称
+constexpr const wchar_t* EXCEL_APPLICATION_CLASS_NAME = L"Application";     //"Application"のオブジェクト名称
+constexpr const wchar_t* EXCEL_APPLICATION_RUN_MethodName = L"Run";         //"Application.Run"のメソッド名称
+
+
+
+//***************************************************************************************************
+//                                  ■■■ ヘルパー用関数 ■■■
+//***************************************************************************************************
+//* 機能　　：引数に従った Application オブジェクトを取得します
+//---------------------------------------------------------------------------------------------------
+//* 引数　　：※割愛します
+//---------------------------------------------------------------------------------------------------
+//* 詳細説明：WorkbookからApplicationを取得するために使います
+//***************************************************************************************************
+static HRESULT GetProperty(IDispatch* pDisp, const wchar_t* propName, CComVariant& result) {
+    if (!pDisp) return E_POINTER;
+    OLECHAR* name = (OLECHAR*)propName;
+    DISPID dispID;
+    HRESULT hr = pDisp->GetIDsOfNames(IID_NULL, &name, 1, LOCALE_USER_DEFAULT, &dispID);
+    if (FAILED(hr)) return hr;
+    DISPPARAMS params = { NULL, NULL, 0, 0 };
+    return pDisp->Invoke(dispID, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_PROPERTYGET, &params, &result, NULL, NULL);
+}
+
+
+
+//***************************************************************************************************
+//                                  ■■■ メイン関数 ■■■
+//***************************************************************************************************
 //* 機能　　：Excel マクロを実行する関数
 //---------------------------------------------------------------------------------------------------
-//* 引数　　：ExcelMacroPass     Action要素のarguments。[マクロ名-ExcelのPID]を想定してます。
+//* 引数　　：ExcelMacroPass     Action要素のarguments。{マクロ名}-{ExcelVBA からの Application.hwnd} を想定してます。
 //            UserInputs         Input要素で入力した内容、あるいはSelect要素のID名称とそれに紐づくInput要素のIDとのセットとなる2次元配列                             
+//---------------------------------------------------------------------------------------------------
+//* 詳細説明：ExcelのプロセスIDも渡すことで、複数プロセスで起動してるExcel環境でも対応できます
 //***************************************************************************************************
 static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInputs) {
-    //詳細メッセージ、取得用
-    EXCEPINFO excepInfo;
-    memset(&excepInfo, 0, sizeof(EXCEPINFO));  // 初期化
+    //---------- 1. 末尾の"-"区切り記号を利用して、Excelマクロ名とExcel ウィンドウのハンドルを取得----------
+    //一旦、別変数へ
+    std::wstring fullArg = ExcelMacroPass;
 
-    // 1. ExcelのCLSIDを取得
-    CLSID clsid;
-    HRESULT hr = CLSIDFromProgID(L"Excel.Application", &clsid);
-
-    // 恐らく、Excelがインストールされてない場合
-    if (FAILED(hr)) {
-        MessageBoxW(nullptr, L"Failed to get CLSID for Excel", L"Error", MB_OK);
+    // 最後の '-' の文字位置を取得
+    // ※ハイフンが見つからない、またはハイフンが末尾にある → フォーマット不正
+    size_t lastHyphen = fullArg.rfind(L'-');
+    if (lastHyphen == std::wstring::npos || lastHyphen == fullArg.length() - 1) {
+        MessageBoxW(nullptr, L"引数の形式が不正です。{マクロ名}-{ExcelVBA からの Application.hwnd} で渡す必要があります。", L"Error", MB_OK);
         return;
     }
 
-    // 2. 既存のExcelインスタンスを取得
-    CComPtr<::IUnknown> pUnk;
-    hr = GetActiveObject(clsid, nullptr, reinterpret_cast<::IUnknown**>(&pUnk));  // まずIUnknownを取得
+    // マクロ名部分と Excel ウィンドウのハンドル 部分を抽出
+    std::wstring macroNameOnly = fullArg.substr(0, lastHyphen); //マクロ名
+    //MessageBoxW(nullptr, macroNameOnly.c_str(), L"Info:マクロ名", MB_OK);
 
-    // 起動中のExcelがない場合
-    if (FAILED(hr)) {
-        MessageBoxW(nullptr, L"Failed to get active Excel instance", L"Error", MB_OK);
+    std::wstring hwndStr = fullArg.substr(lastHyphen + 1);      //一時オブジェクトを防ぐために変数に保持
+    HWND targetHWND = (HWND)(std::stoull(hwndStr));             //HWND にキャストします。
+    //MessageBoxW(nullptr, hwndStr.c_str(), L"Info:ハンドル値", MB_OK);
+
+    //wchar_t title[256];
+    //GetWindowTextW(targetHWND, title, 256);
+    //MessageBoxW(nullptr, title, L"対象ウィンドウのタイトル", MB_OK);
+
+    //wchar_t className[256];
+    //GetClassNameW(targetHWND, className, 256);
+    //MessageBoxW(nullptr, className, L"対象ウィンドウのクラス名", MB_OK);
+
+
+    //---------- 2. 孫ウィンドウ経由で、Excel Applicationオブジェクト取得 ----------
+    CComPtr<IDispatch> pExcelDispatch;
+    HRESULT hr = E_FAIL; // 見つからなかった場合のデフォルト
+
+    // 1. XLMAINウィンドウの子である「XLDESK」ウィンドウを探す
+    HWND hXlDesk = FindWindowExW(targetHWND, NULL, EXCEL_DESK_CLASS_NAME, NULL);
+    if (hXlDesk) {
+        // 2. XLDESKの子である「EXCEL7」ウィンドウを探す
+        HWND hExcel7 = FindWindowExW(hXlDesk, NULL, EXCEL_SHEET_CLASS_NAME, NULL);
+        if (hExcel7) {
+            // 3. EXCEL7ウィンドウから直接Workbookオブジェクトを取得
+            CComPtr<IDispatch> pWorkbookDisp;
+            hr = AccessibleObjectFromWindow(hExcel7, OBJID_NATIVEOM, IID_IDispatch, (void**)&pWorkbookDisp);
+
+            if (SUCCEEDED(hr) && pWorkbookDisp) {
+                // 4. WorkbookオブジェクトからApplicationオブジェクトを取得
+                CComVariant varApp;
+                hr = GetProperty(pWorkbookDisp, EXCEL_APPLICATION_CLASS_NAME, varApp);
+                if (SUCCEEDED(hr) && varApp.vt == VT_DISPATCH) {
+                    pExcelDispatch = varApp.pdispVal; // 成功！
+                }
+            }
+        }
+        else {
+            hr = HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND);
+        }
+    }
+    else {
+        hr = HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND);
+    }
+    // --- ここまで ---
+
+    if (SUCCEEDED(hr) && pExcelDispatch) {
+        //成功！
+    }
+    else {
+        _com_error err(hr);
+        wchar_t buf[512];
+        const wchar_t* reason = L"不明なエラー";
+        if (!hXlDesk) reason = L"子ウィンドウ 'XLDESK' が見つかりません";
+        else if (!FindWindowExW(hXlDesk, NULL, L"EXCEL7", NULL)) reason = L"孫ウィンドウ 'EXCEL7' が見つかりません";
+        else reason = L"EXCEL7からオブジェクト取得に失敗しました";
+
+        swprintf_s(buf, L"エラー理由: %s\nHRESULT=0x%08X\n%s", reason, hr, err.ErrorMessage());
+        MessageBoxW(nullptr, buf, L"エラー", MB_OK);
+
         return;
     }
 
     // 3. IUnknownからIDispatchへのキャスト
     CComPtr<IDispatch> pExcelApp;
-    hr = pUnk->QueryInterface(IID_IDispatch, reinterpret_cast<void**>(&pExcelApp));
+    hr = pExcelDispatch->QueryInterface(IID_IDispatch, reinterpret_cast<void**>(&pExcelApp));
 
-    //キャストに失敗した場合
+    //　キャストに失敗した場合
     if (FAILED(hr)) {
         MessageBoxW(nullptr, L"Failed to get IDispatch from Excel instance", L"Error", MB_OK);
         return;
@@ -61,19 +150,19 @@ static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInpu
 
     // 4. DISPIDの取得
     DISPID dispid;
-    OLECHAR* name = const_cast<OLECHAR*>(L"Run");  // 実行するメソッド名(VBAのApplication.Run 相当)
+    OLECHAR* name = const_cast<OLECHAR*>(EXCEL_APPLICATION_RUN_MethodName);  // 実行するメソッド名(VBAのApplication.Run 相当)
     hr = pExcelApp->GetIDsOfNames(IID_NULL, &name, 1, LOCALE_USER_DEFAULT, &dispid);
 
-    //Runメソッドの取得に失敗した場合
+    //　Runメソッドの取得に失敗した場合
     if (FAILED(hr)) {
         MessageBoxW(nullptr, L"Failed to get DISPID for Run method", L"Error", MB_OK);
         return;
     }
 
     // 5. Application.Run メソッドの引数を設定
-    CComVariant macroName(ExcelMacroPass);  // 1. 実行したいマクロのフルパス(action要素のarguments属性)
+    CComVariant macroName(macroNameOnly.c_str());  // 1. 実行したいマクロのフルパス(action要素のarguments属性)
 
-    // 2次元配列とマクロ名を引数として渡す(input要素一式)
+    //　2次元配列とマクロ名を引数として渡す(input要素一式)
     CComVariant saVariant;
     saVariant.vt = VT_ARRAY | VT_BSTR;
     saVariant.parray = UserInputs;
@@ -85,15 +174,19 @@ static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInpu
     DISPPARAMS params = { argsArray, nullptr, 2, 0 };
 
     // 7. マクロの呼び出し
+    //　詳細メッセージ、取得用
+    EXCEPINFO excepInfo;
+    memset(&excepInfo, 0, sizeof(EXCEPINFO));  // 初期化
+
     CComVariant result;
     hr = pExcelApp->Invoke(dispid, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_METHOD, &params, &result, &excepInfo, nullptr);
 
+
+    ////-------------以降は、デバッグ用-------------
     //// 現在のExcelインスタンス内に、指定マクロがないと想定
     //if (FAILED(hr)) {
     //    MessageBoxW(nullptr, L"Failed to get Excel macro", L"Error", MB_OK);
     //}
-
-    ////-------------以降は、デバッグ用-------------
 
     ////MessageBoxでDISPPARAMSの内容を確認
     //std::wstring debugMessage;
