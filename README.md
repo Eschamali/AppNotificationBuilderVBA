@@ -1529,8 +1529,8 @@ action要素のarguments属性にマクロ名、activationType属性に`taForegr
 > できるだけ、ブック内にてプロシージャ名は、ユニークにしてください。  
 > どーーしてもなら、`Module1.Run01FromToast` という書き方でも動作します。
 
-> [!NOTE]
-> header要素も同じような意味の属性がありますが現時点では、機能しません🥺
+> [!IMPORTANT]
+> header要素も同じような意味の属性がありますが、Microsoftの設計思想の都合上、`protocol`で扱うのが無難です。
 
 
 ### アクティブ化時のプロシージャ記述
