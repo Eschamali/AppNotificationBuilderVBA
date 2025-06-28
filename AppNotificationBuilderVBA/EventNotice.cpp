@@ -138,20 +138,10 @@ static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInpu
         return;
     }
 
-    // 3. IUnknownからIDispatchへのキャスト
-    CComPtr<IDispatch> pExcelApp;
-    hr = pExcelDispatch->QueryInterface(IID_IDispatch, reinterpret_cast<void**>(&pExcelApp));
-
-    //　キャストに失敗した場合
-    if (FAILED(hr)) {
-        MessageBoxW(nullptr, L"Failed to get IDispatch from Excel instance", L"Error", MB_OK);
-        return;
-    }
-
-    // 4. DISPIDの取得
+    // 3. DISPIDの取得
     DISPID dispid;
     OLECHAR* name = const_cast<OLECHAR*>(EXCEL_APPLICATION_RUN_MethodName);  // 実行するメソッド名(VBAのApplication.Run 相当)
-    hr = pExcelApp->GetIDsOfNames(IID_NULL, &name, 1, LOCALE_USER_DEFAULT, &dispid);
+    hr = pExcelDispatch->GetIDsOfNames(IID_NULL, &name, 1, LOCALE_USER_DEFAULT, &dispid);
 
     //　Runメソッドの取得に失敗した場合
     if (FAILED(hr)) {
@@ -159,7 +149,7 @@ static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInpu
         return;
     }
 
-    // 5. Application.Run メソッドの引数を設定
+    // 4. Application.Run メソッドの引数を設定
     CComVariant macroName(macroNameOnly.c_str());  // 1. 実行したいマクロのフルパス(action要素のarguments属性)
 
     //　2次元配列とマクロ名を引数として渡す(input要素一式)
@@ -169,17 +159,17 @@ static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInpu
 
     CComVariant macroArg1(saVariant);      // 2. input要素一式
 
-    // 6. 引数を配列として渡す(※これらの引数は逆の順序で表示されるため、それを考慮した代入を行うこと)
+    // 5. 引数を配列として渡す(※これらの引数は逆の順序で表示されるため、それを考慮した代入を行うこと)
     CComVariant argsArray[2] = { macroArg1,macroName };
     DISPPARAMS params = { argsArray, nullptr, 2, 0 };
 
-    // 7. マクロの呼び出し
+    // 6. マクロの呼び出し
     //　詳細メッセージ、取得用
     EXCEPINFO excepInfo;
     memset(&excepInfo, 0, sizeof(EXCEPINFO));  // 初期化
 
     CComVariant result;
-    hr = pExcelApp->Invoke(dispid, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_METHOD, &params, &result, &excepInfo, nullptr);
+    hr = pExcelDispatch->Invoke(dispid, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_METHOD, &params, &result, &excepInfo, nullptr);
 
 
     ////-------------以降は、デバッグ用-------------
