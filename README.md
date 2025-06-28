@@ -1509,11 +1509,11 @@ action要素のarguments属性にマクロ名、activationType属性に`taForegr
 
 ### アクティブ化できる箇所
 
-下記の要素と属性に、実行したいマクロ名を記述することができます。
+下記の要素と属性に、実行したいプロシージャ名を記述することができます。
 - toast要素 － [launch属性](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-toast#:~:text=%E3%81%AA%E3%81%97-,launch,-%E3%83%88%E3%83%BC%E3%82%B9%E3%83%88%E9%80%9A%E7%9F%A5%E3%81%AB%E3%82%88%E3%81%A3%E3%81%A6)
 ```bas
     With New clsAppNotificationBuilder
-        .SetToastContent_Launch(taForeground) = "[ここに実行したいマクロ名]"
+        .SetToastContent_Launch(taForeground) = "[ここに実行したいプロシージャ名]"
         ~
     End With
 ```
@@ -1521,10 +1521,13 @@ action要素のarguments属性にマクロ名、activationType属性に`taForegr
 - action要素 － [arguments属性](https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-action#:~:text=%E3%81%AA%E3%81%97-,arguments,-%E3%83%A6%E3%83%BC%E3%82%B6%E3%83%BC%E3%81%8C%E3%81%93%E3%81%AE)
 ```bas
     With New clsAppNotificationBuilder
-        .SetIToastActions("TestRun", "[ここに実行したいマクロ名]", taForeground) = 1
+        .SetIToastActions("TestRun", "[ここに実行したいプロシージャ名]", taForeground) = 1
         ~
     End With
 ```
+> [!CAUTION]
+> できるだけ、ブック内にてプロシージャ名は、ユニークにしてください。  
+> どーーしてもなら、`Module1.Run01FromToast` という書き方でも動作します。
 
 > [!NOTE]
 > header要素も同じような意味の属性がありますが現時点では、機能しません🥺
