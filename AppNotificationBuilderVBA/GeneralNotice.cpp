@@ -88,18 +88,6 @@ static NotificationData SetDataBinding(ToastNotificationVariable* ToastUpdata) {
 //            ToastNotificationVariable  データバインディング用引数。後述の「UpdateToastNotification」で使用します           
 //***************************************************************************************************
 void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData, ToastNotificationVariable* ToastUpdata) {
-    // COMの初期化
-    HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-    if (hr == RPC_E_CHANGED_MODE) {
-        // 既に異なるアパートメント モードで初期化されている場合は、そのまま続行
-    }
-    else if (FAILED(hr)) {
-        wchar_t errorMsg[256];
-        swprintf_s(errorMsg, 256, L"COM初期化に失敗しました。HRESULT: 0x%08X", hr);
-        MessageBoxW(nullptr, errorMsg, L"エラー", MB_OK);
-        return;
-    }
-
     try {
         //値Check用
         //MessageBoxW(nullptr, ToastConfigData->AppUserModelID, L"AppUserModelID", MB_OK);
@@ -196,11 +184,6 @@ void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData, T
     catch (const winrt::hresult_error& e) {
         MessageBoxW(nullptr, e.message().c_str(), L"エラー", MB_OK);
     }
-
-    // CoUninitialize()は、CoInitializeExが成功した場合のみ呼び出す
-    if (SUCCEEDED(hr)) {
-        CoUninitialize();
-    }
 }
 
 //***************************************************************************************************
@@ -212,21 +195,10 @@ void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData, T
 //* 注意事項：データバインディングに対応する箇所のみとなります。
 //***************************************************************************************************
 long __stdcall UpdateToastNotification(ToastNotificationParams* ToastConfigData, ToastNotificationVariable* ToastUpdata) {
-    // COMの初期化
-    HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-    if (hr == RPC_E_CHANGED_MODE) {
-        // 既に異なるアパートメント モードで初期化されている場合は、そのまま続行
-    }
-    else if (FAILED(hr)) {
-        wchar_t errorMsg[256];
-        swprintf_s(errorMsg, 256, L"COM初期化に失敗しました。HRESULT: 0x%08X", hr);
-        MessageBoxW(nullptr, errorMsg, L"エラー", MB_OK);
-        return -1;
-    }
-
-    //更新結果用の変数を定義
-    NotificationUpdateResult result;
     try {
+        //更新結果用の変数を定義
+        NotificationUpdateResult result;
+
         //値Check用
         //MessageBoxW(nullptr, ToastConfigData->AppUserModelID, L"AppUserModelID", MB_OK);
         //MessageBoxW(nullptr, ToastConfigData->Tag, L"Tag", MB_OK);
@@ -250,19 +222,14 @@ long __stdcall UpdateToastNotification(ToastNotificationParams* ToastConfigData,
 
         // トースト通知を更新
         result = UpdateToastNotifier.Update(SetDataBinding(ToastUpdata), ToastConfigData->Tag, ToastConfigData->Group);
-    }
 
+        //結果値を返す
+        return static_cast<long>(result);
+    }
     catch (const winrt::hresult_error& e) {
         MessageBoxW(nullptr, e.message().c_str(), L"エラー", MB_OK);
+        return -1;
     }
-
-    // CoUninitialize()は、CoInitializeExが成功した場合のみ呼び出す
-    if (SUCCEEDED(hr)) {
-        CoUninitialize();
-    }
-
-    //結果値を返す
-    return static_cast<long>(result);
 }
 
 //***************************************************************************************************
@@ -273,18 +240,6 @@ long __stdcall UpdateToastNotification(ToastNotificationParams* ToastConfigData,
 //* 機能説明：最も細かく設定できる引数、tag,group,appid　の3つで削除を指定します。
 //***************************************************************************************************
 void __stdcall RemoveToastNotification(ToastNotificationParams* ToastConfigData) {
-    // COMの初期化
-    HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-    if (hr == RPC_E_CHANGED_MODE) {
-        // 既に異なるアパートメント モードで初期化されている場合は、そのまま続行
-    }
-    else if (FAILED(hr)) {
-        wchar_t errorMsg[256];
-        swprintf_s(errorMsg, 256, L"COM初期化に失敗しました。HRESULT: 0x%08X", hr);
-        MessageBoxW(nullptr, errorMsg, L"エラー", MB_OK);
-        return;
-    }
-
     try {
 
         //値Check用
