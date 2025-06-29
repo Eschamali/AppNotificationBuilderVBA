@@ -61,9 +61,13 @@ struct ToastNotificationVariable {
 void OnActivated(ToastNotification const& sender, IInspectable const& args);    //ToastNotification.Activated イベント
 
 
-//関数宣言
+//----------関数宣言----------
+//通知の基本機能
 extern "C" AppNotificationBuilderVBA_API void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData, ToastNotificationVariable* ToastUpdata);    //通知を表示
 extern "C" AppNotificationBuilderVBA_API long __stdcall UpdateToastNotification(ToastNotificationParams* ToastConfigData, ToastNotificationVariable* ToastUpdata);  //通知更新
 extern "C" AppNotificationBuilderVBA_API void __stdcall RemoveToastNotification(ToastNotificationParams* ToastConfigData);                                          //通知削除
+//Collection通知によるグループ化機能
 extern "C" AppNotificationBuilderVBA_API long __stdcall CreateToastCollection(ToastNotificationParams* ToastConfigData, const wchar_t* displayName, const wchar_t* launchArgs, const wchar_t* iconUri);  //トーストCollectionの作成
 extern "C" AppNotificationBuilderVBA_API long __stdcall DeleteToastCollection(ToastNotificationParams* ToastConfigData);  //トーストCollectionを削除
+//設定確認
+extern "C" AppNotificationBuilderVBA_API long __stdcall CheckNotificationSetting(ToastNotificationParams* ToastConfigData);

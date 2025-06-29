@@ -53,6 +53,7 @@ Private Declare PtrSafe Function UpdateToastNotification Lib "AppNotificationBui
 Private Declare PtrSafe Sub RemoveToastNotification Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams)  '通知を削除
 Private Declare PtrSafe Function CreateToastCollection Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams, ByVal DisplayName As LongPtr, ByVal LaunchArgs As LongPtr, ByVal IconUri As LongPtr) As Long 'ToastCollectionの作成
 Private Declare PtrSafe Function DeleteToastCollection Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams) As Long 'ToastCollectionの削除
+Private Declare PtrSafe Function CheckNotificationSetting Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams) As Long '通知check
 
 
 
@@ -1268,7 +1269,6 @@ End Property
 '***************************************************************************************************
 Public Property Let SetIToastActions(ByVal ArgContent As String, ByVal ArgArguments As String, Optional ByVal ArgActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, Optional ArgPendingUpdate As Boolean, Optional ByVal ArgContextMenu As Boolean, Optional ByVal ArgIcon As String, Optional ByVal ArgHintInputId As String, Optional ArgHintButtonStyle As EnumToastButtonStyle, Optional ByVal ArgHintToolTip As String, ByVal Index As Integer)
     With ElementAction(Index)
-
         .Content = ArgContent
         .Arguments = ArgArguments & "-" & Application.hwnd
         .ActivationType = SetToastActivationType(ArgActivationType)
@@ -1373,7 +1373,7 @@ Public Property Let SetToastHeader(Optional ByVal ArgID As String, Optional ByVa
 
         '省略時：このExcelの保存フォルダパス
         If StrPtr(ArgArguments) Then
-            .Arguments = ArgArguments
+            .Arguments = ArgArguments & "-" & Application.hwnd
         Else
             .Arguments = ThisWorkbook.Path
         End If
@@ -1773,7 +1773,6 @@ Private Function MakeXmlToastContentBuilder(DataBindingMode As Boolean) As Strin
     '上記の処理で生成されたxmlコンテンツを返します(末尾に改行が入らないように置換を行います)
     'Debug.Print ToastContents.XML
     MakeXmlToastContentBuilder = Replace(ToastContents.XML, "</toast>" & vbCrLf, "</toast>")
-
 End Function
 
 
@@ -2621,6 +2620,38 @@ Public Property Get RunDll_ToastCollectionManagerRemoveToastCollectionAsync(Opti
     
     'ToastCollectionを削除
     RunDll_ToastCollectionManagerRemoveToastCollectionAsync = DeleteToastCollection(ParamsConvertForDLL(ToastConfig))
+End Property
+
+'***************************************************************************************************
+'* 処理名　：RunDll_CheckNotificationSetting
+'* 機能　　：トースト通知の表示に関する制限を確認します
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：0~4 の値。意味は公式サイトを御覧ください。
+'* 引数　　：CollectionId   コレクションの ID。Collection側の確認をする場合に指定。そうじゃない場合は、AppUserModelID になります。
+'---------------------------------------------------------------------------------------------------
+'* URL     ：https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.notificationsetting
+'***************************************************************************************************
+Public Property Get RunDll_CheckNotificationSetting(Optional ByVal CollectionID As String) As Long
+    '設定値をまとめる
+    With ToastConfig
+        .AppUserModelID = DecisionAppUserModelID(True)
+        '.AllowUse_InternetImageFlag                     '事前に、設定済み
+        .XmlSchema = vbNullString
+
+        .Tag = vbNullString
+        .Group = vbNullString
+        .Schedule_ID = vbNullString
+        .CollectionID = CollectionID
+        
+        .ExpiresOnReboot = False
+        .SuppressPopup = False
+        
+        .Schedule_DeliveryTime = False
+        .ExpirationTime = False
+    End With
+    
+    'チェック
+    RunDll_CheckNotificationSetting = CheckNotificationSetting(ParamsConvertForDLL(ToastConfig))
 End Property
 
 

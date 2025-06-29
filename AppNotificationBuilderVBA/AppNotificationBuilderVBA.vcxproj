@@ -20,6 +20,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CheckNotice.cpp" />
     <ClCompile Include="EventNotice.cpp" />
     <ClCompile Include="CollectionNotice.cpp" />
     <ClCompile Include="GeneralNotice.cpp" />
