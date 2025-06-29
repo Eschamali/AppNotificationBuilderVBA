@@ -1696,7 +1696,7 @@ Toast.Tag：Hello World　にて、Dismissed 発生
 ```
 とイミディエイトに表示されます。
 
-#### 引数について
+### 引数について
 2次元配列ですが、1行分のみです。
 - 1列目：Dismissed になった Tag名
 - 2列目：[ToastDismissalReason 列挙型](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastdismissalreason)
@@ -1736,10 +1736,36 @@ Toast.Tag：Hello World　にて、Failed 発生
 ```
 とイミディエイトに表示されます。
 
-#### 引数について
+### 引数について
 2次元配列ですが、1行分のみです。
 - 1列目：Failed になった Tag名
 - 2列目：エラーコードとエラー内容
+
+# 設定値確認
+## [RunDll_CheckNotificationSetting](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.notificationsetting)
+トースト通知の表示に関する制限を確認します。
+### 制限状況確認方法
+```bas
+Sub 通知の制限状況確認()
+    With New clsAppNotificationBuilder
+        '通知制限状況をチェック
+        Dim Result As Long
+        Result = .RunDll_CheckNotificationSetting
+    End With
+
+    '数値の意味をイミディエイトに出す
+    Select Case Result
+        Case 0: Debug.Print "このアプリによって発生したすべての通知を表示できます。"
+        Case 1: Debug.Print "ユーザーがこのアプリの通知を設定でOFFにしました。"
+        Case 2: Debug.Print "ユーザーまたは管理者は、このコンピューター上のこのユーザーのすべての通知を無効にしました。"
+        Case 3: Debug.Print "管理者は、グループ ポリシーを使用して、このコンピューター上のすべての通知を無効にしました。"
+        Case 4: Debug.Print "このアプリは、package.appxmanifest ファイルでトーストを宣言していません。" & vbCrLf & "この設定は、マニフェストの [アプリケーション UI] ページの [通知] セクションにあります。" & vbCrLf & "アプリでトーストを送信するには、 Toast 対応オプションを「はい」に設定する必要があります。"
+        Case Else: Debug.Print "エラーコード：" & Result, , "アプリ通知デモ", "予期せぬエラー"
+    End Select
+End Sub
+```
+### 引数について
+- CollectionID ： `CollectionID`の確認の場合は、そのIDを指定して下さい。
 
 # httpソース画像の取り扱いについて
 ## AllowUse_InternetImage の挙動
