@@ -1661,7 +1661,7 @@ End Sub
 ## [Dismissed イベント](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.dismissed)
 トースト通知が、有効期限が切れているか、ユーザーによって明示的に無視された状態になると、発生します。
 ### 動作確認方法
-1. 下記のサンプルコードを任意の標準Moduleへ貼り付けで下さい。
+1. 下記のサンプルコードを任意の標準Moduleへ貼り付けて下さい。
 
 ```bas
 Sub DismissedTest()
