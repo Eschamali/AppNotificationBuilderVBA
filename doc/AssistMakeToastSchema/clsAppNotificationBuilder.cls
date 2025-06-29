@@ -9,7 +9,7 @@ Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
 '***************************************************************************************************
 '   VBAから、Windows PowerShell を経由して、デスクトップ通知【トースト通知】を表示させます
-'   また、DLLファイルを経由した通知手段も提供します。Ver1.4.0
+'   また、DLLファイルを経由した通知手段も提供します。Ver1.4.7
 
 ' MIT License
 '
