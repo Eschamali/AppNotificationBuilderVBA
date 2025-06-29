@@ -1656,7 +1656,7 @@ End Sub
 # イベント一覧機能
 ひらめき次第では使えるかも…? な、現時点で扱えるイベント機能を紹介します。
 > [!CAUTION]
-> DLL経由でのみ動作します。
+> DLL経由で表示したトースト通知のみ動作します。
 
 ## [Dismissed イベント](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.dismissed)
 トースト通知が、有効期限が切れているか、ユーザーによって明示的に無視された状態になると、発生します。
