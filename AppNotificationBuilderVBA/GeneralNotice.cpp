@@ -168,7 +168,8 @@ void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData, T
             toast.Data(SetDataBinding(ToastUpdata));
 
             // イベントハンドラーを設定
-            toast.Activated(TypedEventHandler<ToastNotification, IInspectable>(OnActivated)); // OnActivated関数をハンドラーとして設定
+            toast.Activated(TypedEventHandler<ToastNotification, IInspectable>(OnActivated));               //Activated イベント
+            toast.Dismissed(TypedEventHandler<ToastNotification, ToastDismissedEventArgs>(OnDismissed));    //Dismissed	イベント
 
             // 上記で作成されたオブジェクトに各種設定(GroupとTag等)を施す
             toast.ExpiresOnReboot(ToastConfigData->ExpiresOnReboot);

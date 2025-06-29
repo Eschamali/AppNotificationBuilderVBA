@@ -26,6 +26,8 @@ constexpr const wchar_t* EXCEL_SHEET_CLASS_NAME = L"EXCEL7";                //"X
 constexpr const wchar_t* EXCEL_APPLICATION_CLASS_NAME = L"Application";     //"Application"のオブジェクト名称
 constexpr const wchar_t* EXCEL_APPLICATION_RUN_MethodName = L"Run";         //"Application.Run"のメソッド名称
 
+constexpr const wchar_t* EventTriggerMacroName_ToastDismissed = L"ExcelToast_Dismissed";     //トースト通知のDismissed イベント時に使うプロシージャ名
+
 
 
 //***************************************************************************************************
@@ -58,7 +60,7 @@ static HRESULT GetProperty(IDispatch* pDisp, const wchar_t* propName, CComVarian
 //            UserInputs        Input要素で入力した内容、あるいはSelect要素のID名称とそれに紐づくInput要素のIDとのセットとなる2次元配列                             
 //            targetHWND        プロシージャ起動先のExcel ハンドル値。ToastNotification.Group プロパティ から得る設計にしてます
 //---------------------------------------------------------------------------------------------------
-//* 詳細説明：ExcelのプロセスIDも渡すことで、複数プロセスで起動してるExcel環境でも対応できます
+//* 詳細説明：ExcelのHWNDも渡すことで、複数プロセスで起動してるExcel環境でも対応できます
 //***************************************************************************************************
 static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInputs, HWND targetHWND) {
     //---------- 1. 孫ウィンドウ経由で、Excel Applicationオブジェクトを取得 ----------
@@ -192,11 +194,13 @@ static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInpu
 //* 機能　　：トースト通知のアクティベーションを処理する関数
 //---------------------------------------------------------------------------------------------------
 //* 引数　　：sender     通知オブジェクト
-//            args       Input要素にて入力したパラメーター一式と、発動元のarguments属性値
+//            args       Input要素にて入力したパラメーター一式と、発動元のAction要素のarguments属性値あるいは、toast要素のlaunch属性値
 //---------------------------------------------------------------------------------------------------
 //* URL     ：・https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastactivatedeventargs.arguments
 //            ・https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.activated
 //            ・https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotificationactiontriggerdetail
+//---------------------------------------------------------------------------------------------------
+//* 注意事項：残念ながら、Headerクリックによるトリガーはできません
 //***************************************************************************************************
 void OnActivated(ToastNotification const& sender, IInspectable const& args) {
     // IInspectable から ToastActivatedEventArgs にキャストして引数情報を取得
@@ -259,5 +263,64 @@ void OnActivated(ToastNotification const& sender, IInspectable const& args) {
             // エラーハンドリング
             MessageBoxW(nullptr, e.message().c_str(), L"エラー", MB_OK);
         }
+    }
+}
+
+//***************************************************************************************************
+//* 機能　　：トースト通知のDismissedを処理する関数
+//---------------------------------------------------------------------------------------------------
+//* 引数　　：sender     通知オブジェクト
+//            args       閉じられた理由などを含むイベント引数
+//---------------------------------------------------------------------------------------------------
+//* URL     ：・https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.dismissed
+//            ・https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastdismissalreason
+//***************************************************************************************************
+void OnDismissed(ToastNotification const& sender, ToastDismissedEventArgs const& args){
+    try {
+        // GroupプロパティからHWNDを取得(VBA側で必ず設定すること)
+        winrt::hstring group = sender.Group();
+        HWND targetHwnd = (HWND)std::stoull(group.c_str());
+
+        // 閉じられた理由を取得
+        ToastDismissalReason reason = args.Reason();
+        long reasonValue = static_cast<long>(reason);
+
+        //----- デバッグ用 -----
+        //std::wstring reasonName;
+        //switch (reason) {
+        //    case ToastDismissalReason::UserCanceled: reasonName = L"UserCanceled"; break;
+        //    case ToastDismissalReason::ApplicationHidden: reasonName = L"ApplicationHidden"; break;
+        //    case ToastDismissalReason::TimedOut: reasonName = L"TimedOut"; break;
+        //    default: reasonName = L"Unknown"; break;
+        //}
+
+        //std::wstring message = L"通知が閉じられました。\n理由: " + reasonName;
+        //MessageBoxW(nullptr, message.c_str(), L"Dismissedイベント発生", MB_OK);
+
+        // 閉じられた理由を格納するSAFEARRAYを準備
+        SAFEARRAYBOUND bounds[2];long indices[2];
+        bounds[0].lLbound = 0;
+        bounds[0].cElements = 1; // 1行
+        bounds[1].lLbound = 0;
+        bounds[1].cElements = 2; // 2列 (Tag, 理由値)
+        SAFEARRAY* dismissedInfoArray = SafeArrayCreate(VT_BSTR, 2, bounds);
+
+        // 1列目にTagプロパティを設定
+        indices[0] = 0; indices[1] = 0;
+        CComBSTR bstrReasonName(sender.Tag().c_str());
+        SafeArrayPutElement(dismissedInfoArray, indices, bstrReasonName);
+
+        // 2列目に理由値を設定
+        indices[0] = 0; indices[1] = 1;
+        CComBSTR bstrReasonValue(std::to_wstring(reasonValue).c_str());
+        SafeArrayPutElement(dismissedInfoArray, indices, bstrReasonValue);
+
+        //決められたプロシージャ名、閉じられた理由情報の2次元配列、Groupプロパティから得たHWNDをExcelマクロ処理用に渡す
+        ExecuteExcelMacro(EventTriggerMacroName_ToastDismissed, dismissedInfoArray, targetHwnd);
+    }
+    catch (const hresult_error& e)
+    {
+        // エラーハンドリング
+        MessageBoxW(nullptr, e.message().c_str(), L"エラー", MB_OK);
     }
 }

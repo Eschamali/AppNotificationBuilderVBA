@@ -57,8 +57,9 @@ struct ToastNotificationVariable {
 #pragma pack()
 
 
-//このプロジェクト用パブリック関数を宣言
-void OnActivated(ToastNotification const& sender, IInspectable const& args);    //ToastNotification.Activated イベント
+//このプロジェクト用パブリック関数を宣言(主にイベント系)
+void OnActivated(ToastNotification const& sender, IInspectable const& args);                //ToastNotification.Activated イベント
+void OnDismissed(ToastNotification const& sender, ToastDismissedEventArgs const& args);     //ToastNotification.Dismissed イベント
 
 
 //----------関数宣言----------
