@@ -1360,24 +1360,24 @@ End Property
 '***************************************************************************************************
 '* 機能　　：header要素の各属性にセットしたものをtoast要素に挿入します
 '---------------------------------------------------------------------------------------------------
-'* 引数　　：ArgArguments     ：起動スキーマ。URLやファイルパスなど(省略時：このExcelの保存フォルダパス)
-'            ActivationType：このヘッダーがクリックされた場合に使用するアクティブ化の種類
+'* 引数　　：ArgID            ：このヘッダーを一意に識別します。 2 つの通知が同じヘッダー ID を持つ場合、アクション センターで同じヘッダーの下に表示されます。(省略時：このExcelのファイル名)
+'            ArgArguments     ：起動スキーマ。URLやファイルパスなど(省略時：このExcelの保存フォルダパス)
+'            ArgActivationType：このヘッダーがクリックされた場合に使用するアクティブ化の種類
 '            ArgTitle         ：ヘッダーのタイトルです。(推奨：このExcelのBook名　ThisWorkbook.Name)
 '---------------------------------------------------------------------------------------------------
 '* 詳細説明：ArgTitle を vbnullstring で渡すとこの header要素自体を除去できます。
-'* 注意事項：・Microsoft の思想設計上、ActivationType は、Protocol が推奨されてます。
-'            ・ID属性は常に、Application.hwnd とします。
+'* 注意事項：Microsoft の思想設計上、ActivationType は、Protocol が推奨されてます。
 '***************************************************************************************************
-Public Property Let SetToastHeader(Optional ByVal ArgArguments As String, Optional ByVal ActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, ByVal ArgTitle As String)
+Public Property Let SetToastHeader(Optional ByVal ArgID As String, Optional ByVal ArgArguments As String, Optional ByVal ArgActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, ByVal ArgTitle As String)
     With ElementHeader
-        'IDは常に、Application.hwnd とします
-        .id = Application.hwnd
-
+        '省略時：このExcelのファイル名
+        If StrPtr(ArgID) Then .id = ArgID Else .id = ThisWorkbook.Name
+        
         '省略時：このExcelの保存フォルダパス
         If StrPtr(ArgArguments) Then .Arguments = ArgArguments Else .Arguments = ThisWorkbook.Path
 
         '引数の中身そのまんま
-        .ActivationType = SetToastActivationType(ActivationType)
+        .ActivationType = SetToastActivationType(ArgActivationType)
         .Title = ArgTitle
     End With
 End Property
