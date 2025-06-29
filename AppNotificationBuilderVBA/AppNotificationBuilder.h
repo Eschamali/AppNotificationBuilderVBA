@@ -60,6 +60,7 @@ struct ToastNotificationVariable {
 //このプロジェクト用パブリック関数を宣言(主にイベント系)
 void OnActivated(ToastNotification const& sender, IInspectable const& args);                //ToastNotification.Activated イベント
 void OnDismissed(ToastNotification const& sender, ToastDismissedEventArgs const& args);     //ToastNotification.Dismissed イベント
+void OnFailed(ToastNotification const& sender, ToastFailedEventArgs const& args);           //ToastNotification.Failed イベント
 
 
 //----------関数宣言----------

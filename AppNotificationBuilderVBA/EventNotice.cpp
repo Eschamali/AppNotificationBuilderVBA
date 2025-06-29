@@ -26,7 +26,8 @@ constexpr const wchar_t* EXCEL_SHEET_CLASS_NAME = L"EXCEL7";                //"X
 constexpr const wchar_t* EXCEL_APPLICATION_CLASS_NAME = L"Application";     //"Application"のオブジェクト名称
 constexpr const wchar_t* EXCEL_APPLICATION_RUN_MethodName = L"Run";         //"Application.Run"のメソッド名称
 
-constexpr const wchar_t* EventTriggerMacroName_ToastDismissed = L"ExcelToast_Dismissed";     //トースト通知のDismissed イベント時に使うプロシージャ名
+constexpr const wchar_t* EventTriggerMacroName_ToastDismissed = L"ExcelToast_Dismissed";    //トースト通知の Dismissed イベント時に使うプロシージャ名
+constexpr const wchar_t* EventTriggerMacroName_ToastFailed = L"ExcelToast_Failed";          //トースト通知の Failed イベント時に使うプロシージャ名
 
 
 
@@ -317,6 +318,55 @@ void OnDismissed(ToastNotification const& sender, ToastDismissedEventArgs const&
 
         //決められたプロシージャ名、閉じられた理由情報の2次元配列、Groupプロパティから得たHWNDをExcelマクロ処理用に渡す
         ExecuteExcelMacro(EventTriggerMacroName_ToastDismissed, dismissedInfoArray, targetHwnd);
+    }
+    catch (const hresult_error& e)
+    {
+        // エラーハンドリング
+        MessageBoxW(nullptr, e.message().c_str(), L"エラー", MB_OK);
+    }
+}
+
+//***************************************************************************************************
+//* 機能　　：トースト通知のFailedを処理する関数
+//---------------------------------------------------------------------------------------------------
+//* 引数　　：sender     通知オブジェクト
+//            args       エラー関係の引数
+//---------------------------------------------------------------------------------------------------
+//* URL     ：・https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.dismissed
+//            ・https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastdismissalreason
+//***************************************************************************************************
+void OnFailed(ToastNotification const& sender, ToastFailedEventArgs const& args){
+    try {
+        // GroupプロパティからHWNDを取得(VBA側で必ず設定すること)
+        winrt::hstring group = sender.Group();
+        HWND targetHwnd = (HWND)std::stoull(group.c_str());
+
+        // なぜ失敗したのか、HRESULT形式のエラーコードを取得
+        winrt::hresult errorCode = args.ErrorCode();
+
+        // デバッグやロギングのためにエラー情報を文字列化
+        _com_error err(errorCode);
+
+        // エラー理由を格納するSAFEARRAYを準備
+        SAFEARRAYBOUND bounds[2]; long indices[2];
+        bounds[0].lLbound = 0;
+        bounds[0].cElements = 1; // 1行
+        bounds[1].lLbound = 0;
+        bounds[1].cElements = 2; // 2列 (Tag, エラー内容)
+        SAFEARRAY* dismissedInfoArray = SafeArrayCreate(VT_BSTR, 2, bounds);
+
+        // 1列目にTagプロパティを設定
+        indices[0] = 0; indices[1] = 0;
+        CComBSTR bstrReasonName(sender.Tag().c_str());
+        SafeArrayPutElement(dismissedInfoArray, indices, bstrReasonName);
+
+        // 2列目にエラー内容を設定
+        indices[0] = 0; indices[1] = 1;
+        CComBSTR bstrReasonValue(err.ErrorMessage());
+        SafeArrayPutElement(dismissedInfoArray, indices, bstrReasonValue);
+
+        //決められたプロシージャ名、閉じられた理由情報の2次元配列、Groupプロパティから得たHWNDをExcelマクロ処理用に渡す
+        ExecuteExcelMacro(EventTriggerMacroName_ToastFailed, dismissedInfoArray, targetHwnd);
     }
     catch (const hresult_error& e)
     {
