@@ -332,8 +332,7 @@ void OnDismissed(ToastNotification const& sender, ToastDismissedEventArgs const&
 //* 引数　　：sender     通知オブジェクト
 //            args       エラー関係の引数
 //---------------------------------------------------------------------------------------------------
-//* URL     ：・https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.dismissed
-//            ・https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastdismissalreason
+//* URL     ：・https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.failed
 //***************************************************************************************************
 void OnFailed(ToastNotification const& sender, ToastFailedEventArgs const& args){
     try {
@@ -353,20 +352,28 @@ void OnFailed(ToastNotification const& sender, ToastFailedEventArgs const& args)
         bounds[0].cElements = 1; // 1行
         bounds[1].lLbound = 0;
         bounds[1].cElements = 2; // 2列 (Tag, エラー内容)
-        SAFEARRAY* dismissedInfoArray = SafeArrayCreate(VT_BSTR, 2, bounds);
+        SAFEARRAY* failedInfoArray = SafeArrayCreate(VT_BSTR, 2, bounds);
 
         // 1列目にTagプロパティを設定
         indices[0] = 0; indices[1] = 0;
         CComBSTR bstrReasonName(sender.Tag().c_str());
-        SafeArrayPutElement(dismissedInfoArray, indices, bstrReasonName);
+        SafeArrayPutElement(failedInfoArray, indices, bstrReasonName);
 
         // 2列目にエラー内容を設定
-        indices[0] = 0; indices[1] = 1;
-        CComBSTR bstrReasonValue(err.ErrorMessage());
-        SafeArrayPutElement(dismissedInfoArray, indices, bstrReasonValue);
+        wchar_t hresultStr[20]; // "0x" + 8桁の16進数 + NULL文字
+        swprintf_s(hresultStr, L"0x%08X", errorCode);
 
-        //決められたプロシージャ名、閉じられた理由情報の2次元配列、Groupプロパティから得たHWNDをExcelマクロ処理用に渡す
-        ExecuteExcelMacro(EventTriggerMacroName_ToastFailed, dismissedInfoArray, targetHwnd);
+        std::wstring detailedErrorMessage = hresultStr;
+        detailedErrorMessage += L"\n"; // 改行を追加
+        detailedErrorMessage += err.ErrorMessage();
+
+        // 組み立てた文字列をBSTRとして設定
+        indices[0] = 0; indices[1] = 1;
+        CComBSTR bstrErrorDetails(detailedErrorMessage.c_str());
+        SafeArrayPutElement(failedInfoArray, indices, bstrErrorDetails);
+
+        //決められたプロシージャ名、エラー情報の2次元配列、Groupプロパティから得たHWNDをExcelマクロ処理用に渡す
+        ExecuteExcelMacro(EventTriggerMacroName_ToastFailed, failedInfoArray, targetHwnd);
     }
     catch (const hresult_error& e)
     {

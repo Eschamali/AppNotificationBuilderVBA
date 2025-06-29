@@ -1653,6 +1653,94 @@ End Sub
 ![alt text](doc/ToastActived2.png)<br>
 アプリ通知で選択した選択肢や、入力テキストを扱う場合は、予め辞書型（Scripting.Dictionary）で内容をインポートして処理することをおすすめします。
 
+# イベント一覧機能
+ひらめき次第では使えるかも…? な、現時点で扱えるイベント機能を紹介します。
+> [!CAUTION]
+> DLL経由でのみ動作します。
+
+## [Dismissed イベント](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.dismissed)
+トースト通知が、有効期限が切れているか、ユーザーによって明示的に無視された状態になると、発生します。
+### 動作確認方法
+1. 下記のサンプルコードを任意の標準Moduleへ貼り付けで下さい。
+
+```bas
+Sub DismissedTest()
+    With New clsAppNotificationBuilder
+        '1. プロパティ設定
+       .SetToastGenericTitleText = "Hello World"
+       .SetToastGenericContentsText = "Test message"
+
+        '2. メソッド実行
+       .RunDll_ToastNotifierShow "Hello World"
+    End With
+End Sub
+
+Sub ExcelToast_Dismissed(理由)
+    Debug.Print "Toast.Tag：" & 理由(0, 0) & "　にて、Dismissed 発生"
+
+    Select Case 理由(0, 1)
+        Case 0: Debug.Print "理由：ユーザーはトースト通知を無視しました。"
+        Case 1: Debug.Print "理由：アプリは、 ToastNotifier.hide メソッドを呼び出して、トースト通知を明示的に隠しました。"
+        Case 2: Debug.Print "理由：トースト通知は最大許容時間で表示され、フェードアウトされました。トースト通知を表示する最大時間は 7 秒ですが、長時間のトーストの場合は 25 秒です。"
+        Case Else: Debug.Print "理由：予期せぬエラー　Code：" & 理由(0, 0)
+    End Select
+    
+    Debug.Print ""
+End Sub
+```
+
+2. DismissedTest プロシージャを実行します。この状態でしばらく待って、通知がアクションセンターに格納されると…
+```
+Toast.Tag：Hello World　にて、Dismissed 発生
+理由：トースト通知は最大許容時間で表示され、フェードアウトされました。トースト通知を表示する最大時間は 7 秒ですが、長時間のトーストの場合は 25 秒です。
+```
+とイミディエイトに表示されます。
+
+#### 引数について
+2次元配列ですが、1行分のみです。
+- 1列目：Dismissed になった Tag名
+- 2列目：[ToastDismissalReason 列挙型](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastdismissalreason)
+
+## [Failed イベント](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.failed)
+Windows がトースト通知を生成しようとしたときにエラーが発生したときに発生します。
+### 動作確認方法
+1. 下記のサンプルコードを任意の標準Moduleへ貼り付けで下さい。
+
+```bas
+Sub FailedTest()
+    With New clsAppNotificationBuilder
+        '1. プロパティ設定
+       .SetToastGenericTitleText = "Hello World"
+       .SetToastGenericContentsText = "Test message"
+
+        '2. メソッド実行
+       .RunDll_ToastNotifierShow "Hello World"
+    End With
+End Sub
+
+Sub ExcelToast_Failed(エラー理由)
+    Debug.Print "Toast.Tag：" & エラー理由(0, 0) & "　にて、Failed 発生"
+
+    Debug.Print "原因：" & エラー理由(0, 1) & vbcrlf
+End Sub
+```
+
+2. Excel の通知、あるいは通知機能全般をOFFにします。  
+![alt text](doc/Failed1.png)
+
+3. FailedTest プロシージャを実行します。すると、
+```
+Toast.Tag：Hello World　にて、Failed 発生
+原因：0x803E0111
+現在の設定では、通知を配信できません。
+```
+とイミディエイトに表示されます。
+
+#### 引数について
+2次元配列ですが、1行分のみです。
+- 1列目：Failed になった Tag名
+- 2列目：エラーコードとエラー内容
+
 # httpソース画像の取り扱いについて
 ## AllowUse_InternetImage の挙動
 Trueにすると、画像設定関連(SetToastGenericAppLogo等)にて「http」始まりのソースを、[WindowsAPI:URLDownloadToFile](http://officetanaka.net/other/extra/tips01.htm) を介して、環境変数tmp(C:\Users\XXX\AppData\Local\Temp)に保存します。そして、保存したパスのローカルパスを返して、画像付き通知を表示させています。DLが終わるまでは通知がでないのでご注意下さい。<br>
