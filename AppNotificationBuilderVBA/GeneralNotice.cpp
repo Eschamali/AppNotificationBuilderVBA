@@ -228,7 +228,7 @@ long __stdcall UpdateToastNotification(ToastNotificationParams* ToastConfigData,
     }
     catch (const winrt::hresult_error& e) {
         MessageBoxW(nullptr, e.message().c_str(), L"エラー", MB_OK);
-        return -1;
+        return e.code();
     }
 }
 
