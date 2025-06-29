@@ -54,57 +54,29 @@ static HRESULT GetProperty(IDispatch* pDisp, const wchar_t* propName, CComVarian
 //***************************************************************************************************
 //* 機能　　：Excel マクロを実行する関数
 //---------------------------------------------------------------------------------------------------
-//* 引数　　：ExcelMacroPass     Action要素のarguments。{マクロ名}-{ExcelVBA からの Application.hwnd} を想定してます。
-//            UserInputs         Input要素で入力した内容、あるいはSelect要素のID名称とそれに紐づくInput要素のIDとのセットとなる2次元配列                             
+//* 引数　　：ExcelMacroPass    Action要素のarguments。{マクロ名}-{ExcelVBA からの Application.hwnd} を想定してます。
+//            UserInputs        Input要素で入力した内容、あるいはSelect要素のID名称とそれに紐づくInput要素のIDとのセットとなる2次元配列                             
+//            targetHWND        プロシージャ起動先のExcel ハンドル値。ToastNotification.Group プロパティ から得る設計にしてます
 //---------------------------------------------------------------------------------------------------
 //* 詳細説明：ExcelのプロセスIDも渡すことで、複数プロセスで起動してるExcel環境でも対応できます
 //***************************************************************************************************
-static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInputs) {
-    //---------- 1. 末尾の"-"区切り記号を利用して、Excelマクロ名とExcel ウィンドウのハンドルを取得----------
-    //一旦、別変数へ
-    std::wstring fullArg = ExcelMacroPass;
-
-    // 最後の '-' の文字位置を取得
-    // ※ハイフンが見つからない、またはハイフンが末尾にある → フォーマット不正
-    size_t lastHyphen = fullArg.rfind(L'-');
-    if (lastHyphen == std::wstring::npos || lastHyphen == fullArg.length() - 1) {
-        MessageBoxW(nullptr, L"引数の形式が不正です。{マクロ名}-{ExcelVBA からの Application.hwnd} で渡す必要があります。", L"Error", MB_OK);
-        return;
-    }
-
-    // マクロ名部分と Excel ウィンドウのハンドル 部分を抽出
-    std::wstring macroNameOnly = fullArg.substr(0, lastHyphen); //マクロ名
-    //MessageBoxW(nullptr, macroNameOnly.c_str(), L"Info:マクロ名", MB_OK);
-
-    std::wstring hwndStr = fullArg.substr(lastHyphen + 1);      //一時オブジェクトを防ぐために変数に保持
-    HWND targetHWND = (HWND)(std::stoull(hwndStr));             //HWND にキャストします。
-    //MessageBoxW(nullptr, hwndStr.c_str(), L"Info:ハンドル値", MB_OK);
-
-    //wchar_t title[256];
-    //GetWindowTextW(targetHWND, title, 256);
-    //MessageBoxW(nullptr, title, L"対象ウィンドウのタイトル", MB_OK);
-
-    //wchar_t className[256];
-    //GetClassNameW(targetHWND, className, 256);
-    //MessageBoxW(nullptr, className, L"対象ウィンドウのクラス名", MB_OK);
-
-
-    //---------- 2. 孫ウィンドウ経由で、Excel Applicationオブジェクト取得 ----------
+static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInputs, HWND targetHWND) {
+    //---------- 1. 孫ウィンドウ経由で、Excel Applicationオブジェクトを取得 ----------
     CComPtr<IDispatch> pExcelDispatch;
     HRESULT hr = E_FAIL; // 見つからなかった場合のデフォルト
 
-    // 1. XLMAINウィンドウの子である「XLDESK」ウィンドウを探す
+    // 1-1. XLMAINウィンドウの子である「XLDESK」ウィンドウを探す
     HWND hXlDesk = FindWindowExW(targetHWND, NULL, EXCEL_DESK_CLASS_NAME, NULL);
     if (hXlDesk) {
-        // 2. XLDESKの子である「EXCEL7」ウィンドウを探す
+        // 1-2. XLDESKの子である「EXCEL7」ウィンドウを探す
         HWND hExcel7 = FindWindowExW(hXlDesk, NULL, EXCEL_SHEET_CLASS_NAME, NULL);
         if (hExcel7) {
-            // 3. EXCEL7ウィンドウから直接Workbookオブジェクトを取得
+            // 1-3. EXCEL7ウィンドウから直接Workbookオブジェクトを取得
             CComPtr<IDispatch> pWorkbookDisp;
             hr = AccessibleObjectFromWindow(hExcel7, OBJID_NATIVEOM, IID_IDispatch, (void**)&pWorkbookDisp);
 
             if (SUCCEEDED(hr) && pWorkbookDisp) {
-                // 4. WorkbookオブジェクトからApplicationオブジェクトを取得
+                // 1-4. WorkbookオブジェクトからApplicationオブジェクトを取得
                 CComVariant varApp;
                 hr = GetProperty(pWorkbookDisp, EXCEL_APPLICATION_CLASS_NAME, varApp);
                 if (SUCCEEDED(hr) && varApp.vt == VT_DISPATCH) {
@@ -138,7 +110,7 @@ static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInpu
         return;
     }
 
-    // 3. DISPIDの取得
+    // 2. DISPIDの取得
     DISPID dispid;
     OLECHAR* name = const_cast<OLECHAR*>(EXCEL_APPLICATION_RUN_MethodName);  // 実行するメソッド名(VBAのApplication.Run 相当)
     hr = pExcelDispatch->GetIDsOfNames(IID_NULL, &name, 1, LOCALE_USER_DEFAULT, &dispid);
@@ -149,22 +121,22 @@ static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInpu
         return;
     }
 
-    // 4. Application.Run メソッドの引数を設定
-    CComVariant macroName(macroNameOnly.c_str());  // 1. 実行したいマクロのフルパス(action要素のarguments属性)
+    //---------- 3. Application.Run メソッドの引数を設定 ---------- 
+    // 3-1. 実行したいマクロのフルパス(action要素のarguments属性値 ortoast要素のlaunch属性値 を想定)
+    CComVariant macroName(ExcelMacroPass);
 
-    //　2次元配列とマクロ名を引数として渡す(input要素一式)
+    // 3-2. 2次元配列(input要素一式)とマクロ名を引数として渡す設定をする
     CComVariant saVariant;
     saVariant.vt = VT_ARRAY | VT_BSTR;
-    saVariant.parray = UserInputs;
+    saVariant.parray = UserInputs;      //input要素一式 2次元配列
+    CComVariant macroArg1(saVariant);   //適用      
 
-    CComVariant macroArg1(saVariant);      // 2. input要素一式
-
-    // 5. 引数を配列として渡す(※これらの引数は逆の順序で表示されるため、それを考慮した代入を行うこと)
+    // 4. 引数を配列として渡す(※これらの引数は逆の順序で表示されるため、それを考慮した代入を行うこと)
     CComVariant argsArray[2] = { macroArg1,macroName };
     DISPPARAMS params = { argsArray, nullptr, 2, 0 };
 
-    // 6. マクロの呼び出し
-    //　詳細メッセージ、取得用
+    // 5. マクロの呼び出し
+    //　デバッグ詳細メッセージ、取得用
     EXCEPINFO excepInfo;
     memset(&excepInfo, 0, sizeof(EXCEPINFO));  // 初期化
 
@@ -219,22 +191,28 @@ static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInpu
 //***************************************************************************************************
 //* 機能　　：トースト通知のアクティベーションを処理する関数
 //---------------------------------------------------------------------------------------------------
-//* 引数　　：※割愛します 
+//* 引数　　：sender     通知オブジェクト
+//            args       Input要素にて入力したパラメーター一式と、発動元のarguments属性値
 //---------------------------------------------------------------------------------------------------
 //* URL     ：・https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastactivatedeventargs.arguments
 //            ・https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.activated
+//            ・https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotificationactiontriggerdetail
 //***************************************************************************************************
 void OnActivated(ToastNotification const& sender, IInspectable const& args) {
     // IInspectable から ToastActivatedEventArgs にキャストして引数情報を取得
     auto activatedArgs = args.try_as<ToastActivatedEventArgs>();
 
-    // UserInput()からすべてのキーと値のペアを取得
-    auto userInputs = activatedArgs.UserInput();
-
     //トーストからの args.try_as<ToastActivatedEventArgs> があれば、Excelマクロを動かす準備に入る
     if (activatedArgs) {
         try {
-            //ボタン押下したAction要素のarguments属性の内容を取得(マクロ名を想定)
+            // GroupプロパティからHWNDを取得(VBA側で必ず設定すること)
+            winrt::hstring group = sender.Group();
+            HWND targetHwnd = (HWND)std::stoull(group.c_str());
+
+            // UserInput()からすべてのキーと値のペアを取得(ここに、Input要素にて入力したパラメーター一式があります)
+            auto userInputs = activatedArgs.UserInput();
+
+            // ボタン押下によるAction要素のarguments属性値あるいは、toast要素のlaunch属性値の内容を取得
             winrt::hstring argument = activatedArgs.Arguments();
 
             // Input要素のIDと値を格納するための2次元配列を作成する準備(SAFEARRAY)
@@ -273,8 +251,8 @@ void OnActivated(ToastNotification const& sender, IInspectable const& args) {
                 rowIndex++;
             }
 
-            //トーストのaction要素にあるarguments属性の値(マクロ名)と、Input要素一式をExcelマクロ処理用に渡す
-            ExecuteExcelMacro(argument.c_str(), InputElementsArray);
+            //Action要素のarguments属性値あるいは、toast要素のlaunch属性値の内容と、Input要素一式、Groupプロパティから得たHWNDをExcelマクロ処理用に渡す
+            ExecuteExcelMacro(argument.c_str(), InputElementsArray, targetHwnd);
         }
         catch (const hresult_error& e)
         {

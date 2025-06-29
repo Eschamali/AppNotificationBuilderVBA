@@ -486,6 +486,7 @@ Private ElementAction(1 To MaxElementActionNum) As IToastActions
 Private Type IToastActions
     Content                 As String   'ボタンに表示されるコンテンツ。
     Arguments               As String   'ユーザーがこのボタンをクリックした場合にアプリが後から受け取る、アプリで定義された引数の文字列です。
+    Type                    As String   '関連付けられたアプリに渡すことができる引数文字列。ユーザー アクションに応答して実行する必要があるアクションに関する詳細を提供します。
     ActivationType          As String   'ユーザーが特定の操作を行った際に使用されるアクティブ化の種類を決定します。
     afterActivationBehavior As String   'ユーザーがトーストに対して操作を行ったときに、トーストが使用する動作を指定します。
     Placement               As String   '"contextMenu" に設定すると、アクションは、従来のトースト ボタンではなく、トースト通知のコンテキスト メニューに追加されたコンテキスト メニュー アクションになります。
@@ -673,12 +674,12 @@ End Property
 '* 機能　　：toast要素のlaunch、activationType属性へ値をセット
 '---------------------------------------------------------------------------------------------------
 '* 引数　　：ArgSchema          起動スキーマ。URLやファイルパスなど
-'            ArgActivationType  このヘッダーがクリックされた場合に使用するアクティブ化の種類(DLLを使用しない場合、"protocol"以外は機能しません)
+'            ActivationType     このヘッダーがクリックされた場合に使用するアクティブ化の種類(DLLを使用しない場合、"protocol"以外は機能しません)
 '***************************************************************************************************
-Public Property Let SetToastContent_Launch(Optional ByVal ArgActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, ByVal ArgSchema As String)
+Public Property Let SetToastContent_Launch(Optional ByVal ActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, ByVal ArgSchema As String)
     With ElementToast
-        .Launch = ArgSchema & "-" & Application.hwnd
-        .ActivationType = SetToastActivationType(ArgActivationType)
+        .Launch = ArgSchema
+        .ActivationType = SetToastActivationType(ActivationType)
     End With
 End Property
 
@@ -1256,31 +1257,35 @@ End Property
 '***************************************************************************************************
 '* 機能　　：action要素の各属性にセットしたものをactions要素に挿入します
 '---------------------------------------------------------------------------------------------------
-'* 引数　　：ArgContent         ボタンに表示されるコンテンツ
-'            ArgArguments       起動スキーマ。URLやファイルパスなど
-'            ArgActivationType  このボタンが押下された場合に使用するアクティブ化の種類。DLLを使用しない場合、基本"protocol"以外では意味をなしませんが、ここのボタンの場合、"system"にして、所々の設定を行うことで、システムの再通知と無視アクションを利用するアラーム通知を作成できます。
-'            ArgPendingUpdate   ユーザーがトースト上のボタンをクリックすると、通知は "保留中の更新" 表示状態のままです。 この "更新の保留中" の表示状態が長時間続くことを避けるため、バックグラウンド タスクから即座にトーストを更新する必要があります。
-'            ArgContextMenu     Trueで、従来のトースト ボタンではなく、トースト通知のコンテキスト メニューに追加されたコンテキスト メニュー アクションになります。
-'            ArgIcon            トースト ボタン アイコンのイメージソース
-'            ArgHintInputId     テキストBoxの横に来させたいIDを指定します
-'            ArgHintButtonStyle ボタンのスタイル。現状、「緑、赤」の2色のみ対応です。便宜上、数値に応じてスタイル名を設定します。※この機能は、Windows 11 以降のみ機能します。
-'            ArgHintToolTip     ボタンに空のコンテンツ文字列がある場合のボタンのヒント。
+'* 引数　　：Content            ボタンに表示されるコンテンツ
+'            Arguments          起動スキーマ。URLやファイルパスなど
+'            ArgType            関連付けられたアプリに渡すことができる引数文字列。ユーザー アクションに応答して実行する必要があるアクションに関する詳細を提供します。
+'            ActivationType     このボタンが押下された場合に使用するアクティブ化の種類。DLLを使用しない場合、基本"protocol"以外では意味をなしませんが、ここのボタンの場合、"system"にして、所々の設定を行うことで、システムの再通知と無視アクションを利用するアラーム通知を作成できます。
+'            PendingUpdate      ユーザーがトースト上のボタンをクリックすると、通知は "保留中の更新" 表示状態のままです。 この "更新の保留中" の表示状態が長時間続くことを避けるため、バックグラウンド タスクから即座にトーストを更新する必要があります。
+'            ContextMenu        Trueで、従来のトースト ボタンではなく、トースト通知のコンテキスト メニューに追加されたコンテキスト メニュー アクションになります。
+'            IconPath           トースト ボタン アイコンのイメージソース
+'            HintInputId        テキストBoxの横に来させたいIDを指定します
+'            HintButtonStyle    ボタンのスタイル。現状、「緑、赤」の2色のみ対応です。便宜上、数値に応じてスタイル名を設定します。※この機能は、Windows 11 以降のみ機能します。
+'            HintToolTip        ボタンに空のコンテンツ文字列がある場合のボタンのヒント。
 '            Index              追加位置
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：公式Document上には、type属性があるようですがここでは一旦無視します。
 '***************************************************************************************************
-Public Property Let SetIToastActions(ByVal ArgContent As String, ByVal ArgArguments As String, Optional ByVal ArgActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, Optional ArgPendingUpdate As Boolean, Optional ByVal ArgContextMenu As Boolean, Optional ByVal ArgIcon As String, Optional ByVal ArgHintInputId As String, Optional ArgHintButtonStyle As EnumToastButtonStyle, Optional ByVal ArgHintToolTip As String, ByVal Index As Integer)
+Public Property Let SetIToastActions(ByVal Content As String, ByVal Arguments As String, Optional ByVal ActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, Optional PendingUpdate As Boolean, Optional ByVal ContextMenu As Boolean, Optional ByVal IconPath As String, Optional ByVal HintInputId As String, Optional HintButtonStyle As EnumToastButtonStyle, Optional ByVal HintToolTip As String, ByVal Index As Integer)
     With ElementAction(Index)
-        .Content = ArgContent
-        .Arguments = ArgArguments & "-" & Application.hwnd
-        .ActivationType = SetToastActivationType(ArgActivationType)
+        .Content = Content
+        .Arguments = Arguments
+        .ActivationType = SetToastActivationType(ActivationType)
+        '.Type = ArgType
 
-        If ArgPendingUpdate Then .afterActivationBehavior = "pendingUpdate" Else .afterActivationBehavior = vbNullString
-        If ArgContextMenu Then .Placement = "contextMenu" Else .Placement = vbNullString
+        If PendingUpdate Then .afterActivationBehavior = "pendingUpdate" Else .afterActivationBehavior = vbNullString
+        If ContextMenu Then .Placement = "contextMenu" Else .Placement = vbNullString
 
-        .ImageUri = UseHttpImageCheck(ArgIcon)
-        .HintInputId = ArgHintInputId
+        .ImageUri = UseHttpImageCheck(IconPath)
+        .HintInputId = HintInputId
 
         '属性：hint-buttonStyle  は、引数の値に応じて命名します
-        Select Case ArgHintButtonStyle
+        Select Case HintButtonStyle
             Case 1
                 'ボタンを緑色にします。
                 .HintButtonStyle = "Success"
@@ -1292,7 +1297,7 @@ Public Property Let SetIToastActions(ByVal ArgContent As String, ByVal ArgArgume
                 .HintButtonStyle = vbNullString
         End Select
 
-        .HintToolTip = ArgHintToolTip
+        .HintToolTip = HintToolTip
     End With
 End Property
 
@@ -1355,32 +1360,24 @@ End Property
 '***************************************************************************************************
 '* 機能　　：header要素の各属性にセットしたものをtoast要素に挿入します
 '---------------------------------------------------------------------------------------------------
-'* 引数　　：ArgID            ：このヘッダーを一意に識別します。 2 つの通知が同じヘッダー ID を持つ場合、アクション センターで同じヘッダーの下に表示されます。(省略時：このExcelのファイル名)
-'            ArgTitle         ：ヘッダーのタイトルです。(推奨：このExcelのBook名)
-'            ArgArguments     ：起動スキーマ。URLやファイルパスなど(省略時：このExcelの保存フォルダパス)
-'            ArgActivationType：このヘッダーがクリックされた場合に使用するアクティブ化の種類
+'* 引数　　：ArgArguments     ：起動スキーマ。URLやファイルパスなど(省略時：このExcelの保存フォルダパス)
+'            ActivationType：このヘッダーがクリックされた場合に使用するアクティブ化の種類
+'            ArgTitle         ：ヘッダーのタイトルです。(推奨：このExcelのBook名　ThisWorkbook.Name)
 '---------------------------------------------------------------------------------------------------
-'* 注意事項：VBAでは、ArgActivationType:"protocol"以外では意味をなしません
+'* 詳細説明：ArgTitle を vbnullstring で渡すとこの header要素自体を除去できます。
+'* 注意事項：・Microsoft の思想設計上、ActivationType は、Protocol が推奨されてます。
+'            ・ID属性は常に、Application.hwnd とします。
 '***************************************************************************************************
-Public Property Let SetToastHeader(Optional ByVal ArgID As String, Optional ByVal ArgArguments As String, Optional ByVal ArgActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, ByVal ArgTitle As String)
+Public Property Let SetToastHeader(Optional ByVal ArgArguments As String, Optional ByVal ActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, ByVal ArgTitle As String)
     With ElementHeader
-        '省略時：このExcelのファイル名
-        If StrPtr(ArgID) Then
-            .id = ArgID
-        Else
-            .id = ThisWorkbook.Name
-        End If
+        'IDは常に、Application.hwnd とします
+        .id = Application.hwnd
 
         '省略時：このExcelの保存フォルダパス
-        If StrPtr(ArgArguments) Then
-            .Arguments = ArgArguments & "-" & Application.hwnd
-        Else
-            .Arguments = ThisWorkbook.Path
-        End If
+        If StrPtr(ArgArguments) Then .Arguments = ArgArguments Else .Arguments = ThisWorkbook.Path
 
-        '省略時：protocol
-        .ActivationType = SetToastActivationType(ArgActivationType)
-
+        '引数の中身そのまんま
+        .ActivationType = SetToastActivationType(ActivationType)
         .Title = ArgTitle
     End With
 End Property
@@ -1743,6 +1740,7 @@ Private Function MakeXmlToastContentBuilder(DataBindingMode As Boolean) As Strin
                 With Node03__actions.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode03_02__action, "")).Attributes
                     .setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "content", "")).NodeValue = ElementAction(i).Content
                     .setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "arguments", "")).NodeValue = ElementAction(i).Arguments
+                    '.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "type", "")).NodeValue = ElementAction(i).Type
                     .setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "activationType", "")).NodeValue = ElementAction(i).ActivationType
                     If StrPtr(ElementAction(i).afterActivationBehavior) Then .setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "afterActivationBehavior", "")).NodeValue = ElementAction(i).afterActivationBehavior
                     If StrPtr(ElementAction(i).Placement) Then .setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "placement", "")).NodeValue = ElementAction(i).Placement
@@ -2178,7 +2176,7 @@ Public Property Get GenerateCmd_ToastNotifierShow(ByVal ToastTag As String, Opti
         .XmlSchema = MakeXmlToastContentBuilder(UseDataBinding)
         
         .Tag = ToastTag
-        .Group = ThisWorkbook.Name
+        .Group = Application.hwnd
         .Schedule_ID = "ExcelSchedule"
         .CollectionID = CollectionID
         .ExpiresOnReboot = (ExpirationDate < 0)
@@ -2237,7 +2235,7 @@ Public Property Get GenerateCmd_ToastNotifierUpdate(ByVal ToastTag As String) As
         .XmlSchema = vbNullString
 
         .Tag = ToastTag
-        .Group = ThisWorkbook.Name
+        .Group = Application.hwnd
         .Schedule_ID = vbNullString
         .CollectionID = vbNullString
         
@@ -2376,7 +2374,7 @@ Public Property Get GenerateCmd_ToastNotificationHistoryRemove(RemoveTag As Stri
         '.AllowUse_InternetImageFlag                      '事前に、設定済み
 
         .Tag = RemoveTag
-        .Group = ThisWorkbook.Name
+        .Group = Application.hwnd
 
         '削除コマンドを生成
         GenerateCmd_ToastNotificationHistoryRemove = ActionPS & Run__Windows_UI_Notifications__ToastRemove(.Tag, .Group, .AppUserModelID) & Chr(34)
@@ -2467,7 +2465,7 @@ Public Sub RunDll_ToastNotifierShow(ByVal ToastTag As String, Optional ByVal Col
         .XmlSchema = MakeXmlToastContentBuilder(UseDataBinding)
         
         .Tag = ToastTag
-        .Group = ThisWorkbook.Name
+        .Group = Application.hwnd
         .Schedule_ID = "ExcelSchedule"
         .CollectionID = CollectionID
         
@@ -2504,7 +2502,7 @@ Public Property Get RunDll_ToastNotifierUpdate(ByVal ToastTag As String, Optiona
         .XmlSchema = vbNullString
 
         .Tag = ToastTag
-        .Group = ThisWorkbook.Name
+        .Group = Application.hwnd
         .Schedule_ID = vbNullString
         .CollectionID = CollectionID
         
@@ -2536,7 +2534,7 @@ Public Sub RunDll_ToastNotificationHistoryRemove(ByVal ToastTag As String, Optio
         .XmlSchema = vbNullString
 
         .Tag = ToastTag
-        .Group = ThisWorkbook.Name
+        .Group = Application.hwnd
         .Schedule_ID = vbNullString
         .CollectionID = CollectionID
         
