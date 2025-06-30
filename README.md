@@ -1760,7 +1760,7 @@ Sub 通知の制限状況確認()
         Case 2: Debug.Print "ユーザーまたは管理者は、このコンピューター上のこのユーザーのすべての通知を無効にしました。"
         Case 3: Debug.Print "管理者は、グループ ポリシーを使用して、このコンピューター上のすべての通知を無効にしました。"
         Case 4: Debug.Print "このアプリは、package.appxmanifest ファイルでトーストを宣言していません。" & vbCrLf & "この設定は、マニフェストの [アプリケーション UI] ページの [通知] セクションにあります。" & vbCrLf & "アプリでトーストを送信するには、 Toast 対応オプションを「はい」に設定する必要があります。"
-        Case Else: Debug.Print "エラーコード：" & Result, , "アプリ通知デモ", "予期せぬエラー"
+        Case Else: Debug.Print "エラーコード：" & Result
     End Select
 End Sub
 ```
