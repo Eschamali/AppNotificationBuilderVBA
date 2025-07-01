@@ -6,6 +6,8 @@
  *      通知へのアクション(ボタン押下など)で、指定VBAマクロの実行
  * 　   →入力値、ドロップダウンリストで選択したIDも取得可能
  *
+ * ・Dismissed イベント
+ * ・Failed イベント
  *
  * URL
  * https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification#events
@@ -57,11 +59,11 @@ static HRESULT GetProperty(IDispatch* pDisp, const wchar_t* propName, CComVarian
 //***************************************************************************************************
 //* 機能　　：Excel マクロを実行する関数
 //---------------------------------------------------------------------------------------------------
-//* 引数　　：ExcelMacroPass    Action要素のarguments。{マクロ名}-{ExcelVBA からの Application.hwnd} を想定してます。
+//* 引数　　：ExcelMacroPass    Action要素のarguments。{マクロ名}を想定してます。
 //            UserInputs        Input要素で入力した内容、あるいはSelect要素のID名称とそれに紐づくInput要素のIDとのセットとなる2次元配列                             
 //            targetHWND        プロシージャ起動先のExcel ハンドル値。ToastNotification.Group プロパティ から得る設計にしてます
 //---------------------------------------------------------------------------------------------------
-//* 詳細説明：ExcelのHWNDも渡すことで、複数プロセスで起動してるExcel環境でも対応できます
+//* 詳細説明：ExcelのHWNDを渡すことで、複数プロセスで起動してるExcel環境でも対応できます
 //***************************************************************************************************
 static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInputs, HWND targetHWND) {
     //---------- 1. 孫ウィンドウ経由で、Excel Applicationオブジェクトを取得 ----------
