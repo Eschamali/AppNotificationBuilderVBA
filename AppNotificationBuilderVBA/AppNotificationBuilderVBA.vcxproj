@@ -20,16 +20,19 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ChangeNotice.cpp" />
     <ClCompile Include="CheckNotice.cpp" />
     <ClCompile Include="EventNotice.cpp" />
     <ClCompile Include="CollectionNotice.cpp" />
     <ClCompile Include="GeneralNotice.cpp" />
+    <ClCompile Include="sqlite3.c" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AppNotificationBuilder.h" />
+    <ClInclude Include="sqlite3.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

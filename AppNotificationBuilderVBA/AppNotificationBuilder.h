@@ -73,3 +73,5 @@ extern "C" AppNotificationBuilderVBA_API long __stdcall CreateToastCollection(To
 extern "C" AppNotificationBuilderVBA_API long __stdcall DeleteToastCollection(ToastNotificationParams* ToastConfigData);  //トーストCollectionを削除
 //設定確認
 extern "C" AppNotificationBuilderVBA_API long __stdcall CheckNotificationSetting(ToastNotificationParams* ToastConfigData);
+//wpndatabase.db を SQLite で操作する関数
+extern "C" AppNotificationBuilderVBA_API BSTR __stdcall ExecuteSQLite(const wchar_t* dbPath, const wchar_t* sql);
