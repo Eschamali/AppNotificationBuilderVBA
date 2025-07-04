@@ -85,7 +85,7 @@ BSTR __stdcall ExecuteSQLite(const wchar_t* dbPath, const wchar_t* sql)
             std::wstring changesStr = std::to_wstring(changes);
 
             // 変換した文字列とその長さでBSTRを割り当てる
-            bstrResult = SysAllocStringLen(changesStr.c_str(), changesStr.length());
+            bstrResult = SysAllocStringByteLen((const CHAR*)changesStr.c_str(), changesStr.length());
         }
         else {
             // エラーメッセージをワイド文字列に変換して表示
