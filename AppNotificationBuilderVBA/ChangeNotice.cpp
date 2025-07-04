@@ -32,7 +32,7 @@ BSTR __stdcall ExecuteSQLite(const wchar_t* dbPath, const wchar_t* sql)
     CoInitialize(NULL);
 
     sqlite3* db = nullptr;
-    CComBSTR bstrResult; // 結果を格納するBSTR (CComBSTRで自動的にメモリ管理)
+    BSTR bstrResult = nullptr; // 結果を格納するBSTRポインタを直接宣言
 
     // データベースを開く (UTF-16対応のopen16を使用)
     if (sqlite3_open16(dbPath, &db) != SQLITE_OK) {
@@ -57,9 +57,10 @@ BSTR __stdcall ExecuteSQLite(const wchar_t* dbPath, const wchar_t* sql)
             // 最初の行を取得
             if (sqlite3_step(stmt) == SQLITE_ROW) {
                 // 最初の列(0)をテキストとして取得
-                const wchar_t* text = (const wchar_t*)sqlite3_column_text16(stmt, 0);
+                const wchar_t* text = (const wchar_t*)sqlite3_column_text(stmt, 0);
                 if (text) {
-                    bstrResult = text; // CComBSTRに代入
+                    // 取得したテキストの長さを取得し、その長さでBSTRを割り当てる
+                    bstrResult = SysAllocStringByteLen((const CHAR*)text , wcslen(text));
                 }
             }
             // else: 行が見つからなかった場合は、bstrResultは空のまま
@@ -81,8 +82,10 @@ BSTR __stdcall ExecuteSQLite(const wchar_t* dbPath, const wchar_t* sql)
         if (sqlite3_exec(db, utf8_sql, 0, 0, &errMsg) == SQLITE_OK) {
             // 成功した場合、影響を受けた行数を取得
             int changes = sqlite3_changes(db);
-            // 行数を文字列に変換してBSTRに設定
-            bstrResult = std::to_wstring(changes).c_str();
+            std::wstring changesStr = std::to_wstring(changes);
+
+            // 変換した文字列とその長さでBSTRを割り当てる
+            bstrResult = SysAllocStringLen(changesStr.c_str(), changesStr.length());
         }
         else {
             // エラーメッセージをワイド文字列に変換して表示
@@ -99,7 +102,6 @@ BSTR __stdcall ExecuteSQLite(const wchar_t* dbPath, const wchar_t* sql)
     sqlite3_close(db);
     CoUninitialize();
 
-    // CComBSTRのDetach()メソッドで、所有権を放棄してBSTRポインタを返す
-    // これにより、呼び出し元(VBA)がSysFreeStringで解放する責任を負う
-    return bstrResult.Detach();
+    // 作成したBSTRポインタをそのまま返す
+    return bstrResult;
 }
