@@ -54,6 +54,7 @@ Private Declare PtrSafe Sub RemoveToastNotification Lib "AppNotificationBuilderV
 Private Declare PtrSafe Function CreateToastCollection Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams, ByVal DisplayName As LongPtr, ByVal LaunchArgs As LongPtr, ByVal IconUri As LongPtr) As Long 'ToastCollectionの作成
 Private Declare PtrSafe Function DeleteToastCollection Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams) As Long 'ToastCollectionの削除
 Private Declare PtrSafe Function CheckNotificationSetting Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams) As Long '通知check
+Private Declare PtrSafe Function ExecuteSQLite Lib "AppNotificationBuilderVBA" (ByVal DB_Path As LongPtr, ByVal sql As LongPtr) As String    'SQLite操作用
 
 
 
@@ -61,6 +62,7 @@ Private Declare PtrSafe Function CheckNotificationSetting Lib "AppNotificationBu
 '                           ■■■ ユーザー定義エラー番号文言 ■■■
 '***************************************************************************************************
 Private Const vbObjectErrorID_0001 As String = "設定したスケジュールは、現在のシステム日時に対して過去の日時に設定されてます。" & vbCrLf & "設定したスケジュール通知日時が、未来であることを確認してください。 "
+Private Const vbObjectErrorID_0002 As String = "設定したパラメーターは、定義されていません。"
 
 
 
@@ -101,7 +103,7 @@ Private Declare PtrSafe Function URLDownloadToFile Lib "urlmon" Alias "URLDownlo
 
 
 '***************************************************************************************************
-'■■■ 一部の設定プロパティ値を列挙型で宣言 ■■■
+'                          ■■■ 一部の設定プロパティ値を列挙型で宣言 ■■■
 '***************************************************************************************************
 '  機能     ：トーストが表すシナリオを指定します。数字の代わりにこの名称でも機能します。
 '---------------------------------------------------------------------------------------------------
@@ -170,7 +172,7 @@ End Enum
 
 
 '***************************************************************************************************
-' ■■■ タイムゾーン　ユーザー定義型宣言 ■■■
+'                       ■■■ タイムゾーン　ユーザー定義型宣言 ■■■
 '***************************************************************************************************
 '* 機能　　：日付、時刻データを扱う場合は、UTC基準になる場合があるため、その設定です
 '===================================================================================================
@@ -184,7 +186,7 @@ End Type
 
 
 '***************************************************************************************************
-'■■■ トーストの挙動を決めるユーザー定義型宣言 ■■■
+'                   ■■■ トーストの挙動を決めるユーザー定義型宣言 ■■■
 '***************************************************************************************************
 ' 機能：Tag,Group,suppresspopup等といった[Windows.UI.Notifications]関連の設定値をまとめたものです
 '===================================================================================================
@@ -208,7 +210,7 @@ Private Type ToastNotification
 End Type
 
 '***************************************************************************************************
-'■■■ VBA→DLLへの値参照が正しくできるようにするための中継用ユーザー定義型宣言 ■■■
+'       ■■■ VBA→DLLへの値参照が正しくできるようにするための中継用ユーザー定義型宣言 ■■■
 '***************************************************************************************************
 ' 機能：スタック領域の制限の都合上、構造体としてを定義します。
 '---------------------------------------------------------------------------------------------------
@@ -254,7 +256,55 @@ End Type
 
 
 '***************************************************************************************************
-'■■■ トースト スキーマに基づくメンバユーザー定義型宣言 ■■■
+'                         ■■■ "wpndatabase.db"に関する定数/変数一式 ■■■
+'***************************************************************************************************
+'-----基本-----
+Private LatestExecuteSQLiteNum      As Long
+Private Const 設定DB保存相対パス    As String = "\Microsoft\Windows\Notifications\wpndatabase.db"
+'-----WNSId 一覧(今のところ、システムでは2種類用意されてる)-----
+Public Enum Wpndatabase_WNSId
+    wsCustom                '好きな文字列指定用
+    wsSystem                'システム
+    wsNonImmersivePackage   '非パッケージ
+End Enum
+'-----HandlerType 一覧(今のところ、3種類用意されてる)-----
+Public Enum Wpndatabase_HandlerType
+    htDesktop       'Win32アプリ(非パッケージ)
+    htImmersive     'パッケージアプリ(UWP)
+    htSystem        'システムアプリ
+End Enum
+'-----SettingKey 一覧(今のところ、24種類用意されてる)-----
+Public Enum Wpndatabase_SettingKey
+    skS_tickle
+    skC_tile
+    skR_badge
+    skS_lock_toast
+    skS_tile
+    skS_lock_badge
+    skS_banner
+    skS_lock_tile
+    skR_tile
+    skS_badge
+    skS_audio
+    skS_voip
+    skS_stopCloud
+    skS_listenerEnabled
+    skC_cloud
+    skC_toast
+    skC_internet
+    skC_badge
+    skC_ringing
+    skC_tickle
+    skC_voip
+    skC_storage_toast
+    skS_toast
+    skC_storage_tile
+End Enum
+
+
+
+'***************************************************************************************************
+'                   ■■■ トースト スキーマに基づくメンバユーザー定義型宣言 ■■■
 '***************************************************************************************************
 '下記に基づいて順番に、宣言します
 '→https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/root-elements
@@ -2650,6 +2700,212 @@ Public Property Get RunDll_CheckNotificationSetting(Optional ByVal CollectionID 
     
     'チェック
     RunDll_CheckNotificationSetting = CheckNotificationSetting(ParamsConvertForDLL(ToastConfig))
+End Property
+
+
+
+'***************************************************************************************************
+'                               ■■■ wpndatabase.db 操作関連 ■■■
+'***************************************************************************************************
+'* 機能　　：簡単な引数で、SELECT文を作成します
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：SELECT文
+'* 引数　　：※日本語名まんまのため省略します
+'---------------------------------------------------------------------------------------------------
+'* 詳細説明：
+'* 注意事項：WHERE句部分は最大、2セットまでとし、ANDとします
+'***************************************************************************************************
+Private Function SELECT文生成(取得したい列 As String, 対象テーブル As String, 条件列1 As String, 条件値1 As String, Optional 条件列2 As String, Optional 条件値2 As String) As String
+    '条件列2 が指定されてるかで、WHERE句に AND を足す
+    If StrPtr(条件列2) Then
+        SELECT文生成 = WorksheetFunction.TextJoin(" ", False, "SELECT", 取得したい列, "FROM", 対象テーブル, "WHERE", 条件列1 & "='" & 条件値1 & "'", "AND", 条件列2 & "='" & 条件値2 & "';")
+    Else
+        SELECT文生成 = WorksheetFunction.TextJoin(" ", False, "SELECT", 取得したい列, "FROM", 対象テーブル, "WHERE", 条件列1 & "='" & 条件値1 & "';")
+    End If
+End Function
+
+'***************************************************************************************************
+'* 機能　　：簡単な引数で、UPDATE文を作成します
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：UPDATE文
+'* 引数　　：※日本語名まんまのため省略します
+'---------------------------------------------------------------------------------------------------
+'* 詳細説明：
+'* 注意事項：WHERE句部分は最大、2セットまでとし、ANDとします
+'***************************************************************************************************
+Private Function UPDATE文生成(設定したい列 As String, ByVal 設定したい値 As String, 対象テーブル As String, 条件列1 As String, 条件値1 As String, Optional 条件列2 As String, Optional 条件値2 As String) As String
+    '条件列2 が指定されてるかで、WHERE句に AND を足す
+    If StrPtr(条件列2) Then
+        UPDATE文生成 = WorksheetFunction.TextJoin(" ", False, "UPDATE", 対象テーブル, "SET", 設定したい列 & "='" & 設定したい値 & "'", "WHERE", 条件列1 & "='" & 条件値1 & "'", "AND", 条件列2 & "='" & 条件値2 & "';")
+    Else
+        UPDATE文生成 = WorksheetFunction.TextJoin(" ", False, "UPDATE", 対象テーブル, "SET", 設定したい列 & "='" & 設定したい値 & "'", "WHERE", 条件列1 & "='" & 条件値1 & "';")
+    End If
+End Function
+
+'***************************************************************************************************
+'* 機能　　：数値指定で、対応の[SettingKey]の名称を返します
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：対応する[SettingKey]の名称
+'* 引数　　：列挙型（列挙体）Enum：Wpndatabase_SettingKey
+'***************************************************************************************************
+Private Function 対応表_Wpndatabase_SettingKey(Parameter As Wpndatabase_SettingKey) As String
+    Dim ResultString As String
+    Select Case Parameter
+        Case skS_tickle: ResultString = "s:tickle"
+        Case skC_tile: ResultString = "c:tile"
+        Case skR_badge: ResultString = "r:badge"
+        Case skS_lock_toast: ResultString = "s:lock:toast"
+        Case skS_tile: ResultString = "s:tile"
+        Case skS_lock_badge: ResultString = "s:lock:badge"
+        Case skS_banner: ResultString = "s:banner"
+        Case skS_lock_tile: ResultString = "s:lock:tile"
+        Case skR_tile: ResultString = "r:tile"
+        Case skS_badge: ResultString = "s:badge"
+        Case skS_audio: ResultString = "s:audio"
+        Case skS_voip: ResultString = "s:voip"
+        Case skS_stopCloud: ResultString = "s:stopCloud"
+        Case skS_listenerEnabled: ResultString = "s:listenerEnabled"
+        Case skC_cloud: ResultString = "c:cloud"
+        Case skC_toast: ResultString = "c:toast"
+        Case skC_internet: ResultString = "c:internet"
+        Case skC_badge: ResultString = "c:badge"
+        Case skC_ringing: ResultString = "c:ringing"
+        Case skC_tickle: ResultString = "c:tickle"
+        Case skC_voip: ResultString = "c:voip"
+        Case skC_storage_toast: ResultString = "c:storage:toast"
+        Case skS_toast: ResultString = "s:toast"
+        Case skC_storage_tile: ResultString = "c:storage:tile"
+        Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
+    End Select
+
+    '結果を返す
+    対応表_Wpndatabase_SettingKey = ResultString
+End Function
+
+'***************************************************************************************************
+'* 機能　　："AppUserModelID"を基に、[RecordId]を取得します。
+'---------------------------------------------------------------------------------------------------
+'* 返り値　："AppUserModelID"に基づく、[RecordId]
+'---------------------------------------------------------------------------------------------------
+'* 詳細説明：・同梱のDLLを経由して、"wpndatabase.db"を SQLite を使って取得します
+'            ・HandlerSettings の設定に必要です
+'***************************************************************************************************
+Private Function GetWpndatabase_HandlerID() As Long
+    'wpndatabase.db の絶対パスを取得
+    Dim TargetPath As String: TargetPath = Environ("LOCALAPPDATA") & 設定DB保存相対パス
+
+    '[RecordId]を取得する SELECT 文を組む
+    Dim SQL_SELECT As String: SQL_SELECT = SELECT文生成("RecordId", "NotificationHandler", "PrimaryId", DecisionAppUserModelID(True))
+
+    '実行して、RecordId を取得する(整数を前提)
+    GetWpndatabase_HandlerID = CLng(ExecuteSQLite(StrPtr(TargetPath), StrPtr(SQL_SELECT)))
+End Function
+
+'***************************************************************************************************
+'* 機能　　："AppUserModelID"を基に、[WNSId]を取得します。
+'---------------------------------------------------------------------------------------------------
+'* 返り値　："AppUserModelID"に基づく、[WNSID]
+'***************************************************************************************************
+Public Property Get GetWpndatabase_WNSId() As String
+    'wpndatabase.db の絶対パスを取得
+    Dim TargetPath As String: TargetPath = Environ("LOCALAPPDATA") & 設定DB保存相対パス
+
+    '[WNSID]を取得する SELECT 文を組む
+    Dim SQL_SELECT As String: SQL_SELECT = SELECT文生成("WNSId", "NotificationHandler", "PrimaryId", DecisionAppUserModelID(True))
+
+    '実行して、WNSID を取得する
+    GetWpndatabase_WNSId = ExecuteSQLite(StrPtr(TargetPath), StrPtr(SQL_SELECT))
+End Property
+
+'***************************************************************************************************
+'* 機能　　："AppUserModelID"を基に、[WNSId]を更新します。
+'---------------------------------------------------------------------------------------------------
+'* 引数　  ：・Custom_WNSId       任意の WNSId
+'          　・Wpndatabase_WNSId  システムで用意されてるパラメーター
+'---------------------------------------------------------------------------------------------------
+'* 詳細説明：カスタムな WNSId を指定する際は、({任意のWNSId}) = wsCustom と記述します
+'***************************************************************************************************
+Public Property Let SetWpndatabase_WNSId(Optional Custom_WNSId As String, WNSId As Wpndatabase_WNSId)
+    'wpndatabase.db の絶対パスを取得
+    Dim TargetPath As String: TargetPath = Environ("LOCALAPPDATA") & 設定DB保存相対パス
+
+    'ID に紐づくParameterを設定
+    Dim WNSId_string As String
+    Select Case WNSId
+        Case wsSystem: WNSId_string = "System"
+        Case wsNonImmersivePackage: WNSId_string = "NonImmersivePackage"
+        Case Else: WNSId_string = Custom_WNSId
+    End Select
+
+    '"WNSID"を設定する UPDATE 文を組む
+    Dim SQL_UPDATE As String: SQL_UPDATE = UPDATE文生成("WNSId", WNSId_string, "NotificationHandler", "PrimaryId", DecisionAppUserModelID(True))
+
+    '実行して、WNSID を設定する
+    LatestExecuteSQLiteNum = ExecuteSQLite(StrPtr(TargetPath), StrPtr(SQL_UPDATE))
+End Property
+
+'***************************************************************************************************
+'* 機能　　："AppUserModelID"を基に、[HandlerType]を取得します。
+'---------------------------------------------------------------------------------------------------
+'* 返り値　："AppUserModelID"に基づく、[HandlerType]
+'***************************************************************************************************
+Public Property Get GetWpndatabase_HandlerType() As String
+    'wpndatabase.db の絶対パスを取得
+    Dim TargetPath As String: TargetPath = Environ("LOCALAPPDATA") & 設定DB保存相対パス
+
+    '"HandlerType"を取得する SELECT 文を組む
+    Dim SQL_SELECT As String: SQL_SELECT = SELECT文生成("HandlerType", "NotificationHandler", "PrimaryId", DecisionAppUserModelID(True))
+
+    '実行して、HandlerType を取得する
+    GetWpndatabase_HandlerType = ExecuteSQLite(StrPtr(TargetPath), StrPtr(SQL_SELECT))
+End Property
+
+'***************************************************************************************************
+'* 機能　　："AppUserModelID"を基に、[HandlerType]を更新します。
+'---------------------------------------------------------------------------------------------------
+'* 引数　  ：Wpndatabase_HandlerType  システムで用意されてるパラメーター
+'***************************************************************************************************
+Public Property Let SetWpndatabase_HandlerType(HandlerTypeMode As Wpndatabase_HandlerType)
+    'wpndatabase.db の絶対パスを取得
+    Dim TargetPath As String: TargetPath = Environ("LOCALAPPDATA") & 設定DB保存相対パス
+    
+    '接頭辞
+    Const HandlerType目印 As String = "app:"
+
+    'ID に紐づくParameterを設定
+    Dim HandlerType_string As String
+    Select Case HandlerTypeMode
+        Case htDesktop: HandlerType_string = HandlerType目印 & "desktop"
+        Case htImmersive: HandlerType_string = HandlerType目印 & "immersive"
+        Case htSystem: HandlerType_string = HandlerType目印 & "system"
+        Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
+    End Select
+
+    '"HandlerType"を設定する UPDATE 文を組む
+    Dim SQL_UPDATE As String: SQL_UPDATE = UPDATE文生成("HandlerType", HandlerType_string, "NotificationHandler", "PrimaryId", DecisionAppUserModelID(True))
+
+    '実行して、HandlerType を設定する
+    LatestExecuteSQLiteNum = ExecuteSQLite(StrPtr(TargetPath), StrPtr(SQL_UPDATE))
+End Property
+
+'***************************************************************************************************
+'* 機能　　：[HandlerId](NotificationHandler-[AppUserModelID]に紐づくやつ)から、[SettingKey]を基に、[Value]を取得します。
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：論理値
+'* 引数　  ：SettingKey     内部パラメーター名ID
+'***************************************************************************************************
+Public Property Get GetWpndatabase_SettingKeyValue(SettingKeyID As Wpndatabase_SettingKey) As Boolean
+    'wpndatabase.db の絶対パスを取得
+    Dim TargetPath As String: TargetPath = Environ("LOCALAPPDATA") & 設定DB保存相対パス
+    
+    '現在のこの Class で設定中の AppUserModelID を基に、HandlerId を特定します
+    Dim TargetHandlerId As Long: TargetHandlerId = GetWpndatabase_HandlerID
+
+    '[HandlerId]と[SettingKey]を基に、[Value]を取得する SELECT 文を組む
+    Dim SQL_SELECT As String: SQL_SELECT = SELECT文生成("Value", "HandlerSettings", "HandlerId", CStr(TargetHandlerId), "SettingKey", 対応表_Wpndatabase_SettingKey(SettingKeyID))
+
+    '実行して、Value を取得する
+    GetWpndatabase_SettingKeyValue = CBool(ExecuteSQLite(StrPtr(TargetPath), StrPtr(SQL_SELECT)))
 End Property
 
 
