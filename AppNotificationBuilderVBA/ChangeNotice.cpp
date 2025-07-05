@@ -1,5 +1,5 @@
 ﻿/***************************************************************************************************
-*										通知の挙動設定
+*									    通知の挙動設定 その1
 ***************************************************************************************************
 *              "wpndatabase.db" の操作に特化した SQLite 操作コードを提供します。
 * 
@@ -9,7 +9,7 @@
 
 //設定がまとまってるヘッダーファイルを指定
 #include "AppNotificationBuilder.h"
-#include "sqlite3.h"   // SQLiteのヘッダー
+#include "sqlite3.h"                // SQLiteのヘッダー
 
 
 
@@ -23,7 +23,7 @@
 //            sql           SQL文
 //---------------------------------------------------------------------------------------------------
 //* 注意事項：・SELECT文を行う際は、列は1つ、WHERE句も1件しか返さなそうな条件にすること。
-//              これは、返り値をシンプルに抑えるため、SELECT文で複数件ヒットしても、先頭行、先頭列しか返せません。
+//              これは、返り値をシンプルに抑えるため。SELECT文で複数件ヒットしても、先頭行、先頭列しか返せません。
 //***************************************************************************************************
 BSTR __stdcall ExecuteSQLite(const wchar_t* dbPath, const wchar_t* sql)
 {
@@ -40,15 +40,18 @@ BSTR __stdcall ExecuteSQLite(const wchar_t* dbPath, const wchar_t* sql)
         return nullptr;
     }
 
-    // --- SQL文がSELECTか、それ以外かを判定 ---
+    //文字列変数を容易
     std::wstring sql_str = sql;
     std::wstring sql_upper = sql_str;
-    // SQL文を大文字に変換して、先頭が "SELECT" かどうかをチェック
+
+    // SQL文を大文字に変換
     std::transform(sql_upper.begin(), sql_upper.end(), sql_upper.begin(), ::toupper);
 
-    // 先頭の空白をトリム
+    // 念の為、先頭の空白をトリム
     sql_upper.erase(0, sql_upper.find_first_not_of(L" \t\n\r"));
 
+    // --- SQL文がSELECTか、それ以外かを判定 ---
+    // --- SELECT の処理 ---
     if (sql_upper.rfind(L"SELECT", 0) == 0) {
         // --- SELECT文の処理 ---
         sqlite3_stmt* stmt = nullptr;
