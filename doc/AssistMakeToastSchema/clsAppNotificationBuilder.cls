@@ -9,7 +9,7 @@ Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
 '***************************************************************************************************
 '   VBAから、Windows PowerShell を経由して、デスクトップ通知【トースト通知】を表示させます
-'   また、DLLファイルを経由した通知手段も提供します。Ver1.4.7
+'   また、DLLファイルを経由した通知手段も提供します。Ver1.5.0
 
 ' MIT License
 '
@@ -2863,7 +2863,7 @@ End Property
 '***************************************************************************************************
 '* 機能　　："AppUserModelID"を基に、[HandlerType]を更新します。
 '---------------------------------------------------------------------------------------------------
-'* 引数　  ：Wpndatabase_HandlerType  システムで用意されてるパラメーター
+'* 引数　  ：Wpndatabase_HandlerType  列挙型（列挙体）Enum：Wpndatabase_HandlerType
 '***************************************************************************************************
 Public Property Let SetWpndatabase_HandlerType(HandlerTypeMode As Wpndatabase_HandlerType)
     'wpndatabase.db の絶対パスを取得
@@ -2892,9 +2892,9 @@ End Property
 '* 機能　　：[HandlerId](NotificationHandler-[AppUserModelID]に紐づくやつ)から、[SettingKey]を基に、[Value]を取得します。
 '---------------------------------------------------------------------------------------------------
 '* 返り値　：論理値
-'* 引数　  ：SettingKey     内部パラメーター名ID
+'* 引数　  ：SettingKey     列挙型（列挙体）Enum：Wpndatabase_SettingKey
 '***************************************************************************************************
-Public Property Get GetWpndatabase_SettingKeyValue(SettingKeyID As Wpndatabase_SettingKey) As Boolean
+Public Property Get Wpndatabase_SettingKeyValue(SettingKeyID As Wpndatabase_SettingKey) As Boolean
     'wpndatabase.db の絶対パスを取得
     Dim TargetPath As String: TargetPath = Environ("LOCALAPPDATA") & 設定DB保存相対パス
     
@@ -2904,8 +2904,28 @@ Public Property Get GetWpndatabase_SettingKeyValue(SettingKeyID As Wpndatabase_S
     '[HandlerId]と[SettingKey]を基に、[Value]を取得する SELECT 文を組む
     Dim SQL_SELECT As String: SQL_SELECT = SELECT文生成("Value", "HandlerSettings", "HandlerId", CStr(TargetHandlerId), "SettingKey", 対応表_Wpndatabase_SettingKey(SettingKeyID))
 
-    '実行して、Value を取得する
-    GetWpndatabase_SettingKeyValue = CBool(ExecuteSQLite(StrPtr(TargetPath), StrPtr(SQL_SELECT)))
+    '実行して、Value を取得し、論理値として返す
+    Wpndatabase_SettingKeyValue = CBool(ExecuteSQLite(StrPtr(TargetPath), StrPtr(SQL_SELECT)))
+End Property
+
+'***************************************************************************************************
+'* 機能　　：[HandlerId](NotificationHandler-[AppUserModelID]に紐づくやつ)から、[SettingKey]を基に、[Value]を設定します。
+'---------------------------------------------------------------------------------------------------
+'* 引数　  ：SettingKey     列挙型（列挙体）Enum：Wpndatabase_SettingKey
+'            SetFlag        論理値
+'***************************************************************************************************
+Public Property Let Wpndatabase_SettingKeyValue(SettingKeyID As Wpndatabase_SettingKey, SetFlag As Boolean)
+    'wpndatabase.db の絶対パスを取得
+    Dim TargetPath As String: TargetPath = Environ("LOCALAPPDATA") & 設定DB保存相対パス
+    
+    '現在のこの Class で設定中の AppUserModelID を基に、HandlerId を特定します
+    Dim TargetHandlerId As Long: TargetHandlerId = GetWpndatabase_HandlerID
+
+    '[HandlerId]と[SettingKey]を基に、[Value]を設定する UPDATE 文を組む
+    Dim SQL_UPDATE As String: SQL_UPDATE = UPDATE文生成("Value", SetFlag * -1, "HandlerSettings", "HandlerId", CStr(TargetHandlerId), "SettingKey", 対応表_Wpndatabase_SettingKey(SettingKeyID))
+
+    '実行して、Value を設定する
+    LatestExecuteSQLiteNum = ExecuteSQLite(StrPtr(TargetPath), StrPtr(SQL_UPDATE))
 End Property
 
 
