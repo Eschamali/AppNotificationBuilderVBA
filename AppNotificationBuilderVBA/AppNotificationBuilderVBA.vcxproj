@@ -25,6 +25,7 @@
     <ClCompile Include="EventNotice.cpp" />
     <ClCompile Include="CollectionNotice.cpp" />
     <ClCompile Include="GeneralNotice.cpp" />
+    <ClCompile Include="RegistryEdit.cpp" />
     <ClCompile Include="sqlite3.c" />
   </ItemGroup>
   <ItemGroup>

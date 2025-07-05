@@ -68,10 +68,12 @@ void OnFailed(ToastNotification const& sender, ToastFailedEventArgs const& args)
 extern "C" AppNotificationBuilderVBA_API void __stdcall ShowToastNotification(ToastNotificationParams* ToastConfigData, ToastNotificationVariable* ToastUpdata);    //通知を表示
 extern "C" AppNotificationBuilderVBA_API long __stdcall UpdateToastNotification(ToastNotificationParams* ToastConfigData, ToastNotificationVariable* ToastUpdata);  //通知更新
 extern "C" AppNotificationBuilderVBA_API void __stdcall RemoveToastNotification(ToastNotificationParams* ToastConfigData);                                          //通知削除
+extern "C" AppNotificationBuilderVBA_API long __stdcall CheckNotificationSetting(ToastNotificationParams* ToastConfigData);                                         //設定確認
 //Collection通知によるグループ化機能
 extern "C" AppNotificationBuilderVBA_API long __stdcall CreateToastCollection(ToastNotificationParams* ToastConfigData, const wchar_t* displayName, const wchar_t* launchArgs, const wchar_t* iconUri);  //トーストCollectionの作成
 extern "C" AppNotificationBuilderVBA_API long __stdcall DeleteToastCollection(ToastNotificationParams* ToastConfigData);  //トーストCollectionを削除
-//設定確認
-extern "C" AppNotificationBuilderVBA_API long __stdcall CheckNotificationSetting(ToastNotificationParams* ToastConfigData);
 //wpndatabase.db を SQLite で操作する関数
 extern "C" AppNotificationBuilderVBA_API BSTR __stdcall ExecuteSQLite(const wchar_t* dbPath, const wchar_t* sql);
+//レジストリエディター を操作する関数
+extern "C" AppNotificationBuilderVBA_API long __stdcall AttemptToWriteRegistry(HWND hwnd, HINSTANCE hinst, LPWSTR lpszCmdLine, int nCmdShow);   //VBAから呼び出す用
+extern "C" AppNotificationBuilderVBA_API void __stdcall WriteRegistryAsAdmin(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCmdShow);      //rundll32 から管理者権限で呼び出される関数のための専用プロトタイプ
