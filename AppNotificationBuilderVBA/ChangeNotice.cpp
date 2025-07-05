@@ -56,10 +56,10 @@ BSTR __stdcall ExecuteSQLite(const wchar_t* dbPath, const wchar_t* sql)
             // 最初の行を取得
             if (sqlite3_step(stmt) == SQLITE_ROW) {
                 // 最初の列(0)をテキストとして取得
-                const wchar_t* text = (const wchar_t*)sqlite3_column_text(stmt, 0);
-                if (text) {
+                const char* text_utf8 = (const char*)sqlite3_column_text(stmt, 0);
+                if (text_utf8) {
                     // 取得したテキストの長さを取得し、その長さでBSTRを割り当てる
-                    bstrResult = SysAllocStringByteLen((const CHAR*)text , wcslen(text));
+                    bstrResult = SysAllocStringByteLen(text_utf8, strlen(text_utf8));
                 }
             }
             // else: 行が見つからなかった場合は、bstrResultは空のまま
