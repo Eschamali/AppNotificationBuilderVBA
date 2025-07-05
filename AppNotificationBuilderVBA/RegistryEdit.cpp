@@ -18,7 +18,7 @@
 //                                  ■■■ 静的定数 ■■■
 //***************************************************************************************************
 constexpr wchar_t ParameterDelimiter = L'|';                       //レジストリ書き込み処理を行う際の区切り文字(1文字分)
-constexpr const wchar_t* TargetRegistryPath = L"AppUserModelId\\";  //レジストリ操作を行う相対パス
+constexpr const wchar_t* TargetRegistryPath = L"AppUserModelId";  //レジストリ操作を行う相対パス
 
 
 
@@ -67,7 +67,9 @@ static HRESULT WriteKeyFromArgs(const std::wstring& combinedArgs) {
 
     //HKEY_CLASSES_ROOT 始まりとして、編集要求
     HKEY hKey;
-    std::wstring regPath = TargetRegistryPath + aumid;
+    std::wstring regPath = TargetRegistryPath;
+    regPath += L"\\";
+    regPath += aumid;
     LSTATUS status = RegCreateKeyExW(
         HKEY_CLASSES_ROOT,
         regPath.c_str(),
@@ -92,6 +94,27 @@ static HRESULT WriteKeyFromArgs(const std::wstring& combinedArgs) {
     case 2: // REG_EXPAND_SZ
     {
         status = RegSetValueExW(hKey, valueName.c_str(), 0, REG_EXPAND_SZ, (const BYTE*)valueData.c_str(), (valueData.length() + 1) * sizeof(wchar_t));
+        break;
+    }
+    case -1: // 削除処理
+    {
+        if (!valueName.empty()) {
+            // "値の名前"が指定されている場合 -> 値を削除
+            status = RegOpenKeyExW(HKEY_CLASSES_ROOT, regPath.c_str(), 0, KEY_SET_VALUE, &hKey);
+            if (status == ERROR_SUCCESS) {
+                status = RegDeleteValueW(hKey, valueName.c_str());
+            }
+        }
+        else {
+            // "値の名前"が空の場合 -> キーごと削除
+            std::wstring parentPath = TargetRegistryPath;
+            status = RegOpenKeyExW(HKEY_CLASSES_ROOT, parentPath.c_str(), 0, KEY_SET_VALUE, &hKey);
+            if (status == ERROR_SUCCESS) {
+                // 親キーから、指定されたAUMIDのサブキーを削除
+                status = RegDeleteKeyW(hKey, aumid.c_str());
+            }
+        }
+
         break;
     }
     default:
