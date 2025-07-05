@@ -163,74 +163,55 @@ void __stdcall WriteRegistryAsAdmin(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLin
 long __stdcall AttemptToWriteRegistry(HWND hwnd, HINSTANCE hinst, LPWSTR lpszCmdLine, int nCmdSho)
 {
     //MessageBoxW(nullptr, lpszCmdLine, L"引数の中身", MB_OK);
-
-    //レジストリ登録へ移る
     CoInitialize(NULL);
-    HRESULT hr = WriteKeyFromArgs(lpszCmdLine);
 
-    //登録成功か判定
-    if (SUCCEEDED(hr)) {
-        //MessageBoxW(nullptr, L"レジストリの設定に成功しました。", L"成功", MB_OK);
+    // このDLL のハンドル取得を試みる
+    HMODULE hModule = NULL;
+    HRESULT hr = GetModuleHandleExW(
+        GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+        (LPCWSTR)AttemptToWriteRegistry,
+        &hModule
+    );
+
+    if (hModule == NULL) {
+        MessageBoxW(nullptr, L"自分自身のDLLハンドルを取得できませんでした。", L"致命的エラー", MB_OK);
+        CoUninitialize();
         return hr;
     }
-    else if (HRESULT_CODE(hr) == ERROR_ACCESS_DENIED) {
-        // アクセス拒否の場合、権限昇格を試みる
 
-        // このDLL のハンドル取得を試みる
-        HMODULE hModule = NULL;
-        GetModuleHandleExW(
-            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-            (LPCWSTR)AttemptToWriteRegistry,
-            &hModule
-        );
+    //引数を組み立てる
+    long Result;
+    wchar_t dllPath[MAX_PATH];
+    GetModuleFileNameW(hModule, dllPath, MAX_PATH); // ★取得した自分自身のハンドルを使う！
+    std::wstring params = L"\"";
+    params += dllPath;
+    params += L"\",WriteRegistryAsAdmin ";  // rundll32 に実行させたい関数名
+    params += lpszCmdLine;                 // AUMID|Name|Type|Data の文字列
+    
+    //ユーザーアカウント制御 に渡すパラメーター一式
+    SHELLEXECUTEINFOW sei = { sizeof(sei) };
+    sei.fMask = SEE_MASK_NOCLOSEPROCESS;
+    sei.lpVerb = L"runas";
+    sei.lpFile = L"rundll32.exe";
+    sei.lpParameters = params.c_str();
+    sei.nShow = SW_HIDE;
+    
+    //ユーザーアカウント制御 を表示させる
+    //※Excel自体が、管理者権限を持っている場合、即 True を返します。
+    if (ShellExecuteExW(&sei)) {
+        //許可されたら、rundll32 側の処理が終わるまで待つ
+        WaitForSingleObject(sei.hProcess, INFINITE);
+        CloseHandle(sei.hProcess);
 
-        if (hModule == NULL) {
-            MessageBoxW(nullptr, L"自分自身のDLLハンドルを取得できませんでした。", L"致命的エラー", MB_OK);
-            CoUninitialize();
-            return hr;
-        }
-
-        //引数を組み立てる
-        wchar_t dllPath[MAX_PATH];
-        GetModuleFileNameW(hModule, dllPath, MAX_PATH); // ★取得した自分自身のハンドルを使う！
-        std::wstring params = L"\"";
-        params += dllPath;
-        params += L"\",WriteRegistryAsAdmin ";  // rundll32 に実行させたい関数名
-        params += lpszCmdLine;                 // AUMID|Name|Type|Data の文字列
-
-        //ユーザーアカウント制御 に渡すパラメーター一式
-        SHELLEXECUTEINFOW sei = { sizeof(sei) };
-        sei.fMask = SEE_MASK_NOCLOSEPROCESS;
-        sei.lpVerb = L"runas";
-        sei.lpFile = L"rundll32.exe";
-        sei.lpParameters = params.c_str();
-        sei.nShow = SW_HIDE;
-
-        //ユーザーアカウント制御 を表示させる
-        if (ShellExecuteExW(&sei)) {
-            //許可されたら、rundll32 側の処理が終わるまで待つ
-            WaitForSingleObject(sei.hProcess, INFINITE);
-            CloseHandle(sei.hProcess);
-
-            //MessageBoxW(nullptr, L"権限昇格を伴う処理が完了しました。", L"情報", MB_OK);
-            CoUninitialize();
-            return -1;
-        }
-        else {
-            //拒否された場合
-            //MessageBoxW(nullptr, L"操作はユーザーによってキャンセルされました。", L"キャンセル", MB_OK);
-            CoUninitialize();
-            return -2;
-        }
+        Result = -1;
+        //MessageBoxW(nullptr, L"権限昇格を伴う処理が完了しました。", L"情報", MB_OK);
     }
     else {
-        _com_error err(hr);
-        wchar_t buf[512];
-        swprintf_s(buf, L"レジストリ書き込みに失敗しました。\nHRESULT=0x%08X\n%s", hr, err.ErrorMessage());
-        MessageBoxW(nullptr, buf, L"エラー", MB_OK);
+        //拒否された場合
+        Result = -2;
+        //MessageBoxW(nullptr, L"操作はユーザーによってキャンセルされました。", L"キャンセル", MB_OK);
     }
-
     //解放
     CoUninitialize();
-    return hr;
+    return Result;
 }
