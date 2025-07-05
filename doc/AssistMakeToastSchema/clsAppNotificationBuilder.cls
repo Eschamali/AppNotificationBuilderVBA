@@ -273,7 +273,8 @@ Public Enum Wpndatabase_HandlerType
     htImmersive     'パッケージアプリ(UWP)
     htSystem        'システムアプリ
 End Enum
-'-----SettingKey 一覧(今のところ、24種類用意されてる)-----
+'-----SettingKey 一覧(今のところ、28種類用意されてる)-----
+'ただし、一度でもアプリ側が対応するパラメーターを使用しないと出てこない仕様のため、まだまだあるかも…?
 Public Enum Wpndatabase_SettingKey
     skS_tickle
     skC_tile
@@ -299,6 +300,10 @@ Public Enum Wpndatabase_SettingKey
     skC_storage_toast
     skS_toast
     skC_storage_tile
+    skM_SecondaryTileMigrationComplete
+    skS_cycle_medium
+    skS_cycle_wide
+    skS_cycle_large
 End Enum
 
 
@@ -2712,7 +2717,6 @@ End Property
 '* 返り値　：SELECT文
 '* 引数　　：※日本語名まんまのため省略します
 '---------------------------------------------------------------------------------------------------
-'* 詳細説明：
 '* 注意事項：WHERE句部分は最大、2セットまでとし、ANDとします
 '***************************************************************************************************
 Private Function SELECT文生成(取得したい列 As String, 対象テーブル As String, 条件列1 As String, 条件値1 As String, Optional 条件列2 As String, Optional 条件値2 As String) As String
@@ -2730,7 +2734,6 @@ End Function
 '* 返り値　：UPDATE文
 '* 引数　　：※日本語名まんまのため省略します
 '---------------------------------------------------------------------------------------------------
-'* 詳細説明：
 '* 注意事項：WHERE句部分は最大、2セットまでとし、ANDとします
 '***************************************************************************************************
 Private Function UPDATE文生成(設定したい列 As String, ByVal 設定したい値 As String, 対象テーブル As String, 条件列1 As String, 条件値1 As String, Optional 条件列2 As String, Optional 条件値2 As String) As String
@@ -2740,6 +2743,19 @@ Private Function UPDATE文生成(設定したい列 As String, ByVal 設定したい値 As Stri
     Else
         UPDATE文生成 = WorksheetFunction.TextJoin(" ", False, "UPDATE", 対象テーブル, "SET", 設定したい列 & "='" & 設定したい値 & "'", "WHERE", 条件列1 & "='" & 条件値1 & "';")
     End If
+End Function
+
+'***************************************************************************************************
+'* 機能　　：簡単な引数で、テーブル：HandlerSettings 用 INSERT文を作成します
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：INSERT文
+'* 引数　　：※日本語名まんまのため省略します
+'---------------------------------------------------------------------------------------------------
+'* 詳細説明：テーブル：HandlerSettings　は、SettingKey を動的生成するため、新しい設定の適用に使用します。
+'* 注意事項：テーブル：HandlerSettings　専用です
+'***************************************************************************************************
+Private Function INSERT文生成_HandlerSettings(HandlerId As Long, SettingKey As String, flag As Boolean) As String
+    INSERT文生成_HandlerSettings = WorksheetFunction.TextJoin(" ", False, "INSERT", "INTO", "HandlerSettings", "VALUES('" & HandlerId & "',", "'" & SettingKey & "',", "'" & flag * -1 & "');")
 End Function
 
 '***************************************************************************************************
@@ -2775,6 +2791,10 @@ Private Function 対応表_Wpndatabase_SettingKey(Parameter As Wpndatabase_SettingK
         Case skC_storage_toast: ResultString = "c:storage:toast"
         Case skS_toast: ResultString = "s:toast"
         Case skC_storage_tile: ResultString = "c:storage:tile"
+        Case skM_SecondaryTileMigrationComplete: ResultString = "m:SecondaryTileMigrationComplete"
+        Case skS_cycle_medium: ResultString = "s:cycle:medium"
+        Case skS_cycle_wide: ResultString = "s:cycle:wide"
+        Case skS_cycle_large: ResultString = "s:cycle:large"
         Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
     End Select
 
@@ -2870,14 +2890,14 @@ Public Property Let SetWpndatabase_HandlerType(HandlerTypeMode As Wpndatabase_Ha
     Dim TargetPath As String: TargetPath = Environ("LOCALAPPDATA") & 設定DB保存相対パス
     
     '接頭辞
-    Const HandlerType目印 As String = "app:"
+    Const HandlerType接頭辞 As String = "app:"
 
     'ID に紐づくParameterを設定
     Dim HandlerType_string As String
     Select Case HandlerTypeMode
-        Case htDesktop: HandlerType_string = HandlerType目印 & "desktop"
-        Case htImmersive: HandlerType_string = HandlerType目印 & "immersive"
-        Case htSystem: HandlerType_string = HandlerType目印 & "system"
+        Case htDesktop: HandlerType_string = HandlerType接頭辞 & "desktop"
+        Case htImmersive: HandlerType_string = HandlerType接頭辞 & "immersive"
+        Case htSystem: HandlerType_string = HandlerType接頭辞 & "system"
         Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
     End Select
 
@@ -2893,6 +2913,8 @@ End Property
 '---------------------------------------------------------------------------------------------------
 '* 返り値　：論理値
 '* 引数　  ：SettingKey     列挙型（列挙体）Enum：Wpndatabase_SettingKey
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：SettingKey は、動的生成なので、存在しない SettingKey が来たら、False で INSERT文を実行します
 '***************************************************************************************************
 Public Property Get Wpndatabase_SettingKeyValue(SettingKeyID As Wpndatabase_SettingKey) As Boolean
     'wpndatabase.db の絶対パスを取得
@@ -2902,10 +2924,19 @@ Public Property Get Wpndatabase_SettingKeyValue(SettingKeyID As Wpndatabase_Sett
     Dim TargetHandlerId As Long: TargetHandlerId = GetWpndatabase_HandlerID
 
     '[HandlerId]と[SettingKey]を基に、[Value]を取得する SELECT 文を組む
-    Dim SQL_SELECT As String: SQL_SELECT = SELECT文生成("Value", "HandlerSettings", "HandlerId", CStr(TargetHandlerId), "SettingKey", 対応表_Wpndatabase_SettingKey(SettingKeyID))
+    Dim SettingKeyName As String: SettingKeyName = 対応表_Wpndatabase_SettingKey(SettingKeyID)
+    Dim SQL_SELECT As String: SQL_SELECT = SELECT文生成("Value", "HandlerSettings", "HandlerId", CStr(TargetHandlerId), "SettingKey", SettingKeyName)
 
-    '実行して、Value を取得し、論理値として返す
-    Wpndatabase_SettingKeyValue = CBool(ExecuteSQLite(StrPtr(TargetPath), StrPtr(SQL_SELECT)))
+    '実行して、Value を取得
+    Dim SELECT結果 As String: SELECT結果 = ExecuteSQLite(StrPtr(TargetPath), StrPtr(SQL_SELECT))
+    
+    'もし何も得られない場合、そもそもdbにないので、INSERTで設定する。デフォルトは、false とします
+    If SELECT結果 = "" Then
+        LatestExecuteSQLiteNum = ExecuteSQLite(StrPtr(TargetPath), StrPtr(INSERT文生成_HandlerSettings(TargetHandlerId, SettingKeyName, False * -1)))
+        Wpndatabase_SettingKeyValue = False
+    Else
+       Wpndatabase_SettingKeyValue = CBool(SELECT結果)
+    End If
 End Property
 
 '***************************************************************************************************
@@ -2913,6 +2944,8 @@ End Property
 '---------------------------------------------------------------------------------------------------
 '* 引数　  ：SettingKey     列挙型（列挙体）Enum：Wpndatabase_SettingKey
 '            SetFlag        論理値
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：SettingKey は、動的生成なので、存在しない SettingKey が来たら、SetFlag で INSERT文を実行します
 '***************************************************************************************************
 Public Property Let Wpndatabase_SettingKeyValue(SettingKeyID As Wpndatabase_SettingKey, SetFlag As Boolean)
     'wpndatabase.db の絶対パスを取得
@@ -2922,10 +2955,14 @@ Public Property Let Wpndatabase_SettingKeyValue(SettingKeyID As Wpndatabase_Sett
     Dim TargetHandlerId As Long: TargetHandlerId = GetWpndatabase_HandlerID
 
     '[HandlerId]と[SettingKey]を基に、[Value]を設定する UPDATE 文を組む
-    Dim SQL_UPDATE As String: SQL_UPDATE = UPDATE文生成("Value", SetFlag * -1, "HandlerSettings", "HandlerId", CStr(TargetHandlerId), "SettingKey", 対応表_Wpndatabase_SettingKey(SettingKeyID))
+    Dim SettingKeyName As String: SettingKeyName = 対応表_Wpndatabase_SettingKey(SettingKeyID)
+    Dim SQL_UPDATE As String: SQL_UPDATE = UPDATE文生成("Value", SetFlag * -1, "HandlerSettings", "HandlerId", CStr(TargetHandlerId), "SettingKey", SettingKeyName)
 
     '実行して、Value を設定する
     LatestExecuteSQLiteNum = ExecuteSQLite(StrPtr(TargetPath), StrPtr(SQL_UPDATE))
+    
+    'もし0件の場合、そもそもdbにないので、INSERTで設定する
+    If LatestExecuteSQLiteNum = 0 Then LatestExecuteSQLiteNum = INSERT文生成_HandlerSettings(TargetHandlerId, SettingKeyName, SetFlag * -1)
 End Property
 
 
