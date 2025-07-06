@@ -2993,7 +2993,7 @@ End Property
 '***************************************************************************************************
 '                               ■■■ レジストリ操作関連 ■■■
 '***************************************************************************************************
-'* 機能　　：レジストリ　コンピューター\HKEY_CLASSES_ROOT\AppUserModelId\[AppUserModelID名称] へパラメーターを登録します
+'* 機能　　：レジストリ　コンピューター\HKEY_CLASSES_ROOT\AppUserModelId\[AppUserModelID名称] へパラメーターを登録し、正しく書き込めたか判定します
 '---------------------------------------------------------------------------------------------------
 '* 引数　  ：aumid      AppUserModelID
 '            valueName  値の名称
@@ -3001,7 +3001,8 @@ End Property
 '            valueData  登録値
 '
 '* 返り値  ：結果コード
-'               -1：ユーザーアカウント制御にて許可しました。または、既に管理者権限状態で実行された
+'                0：成功
+'               -1：ユーザーアカウント制御にて許可しましたまたは、既に管理者権限状態で実行されたが、登録/削除の確認が取れなかった。
 '               -2：ユーザーアカウント制御にて拒否しました
 '               他：エラーコード
 '---------------------------------------------------------------------------------------------------
@@ -3012,8 +3013,61 @@ Private Function AttemptRegistryValue(ByVal aumid As String, ByVal valueName As 
     ' 引数をパイプ区切りで結合
     Dim combinedArgs As String: combinedArgs = WorksheetFunction.TextJoin(パラメーター区切り文字, False, aumid, valueName, valueType, valueData)
     
-    ' DLL関数を呼び出し
-    AttemptRegistryValue = AttemptToWriteRegistry(0, 0, StrPtr(combinedArgs), 0)
+    ' DLL関数を呼び出して、ユーザーアカウント制御を利用した登録処理
+    Dim ResultCode As Long: ResultCode = AttemptToWriteRegistry(0, 0, StrPtr(combinedArgs), 0)
+    
+    '結果コードに応じた分岐
+    If ResultCode = -1 Then
+        'ユーザーアカウント制御にて許可したので、存在チェックする
+        Dim wmiService As Object, regProvider As Object
+        Set wmiService = GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\default")
+        Set regProvider = wmiService.Get("StdRegProv")
+        
+        ' HKEY_CLASSES_ROOT (HKCR) を起点とする
+        Const HKEY_CLASSES_ROOT = &H80000000
+    
+        '確認用パラメーター用意
+        Dim strValue As String  'SZ用
+        Dim dwordValue As Long  'DWORD用
+        Dim lResult As Long     '実行結果
+        Dim keyPath As String: keyPath = "AppUserModelId\" & aumid
+        
+        '設定型に応じた確認処理
+        Select Case valueType
+            'DWORD 存在確認
+            Case RegistryType.REG_DWORD
+                'DWORDとして読み取りを試みる
+                lResult = regProvider.GetDWORDValue(HKEY_CLASSES_ROOT, keyPath, valueName, dwordValue)
+                
+                '結果を返す
+                If lResult Then AttemptRegistryValue = ResultCode Else AttemptRegistryValue = lResult
+                
+            'SZ 存在確認
+            Case RegistryType.REG_SZ
+                'SZとして読み取りを試みる
+                lResult = regProvider.GetStringValue(HKEY_CLASSES_ROOT, keyPath, valueName, strValue)
+                
+                '結果を返す
+                If lResult Then AttemptRegistryValue = ResultCode Else AttemptRegistryValue = lResult
+            
+            '削除確認
+            Case RegistryType.REG_Delete
+                'DWORDとして読み取りを試みる
+                lResult = regProvider.GetDWORDValue(HKEY_CLASSES_ROOT, keyPath, valueName, dwordValue)
+                'あったら、ここで終わり
+                If lResult = 0 Then AttemptRegistryValue = lResult * -1: Exit Function
+
+                'SZとして読み取りを試みる
+                lResult = regProvider.GetStringValue(HKEY_CLASSES_ROOT, keyPath, valueName, strValue)
+                'あったら、所定の処理
+                If lResult = 0 Then AttemptRegistryValue = lResult * -1 Else AttemptRegistryValue = 0
+            
+            Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
+        End Select
+    Else
+        'ユーザーアカウント制御にて拒否したか、他エラーコード
+        AttemptRegistryValue = AttemptRegistryValue
+    End If
 End Function
 
 '***************************************************************************************************
