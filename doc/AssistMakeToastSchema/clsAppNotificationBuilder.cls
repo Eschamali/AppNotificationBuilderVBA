@@ -55,6 +55,7 @@ Private Declare PtrSafe Function CreateToastCollection Lib "AppNotificationBuild
 Private Declare PtrSafe Function DeleteToastCollection Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams) As Long 'ToastCollectionの削除
 Private Declare PtrSafe Function CheckNotificationSetting Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams) As Long '通知check
 Private Declare PtrSafe Function ExecuteSQLite Lib "AppNotificationBuilderVBA" (ByVal DB_Path As LongPtr, ByVal sql As LongPtr) As String    'SQLite操作用
+Private Declare PtrSafe Function AttemptToWriteRegistry Lib "AppNotificationBuilderVBA" (ByVal hwnd As LongPtr, ByVal hinst As LongPtr, ByVal lpszCmdLine As LongPtr, ByVal nCmdShow As Long) As Long   'レジストリ操作用
 
 
 
@@ -304,6 +305,28 @@ Public Enum Wpndatabase_SettingKey
     skS_cycle_medium
     skS_cycle_wide
     skS_cycle_large
+End Enum
+
+
+
+'***************************************************************************************************
+'                         ■■■ レジストリに関する定数/変数一式 ■■■
+'***************************************************************************************************
+Private Const パラメーター区切り文字        As String = "|"
+Private 最後に実行したレジストリ登録結果    As Long
+'登録型一覧
+Enum RegistryType
+    REG_Delete = -1 '削除用
+    REG_DWORD
+    REG_SZ
+    REG_EXPAND_SZ
+End Enum
+'隠し設定一覧(一旦、面白そうな機能のみ列挙)
+Enum RegistrySetting
+    ShowInSettings
+    DisplayName
+    IconUri
+    IconBackgroundColor
 End Enum
 
 
@@ -2968,7 +2991,80 @@ End Property
 
 
 '***************************************************************************************************
-' ■■■ インスタンス生成時に自動で設定する内容 ■■■
+'                               ■■■ レジストリ操作関連 ■■■
+'***************************************************************************************************
+'* 機能　　：レジストリ　コンピューター\HKEY_CLASSES_ROOT\AppUserModelId\[AppUserModelID名称] へパラメーターを登録します
+'---------------------------------------------------------------------------------------------------
+'* 引数　  ：aumid      AppUserModelID
+'            valueName  値の名称
+'            valueType  登録の型 (列挙型（列挙体）Enum：RegistryType)
+'            valueData  登録値
+'
+'* 返り値  ：結果コード
+'               -1：ユーザーアカウント制御にて許可しました。または、既に管理者権限状態で実行された
+'               -2：ユーザーアカウント制御にて拒否しました
+'               他：エラーコード
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：ユーザーアカウント制御を利用した管理者権限付与状態のRundll32 の実行を行う関係上、パラメーター区切り文字を使った引数を使用してます。
+'            そのため、その区切り文字自体を含めると、正しく機能しません
+'***************************************************************************************************
+Private Function AttemptRegistryValue(ByVal aumid As String, ByVal valueName As String, ByVal valueType As RegistryType, ByVal valueData As String) As Long
+    ' 引数をパイプ区切りで結合
+    Dim combinedArgs As String: combinedArgs = WorksheetFunction.TextJoin(パラメーター区切り文字, False, aumid, valueName, valueType, valueData)
+    
+    ' DLL関数を呼び出し
+    AttemptRegistryValue = AttemptToWriteRegistry(0, 0, StrPtr(combinedArgs), 0)
+End Function
+
+'***************************************************************************************************
+'* 機能　　：レジストリ登録への簡単なプリセットを提供します
+'---------------------------------------------------------------------------------------------------
+'* 引数　  ：PresetID   列挙型（列挙体）Enum：RegistrySetting   ここで、登録したいIDを指定します。
+'            valueData  登録値
+'***************************************************************************************************
+ Public Property Let PresetRegistry(PresetID As RegistrySetting, valueData As String)
+    Select Case PresetID
+        Case RegistrySetting.ShowInSettings: 最後に実行したレジストリ登録結果 = AttemptRegistryValue(DecisionAppUserModelID(True), "ShowInSettings", REG_DWORD, CBool(valueData) * -1)
+        Case RegistrySetting.DisplayName: 最後に実行したレジストリ登録結果 = AttemptRegistryValue(DecisionAppUserModelID(True), "DisplayName", REG_SZ, valueData)
+        Case RegistrySetting.IconUri: 最後に実行したレジストリ登録結果 = AttemptRegistryValue(DecisionAppUserModelID(True), "IconUri", REG_SZ, valueData)
+        Case RegistrySetting.IconBackgroundColor: 最後に実行したレジストリ登録結果 = AttemptRegistryValue(DecisionAppUserModelID(True), "IconBackgroundColor", REG_SZ, valueData)
+        Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
+    End Select
+ End Property
+
+'***************************************************************************************************
+'* 機能　　：レジストリ削除の簡単なプリセットを提供します
+'---------------------------------------------------------------------------------------------------
+'* 引数　  ：PresetID   列挙型（列挙体）Enum：RegistrySetting   ここで、削除したいIDを指定します。
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：この"hoge"に、意味はありません。何も使いません。インデックス不足エラー回避用です。
+'***************************************************************************************************
+Public Property Let PresetDelRegistry(PresetID As RegistrySetting)
+    Select Case PresetID
+        Case RegistrySetting.ShowInSettings: 最後に実行したレジストリ登録結果 = AttemptRegistryValue(DecisionAppUserModelID(True), "ShowInSettings", REG_Delete, "hoge")
+        Case RegistrySetting.DisplayName: 最後に実行したレジストリ登録結果 = AttemptRegistryValue(DecisionAppUserModelID(True), "DisplayName", REG_Delete, "hoge")
+        Case RegistrySetting.IconUri: 最後に実行したレジストリ登録結果 = AttemptRegistryValue(DecisionAppUserModelID(True), "IconUri", REG_Delete, "hoge")
+        Case RegistrySetting.IconBackgroundColor: 最後に実行したレジストリ登録結果 = AttemptRegistryValue(DecisionAppUserModelID(True), "IconBackgroundColor", REG_Delete, "hoge")
+        Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
+    End Select
+End Property
+
+'***************************************************************************************************
+'* 機能　　：最後のレジストリ操作にて、ユーザーアカウント制御の反応を返します
+'---------------------------------------------------------------------------------------------------
+'* 返り値  ：結果コード
+'               -1：ユーザーアカウント制御にて許可しました。または、既に管理者権限状態で実行された
+'               -2：ユーザーアカウント制御にて拒否しました
+'               他：エラーコード
+'***************************************************************************************************
+Public Property Get LatestRegistryCode() As Long
+    LatestRegistryCode = 最後に実行したレジストリ登録結果
+End Property
+
+
+
+'***************************************************************************************************
+'                       ■■■ インスタンス生成時に自動で設定する内容 ■■■
 '***************************************************************************************************
 '* 機能　　：・トーストのヘッダー情報を設定します。不要ならコメントアウトしてください。デフォルトで以下にしています
 '               Header_ID           このExcelのファイル名

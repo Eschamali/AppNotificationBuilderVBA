@@ -156,15 +156,17 @@ void __stdcall WriteRegistryAsAdmin(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLin
     HRESULT hr = WriteKeyFromArgs(wideCmdLine);
 
     //結果を表示する
-    //if (SUCCEEDED(hr)) {
-    //    MessageBoxW(nullptr, L"レジストリの設定に成功しました。", L"成功", MB_OK);
-    //}
-    //else {
-    //    _com_error err(hr);
-    //    wchar_t buf[512];
-    //    swprintf_s(buf, L"レジストリ書き込みに失敗しました。\nHRESULT=0x%08X\n%s", hr, err.ErrorMessage());
-    //    MessageBoxW(nullptr, buf, L"エラー", MB_OK);
-    //}
+    if (SUCCEEDED(hr)) {
+        //成功は出さない
+        //MessageBoxW(nullptr, L"レジストリの設定に成功しました。", L"成功", MB_OK);
+    }
+    else {
+        //エラーだけ、ユーザーに報告する
+        _com_error err(hr);
+        wchar_t buf[512];
+        swprintf_s(buf, L"レジストリ書き込みに失敗しました。\nHRESULT=0x%08X\n%s", hr, err.ErrorMessage());
+        MessageBoxW(nullptr, buf, L"エラー", MB_OK);
+    }
 
     //解放
     CoUninitialize();
@@ -198,6 +200,8 @@ long __stdcall AttemptToWriteRegistry(HWND hwnd, HINSTANCE hinst, LPWSTR lpszCmd
 
     if (hModule == NULL) {
         MessageBoxW(nullptr, L"自分自身のDLLハンドルを取得できませんでした。", L"致命的エラー", MB_OK);
+
+        //返却
         CoUninitialize();
         return hr;
     }
