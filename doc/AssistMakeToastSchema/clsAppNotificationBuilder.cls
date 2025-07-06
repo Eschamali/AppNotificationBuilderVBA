@@ -314,6 +314,7 @@ End Enum
 '***************************************************************************************************
 Private Const パラメーター区切り文字        As String = "|"
 Private 最後に実行したレジストリ登録結果    As Long
+Private Const HKCU配下の通知関連フルパス    As String = "Software\Microsoft\Windows\CurrentVersion\Notifications\Settings\"
 '登録型一覧
 Enum RegistryType
     REG_Delete = -1 '削除用
@@ -321,12 +322,17 @@ Enum RegistryType
     REG_SZ
     REG_EXPAND_SZ
 End Enum
-'隠し設定一覧(一旦、面白そうな機能のみ列挙)
+'レジストリで設定できるパラメーターを用意
 Enum RegistrySetting
+    'HKEY_CLASSES_ROOT 用
     ShowInSettings
     DisplayName
     IconUri
     IconBackgroundColor
+    
+    'HKEY_CURRENT_USER 用
+    Enabled
+    SoundFile
 End Enum
 
 
@@ -2759,13 +2765,16 @@ End Function
 '---------------------------------------------------------------------------------------------------
 '* 注意事項：WHERE句部分は最大、2セットまでとし、ANDとします
 '***************************************************************************************************
-Private Function UPDATE文生成(設定したい列 As String, ByVal 設定したい値 As String, 対象テーブル As String, 条件列1 As String, 条件値1 As String, Optional 条件列2 As String, Optional 条件値2 As String) As String
+Private Function UPDATE文生成(設定したい列 As String, ByVal 設定したい値 As String, 対象テーブル As String, 条件列1 As String, 条件値1 As String, Optional 条件列2 As String, Optional 条件値2 As String, Optional NullMode As Boolean) As String
     '条件列2 が指定されてるかで、WHERE句に AND を足す
     If StrPtr(条件列2) Then
         UPDATE文生成 = WorksheetFunction.TextJoin(" ", False, "UPDATE", 対象テーブル, "SET", 設定したい列 & "='" & 設定したい値 & "'", "WHERE", 条件列1 & "='" & 条件値1 & "'", "AND", 条件列2 & "='" & 条件値2 & "';")
     Else
         UPDATE文生成 = WorksheetFunction.TextJoin(" ", False, "UPDATE", 対象テーブル, "SET", 設定したい列 & "='" & 設定したい値 & "'", "WHERE", 条件列1 & "='" & 条件値1 & "';")
     End If
+    
+    'NULLモードなら空文字時、NULLとして扱います。
+    If NullMode Then UPDATE文生成 = Replace(UPDATE文生成, "''", "NULL", , 1)
 End Function
 
 '***************************************************************************************************
@@ -2880,8 +2889,8 @@ Public Property Let SetWpndatabase_WNSId(Optional Custom_WNSId As String, WNSId 
         Case Else: WNSId_string = Custom_WNSId
     End Select
 
-    '"WNSID"を設定する UPDATE 文を組む
-    Dim SQL_UPDATE As String: SQL_UPDATE = UPDATE文生成("WNSId", WNSId_string, "NotificationHandler", "PrimaryId", DecisionAppUserModelID(True))
+    '"WNSID"を設定する UPDATE 文を組む(空文字の場合は、NULL)
+    Dim SQL_UPDATE As String: SQL_UPDATE = UPDATE文生成("WNSId", WNSId_string, "NotificationHandler", "PrimaryId", DecisionAppUserModelID(True), , , True)
 
     '実行して、WNSID を設定する
     LatestExecuteSQLiteNum = ExecuteSQLite(StrPtr(TargetPath), StrPtr(SQL_UPDATE))
@@ -3071,17 +3080,80 @@ Private Function AttemptRegistryValue(ByVal aumid As String, ByVal valueName As 
 End Function
 
 '***************************************************************************************************
+'* 機能　　：レジストリ　コンピューター\HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings\[AppUserModelID名称] へパラメーターを登録し、正しく書き込めたか判定します
+'---------------------------------------------------------------------------------------------------
+'* 引数　  ：aumid      AppUserModelID
+'            valueName  値の名称
+'            valueType  登録の型 (列挙型（列挙体）Enum：RegistryType)
+'            valueData  登録値
+'
+'* 返り値  ：結果コード
+'               0   成功
+'               2   見つかりません(削除の時に表れることがある)
+'              他   失敗
+'---------------------------------------------------------------------------------------------------
+'* 詳細説明：こちらは、HKEY_CURRENT_USER 領域のため、VBA標準の機能で実装します。
+'***************************************************************************************************
+Private Function CurrentUserRegistryValue(ByVal AppUserModelID As String, ByVal valueName As String, ByVal valueType As RegistryType, ByVal valueData As String) As Long
+    ' レジストリハイブの定数
+    Const HKEY_CURRENT_USER As Long = &H80000001
+
+    '必要な変数を用意
+    Dim wmiService As Object
+    Dim regProvider As Object
+    Dim strKeyPath As String
+    Dim lResult As Long
+    
+    ' 1. WMIサービスに接続
+    Set wmiService = GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\default")
+    Set regProvider = wmiService.Get("StdRegProv")
+    
+    ' 2. HKCU配下のフルパスを組み立てる
+    strKeyPath = HKCU配下の通知関連フルパス & AppUserModelID
+    
+    ' 3. キーが存在しなければ作成する(※削除モードはしない)
+    If valueType > REG_Delete Then
+        lResult = regProvider.CreateKey(HKEY_CURRENT_USER, strKeyPath)
+        If lResult <> 0 Then
+            Debug.Print "キーの作成/オープンに失敗: " & strKeyPath
+    
+            CurrentUserRegistryValue = lResult
+            Exit Function
+        End If
+    End If
+
+    ' 4. 値の型に応じて、適切なWMIメソッドを呼び出す
+    Select Case valueType
+        Case REG_DWORD: lResult = regProvider.SetDWORDValue(HKEY_CURRENT_USER, strKeyPath, valueName, CLng(valueData))
+        Case REG_SZ: lResult = regProvider.SetStringValue(HKEY_CURRENT_USER, strKeyPath, valueName, CStr(valueData))
+        Case REG_EXPAND_SZ: lResult = regProvider.SetExpandedStringValue(HKEY_CURRENT_USER, strKeyPath, valueName, CStr(valueData))
+        Case REG_Delete: lResult = regProvider.DeleteValue(HKEY_CURRENT_USER, strKeyPath, valueName)
+        Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
+    End Select
+
+    '結果コードを返す
+    CurrentUserRegistryValue = lResult
+End Function
+
+'***************************************************************************************************
 '* 機能　　：レジストリ登録への簡単なプリセットを提供します
 '---------------------------------------------------------------------------------------------------
 '* 引数　  ：PresetID   列挙型（列挙体）Enum：RegistrySetting   ここで、登録したいIDを指定します。
 '            valueData  登録値
 '***************************************************************************************************
- Public Property Let PresetRegistry(PresetID As RegistrySetting, valueData As String)
+ Public Property Let PresetRegistry(PresetID As RegistrySetting, ByVal valueData As String)
     Select Case PresetID
+        'HKEY_CLASSES_ROOT 用
         Case RegistrySetting.ShowInSettings: 最後に実行したレジストリ登録結果 = AttemptRegistryValue(DecisionAppUserModelID(True), "ShowInSettings", REG_DWORD, CBool(valueData) * -1)
         Case RegistrySetting.DisplayName: 最後に実行したレジストリ登録結果 = AttemptRegistryValue(DecisionAppUserModelID(True), "DisplayName", REG_SZ, valueData)
         Case RegistrySetting.IconUri: 最後に実行したレジストリ登録結果 = AttemptRegistryValue(DecisionAppUserModelID(True), "IconUri", REG_SZ, valueData)
         Case RegistrySetting.IconBackgroundColor: 最後に実行したレジストリ登録結果 = AttemptRegistryValue(DecisionAppUserModelID(True), "IconBackgroundColor", REG_SZ, valueData)
+        
+        'HKEY_CURRENT_USER 用
+        Case RegistrySetting.Enabled: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "Enabled", REG_DWORD, CBool(valueData) * -1)
+        Case RegistrySetting.SoundFile: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "SoundFile", REG_SZ, "")  '値は常に空文字とします。
+
+        '未定義
         Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
     End Select
  End Property
@@ -3095,10 +3167,17 @@ End Function
 '***************************************************************************************************
 Public Property Let PresetDelRegistry(PresetID As RegistrySetting)
     Select Case PresetID
+        'HKEY_CLASSES_ROOT 用
         Case RegistrySetting.ShowInSettings: 最後に実行したレジストリ登録結果 = AttemptRegistryValue(DecisionAppUserModelID(True), "ShowInSettings", REG_Delete, "hoge")
         Case RegistrySetting.DisplayName: 最後に実行したレジストリ登録結果 = AttemptRegistryValue(DecisionAppUserModelID(True), "DisplayName", REG_Delete, "hoge")
         Case RegistrySetting.IconUri: 最後に実行したレジストリ登録結果 = AttemptRegistryValue(DecisionAppUserModelID(True), "IconUri", REG_Delete, "hoge")
         Case RegistrySetting.IconBackgroundColor: 最後に実行したレジストリ登録結果 = AttemptRegistryValue(DecisionAppUserModelID(True), "IconBackgroundColor", REG_Delete, "hoge")
+        
+        'HKEY_CURRENT_USER 用
+        Case RegistrySetting.Enabled: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "Enabled", REG_Delete, "hoge")
+        Case RegistrySetting.SoundFile: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "SoundFile", REG_Delete, "hoge")
+
+        '未定義
         Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
     End Select
 End Property
