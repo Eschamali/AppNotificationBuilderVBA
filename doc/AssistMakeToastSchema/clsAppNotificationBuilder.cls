@@ -333,6 +333,10 @@ Enum RegistrySetting
     'HKEY_CURRENT_USER 用
     Enabled
     SoundFile
+    AllowContentAboveLock
+    Rank
+    ShowBanner
+    ShowInActionCenter
 End Enum
 
 
@@ -3152,6 +3156,10 @@ End Function
         'HKEY_CURRENT_USER 用
         Case RegistrySetting.Enabled: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "Enabled", REG_DWORD, CBool(valueData) * -1)
         Case RegistrySetting.SoundFile: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "SoundFile", REG_SZ, "")  '値は常に空文字とします。
+        Case RegistrySetting.AllowContentAboveLock: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "AllowContentAboveLock", REG_DWORD, CBool(valueData) * -1)
+        Case RegistrySetting.Rank: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "Rank", REG_DWORD, valueData)
+        Case RegistrySetting.ShowBanner: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "ShowBanner", REG_DWORD, 0)  '値は常に0とします。
+        Case RegistrySetting.ShowInActionCenter: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "ShowInActionCenter", REG_DWORD, 0)  '値は常に0とします。
 
         '未定義
         Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
@@ -3176,6 +3184,10 @@ Public Property Let PresetDelRegistry(PresetID As RegistrySetting)
         'HKEY_CURRENT_USER 用
         Case RegistrySetting.Enabled: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "Enabled", REG_Delete, "hoge")
         Case RegistrySetting.SoundFile: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "SoundFile", REG_Delete, "hoge")
+        Case RegistrySetting.AllowContentAboveLock: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "AllowContentAboveLock", REG_Delete, "hoge")
+        Case RegistrySetting.Rank: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "Rank", REG_Delete, "hoge")
+        Case RegistrySetting.ShowBanner: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "ShowBanner", REG_Delete, "hoge")
+        Case RegistrySetting.ShowInActionCenter: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "ShowInActionCenter", REG_Delete, "hoge")
 
         '未定義
         Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
