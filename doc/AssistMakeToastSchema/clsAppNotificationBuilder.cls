@@ -3055,18 +3055,18 @@ Private Function AttemptRegistryValue(ByVal aumid As String, ByVal valueName As 
                 'DWORDとして読み取りを試みる
                 lResult = regProvider.GetDWORDValue(HKEY_CLASSES_ROOT, keyPath, valueName, dwordValue)
                 'あったら、ここで終わり
-                If lResult = 0 Then AttemptRegistryValue = lResult * -1: Exit Function
+                If lResult = 0 Then AttemptRegistryValue = ResultCode: Exit Function
 
                 'SZとして読み取りを試みる
                 lResult = regProvider.GetStringValue(HKEY_CLASSES_ROOT, keyPath, valueName, strValue)
                 'あったら、所定の処理
-                If lResult = 0 Then AttemptRegistryValue = lResult * -1 Else AttemptRegistryValue = 0
+                If lResult = 0 Then AttemptRegistryValue = ResultCode Else AttemptRegistryValue = 0
             
             Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
         End Select
     Else
         'ユーザーアカウント制御にて拒否したか、他エラーコード
-        AttemptRegistryValue = AttemptRegistryValue
+        AttemptRegistryValue = ResultCode
     End If
 End Function
 
