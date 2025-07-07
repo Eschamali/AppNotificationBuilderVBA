@@ -283,7 +283,7 @@ Public Enum Wpndatabase_SettingKey
     skS_lock_toast
     skS_tile
     skS_lock_badge
-    skS_banner
+    skS_banner                              'レジストリとの連携必須
     skS_lock_tile
     skR_tile
     skS_badge
@@ -299,7 +299,7 @@ Public Enum Wpndatabase_SettingKey
     skC_tickle
     skC_voip
     skC_storage_toast
-    skS_toast
+    skS_toast                               'レジストリとの連携必須
     skC_storage_tile
     skM_SecondaryTileMigrationComplete
     skS_cycle_medium
@@ -331,11 +331,13 @@ Enum RegistrySetting
     IconBackgroundColor
     
     'HKEY_CURRENT_USER 用
+    '--wpndatabase.db 連携必須--
     Enabled
+    ShowBanner
+    '--wpndatabase.db 連携不要--
     SoundFile
     AllowContentAboveLock
     Rank
-    ShowBanner
     ShowInActionCenter
 End Enum
 
@@ -2968,7 +2970,7 @@ Public Property Get Wpndatabase_SettingKeyValue(SettingKeyID As Wpndatabase_Sett
     
     'もし何も得られない場合、そもそもdbにないので、INSERTで設定する。デフォルトは、false とします
     If SELECT結果 = "" Then
-        LatestExecuteSQLiteNum = ExecuteSQLite(StrPtr(TargetPath), StrPtr(INSERT文生成_HandlerSettings(TargetHandlerId, SettingKeyName, False * -1)))
+        LatestExecuteSQLiteNum = ExecuteSQLite(StrPtr(TargetPath), StrPtr(INSERT文生成_HandlerSettings(TargetHandlerId, SettingKeyName, False)))
         Wpndatabase_SettingKeyValue = False
     Else
        Wpndatabase_SettingKeyValue = CBool(SELECT結果)
@@ -2998,7 +3000,9 @@ Public Property Let Wpndatabase_SettingKeyValue(SettingKeyID As Wpndatabase_Sett
     LatestExecuteSQLiteNum = ExecuteSQLite(StrPtr(TargetPath), StrPtr(SQL_UPDATE))
     
     'もし0件の場合、そもそもdbにないので、INSERTで設定する
-    If LatestExecuteSQLiteNum = 0 Then LatestExecuteSQLiteNum = INSERT文生成_HandlerSettings(TargetHandlerId, SettingKeyName, SetFlag * -1)
+    If LatestExecuteSQLiteNum = 0 Then
+        LatestExecuteSQLiteNum = ExecuteSQLite(StrPtr(TargetPath), StrPtr(INSERT文生成_HandlerSettings(TargetHandlerId, SettingKeyName, SetFlag)))
+    End If
 End Property
 
 
@@ -3154,11 +3158,13 @@ End Function
         Case RegistrySetting.IconBackgroundColor: 最後に実行したレジストリ登録結果 = AttemptRegistryValue(DecisionAppUserModelID(True), "IconBackgroundColor", REG_SZ, valueData)
         
         'HKEY_CURRENT_USER 用
+        '--wpndatabase.db 連携必須--
         Case RegistrySetting.Enabled: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "Enabled", REG_DWORD, CBool(valueData) * -1)
+        Case RegistrySetting.ShowBanner: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "ShowBanner", REG_DWORD, 0)  '値は常に0とします。
+        '--wpndatabase.db 連携不要--
         Case RegistrySetting.SoundFile: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "SoundFile", REG_SZ, "")  '値は常に空文字とします。
         Case RegistrySetting.AllowContentAboveLock: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "AllowContentAboveLock", REG_DWORD, CBool(valueData) * -1)
         Case RegistrySetting.Rank: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "Rank", REG_DWORD, valueData)
-        Case RegistrySetting.ShowBanner: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "ShowBanner", REG_DWORD, 0)  '値は常に0とします。
         Case RegistrySetting.ShowInActionCenter: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "ShowInActionCenter", REG_DWORD, 0)  '値は常に0とします。
 
         '未定義
@@ -3182,11 +3188,13 @@ Public Property Let PresetDelRegistry(PresetID As RegistrySetting)
         Case RegistrySetting.IconBackgroundColor: 最後に実行したレジストリ登録結果 = AttemptRegistryValue(DecisionAppUserModelID(True), "IconBackgroundColor", REG_Delete, "hoge")
         
         'HKEY_CURRENT_USER 用
+        '--wpndatabase.db 連携必須--
         Case RegistrySetting.Enabled: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "Enabled", REG_Delete, "hoge")
+        Case RegistrySetting.ShowBanner: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "ShowBanner", REG_Delete, "hoge")
+        '--wpndatabase.db 連携不要--
         Case RegistrySetting.SoundFile: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "SoundFile", REG_Delete, "hoge")
         Case RegistrySetting.AllowContentAboveLock: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "AllowContentAboveLock", REG_Delete, "hoge")
         Case RegistrySetting.Rank: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "Rank", REG_Delete, "hoge")
-        Case RegistrySetting.ShowBanner: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "ShowBanner", REG_Delete, "hoge")
         Case RegistrySetting.ShowInActionCenter: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "ShowInActionCenter", REG_Delete, "hoge")
 
         '未定義
