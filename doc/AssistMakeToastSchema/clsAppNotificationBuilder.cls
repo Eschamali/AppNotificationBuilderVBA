@@ -339,6 +339,7 @@ Enum RegistrySetting
     AllowContentAboveLock
     Rank
     ShowInActionCenter
+    AllowUrgentNotifications
 End Enum
 
 
@@ -3166,6 +3167,7 @@ End Function
         Case RegistrySetting.AllowContentAboveLock: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "AllowContentAboveLock", REG_DWORD, CBool(valueData) * -1)
         Case RegistrySetting.Rank: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "Rank", REG_DWORD, valueData)
         Case RegistrySetting.ShowInActionCenter: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "ShowInActionCenter", REG_DWORD, 0)  '値は常に0とします。
+        Case RegistrySetting.AllowUrgentNotifications: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "AllowUrgentNotifications", REG_DWORD, CBool(valueData) * -1)
 
         '未定義
         Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
@@ -3196,6 +3198,7 @@ Public Property Let PresetDelRegistry(PresetID As RegistrySetting)
         Case RegistrySetting.AllowContentAboveLock: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "AllowContentAboveLock", REG_Delete, "hoge")
         Case RegistrySetting.Rank: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "Rank", REG_Delete, "hoge")
         Case RegistrySetting.ShowInActionCenter: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "ShowInActionCenter", REG_Delete, "hoge")
+        Case RegistrySetting.AllowUrgentNotifications: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(DecisionAppUserModelID(True), "AllowUrgentNotifications", REG_Delete, "hoge")
 
         '未定義
         Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
