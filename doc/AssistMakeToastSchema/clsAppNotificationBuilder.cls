@@ -2228,15 +2228,16 @@ End Function
 '* 機能　　：引数に渡された値で、トースト通知を表示するコマンド文字列を返します。指定日時に通知するスケジュール機能も対応します
 '---------------------------------------------------------------------------------------------------
 '* 返り値　：引数に渡された値で、トーストを表示させるコマンド文字列を返します
-'* 引数　　：ToastTag       ToastTagを指定します。複数通知を提供する際に必要です
-'            CollectionID   トーストコレクションIDがあるなら、それを指定
-'            ScheduleDate   指定日時に通知したい場合は、「Date型」として指定することでスケジュール通知として登録されます。省略時、即時通知とします
-'            ExpirationDate アクションセンターから自動削除される日時を指定。最大30sの遅延バグが発生します。
-'            Suppress       「True」で、ポップアップ メッセージを表示せずに、トースト通知がアクション センターに通知されます。
+'* 引数　　：ToastTag           ToastTagを指定します。複数通知を提供する際に必要です
+'            CollectionID       トーストコレクションIDがあるなら、それを指定
+'            ScheduleDate       指定日時に通知したい場合は、「Date型」として指定することでスケジュール通知として登録されます。省略時、即時通知とします
+'            ExpirationDate     アクションセンターから自動削除される日時を指定。最大30sの遅延バグが発生します。
+'            Suppress           Trueで、ポップアップ メッセージを表示せずに、トースト通知がアクション センターに通知されます。
+'            ExpiresOnReboot    True で、再起動すると同時に、トースト通知が消えます
 '---------------------------------------------------------------------------------------------------
 '* 注意事項：あくまで「コマンド実行の文字列」を返すだけで、呼び出すだけでは実行されません。別途、Shell関数や「Windows Script Host Object Model」を参照設定してRUNコマンドを実行することで、Toastを発行できます。
 '**************************************************************************************************
-Public Property Get GenerateCmd_ToastNotifierShow(ByVal ToastTag As String, Optional ByVal CollectionID As String, Optional ByVal ScheduleDate As Date, Optional ByVal ExpirationDate As Date, Optional ByVal Suppress As Boolean) As String
+Public Property Get GenerateCmd_ToastNotifierShow(ByVal ToastTag As String, Optional ByVal CollectionID As String, Optional ByVal ScheduleDate As Date, Optional ByVal ExpirationDate As Date, Optional ByVal Suppress As Boolean, Optional ExpiresOnReboot As Boolean) As String
     'データバインディングを使用するか判定する
     Dim UseDataBinding As Boolean, i As Long
     
@@ -2270,7 +2271,7 @@ Public Property Get GenerateCmd_ToastNotifierShow(ByVal ToastTag As String, Opti
         .Group = Application.hwnd
         .Schedule_ID = "ExcelSchedule"
         .CollectionID = CollectionID
-        .ExpiresOnReboot = (ExpirationDate < 0)
+        .ExpiresOnReboot = ExpiresOnReboot
         .SuppressPopup = Suppress
         .Schedule_DeliveryTime = ScheduleDate
         .ExpirationTime = ExpirationDate
@@ -2522,11 +2523,12 @@ End Sub
 '            CollectionID       トーストコレクションIDがあるなら、それを指定
 '            ScheduleDate       指定日時に通知したい場合は、「Date型」として指定することでスケジュール通知として登録されます。省略時、即時通知とします
 '            ExpirationDate     アクションセンターから自動削除される日時を指定。最大30sの遅延バグが発生します。
-'            Suppress           「True」で、ポップアップ メッセージを表示せずに、トースト通知がアクション センターに通知されます。
+'            Suppress           True で、ポップアップ メッセージを表示せずに、トースト通知がアクション センターに通知されます。
+'            ExpiresOnReboot    True で、再起動すると同時に、トースト通知が消えます
 '---------------------------------------------------------------------------------------------------
 '* 注意事項：これを実行すると、即座にDll内で処理を行います。また、日時系データを扱う場合は、UTC基準になるので注意
 '**************************************************************************************************
-Public Sub RunDll_ToastNotifierShow(ByVal ToastTag As String, Optional ByVal CollectionID As String, Optional ByVal ScheduleDate As Date, Optional ByVal ExpirationDate As Date, Optional ByVal Suppress As Boolean)
+Public Sub RunDll_ToastNotifierShow(ByVal ToastTag As String, Optional ByVal CollectionID As String, Optional ByVal ScheduleDate As Date, Optional ByVal ExpirationDate As Date, Optional ByVal Suppress As Boolean, Optional ExpiresOnReboot As Boolean)
     'データバインディングを使用するか判定する
     Dim UseDataBinding As Boolean, i As Long
     
@@ -2560,7 +2562,7 @@ Public Sub RunDll_ToastNotifierShow(ByVal ToastTag As String, Optional ByVal Col
         .Schedule_ID = "ExcelSchedule"
         .CollectionID = CollectionID
         
-        .ExpiresOnReboot = (ExpirationDate < 0)
+        .ExpiresOnReboot = ExpiresOnReboot
         .SuppressPopup = Suppress
         
         .Schedule_DeliveryTime = ScheduleDate
