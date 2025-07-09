@@ -241,28 +241,49 @@ long __stdcall UpdateToastNotification(ToastNotificationParams* ToastConfigData,
 //---------------------------------------------------------------------------------------------------
 //* 引数　　：ToastConfigData    ヘッダーファイルに定義した引数。ここから必要な値を使用する方針です
 //---------------------------------------------------------------------------------------------------
-//* 機能説明：最も細かく設定できる引数、tag,group,appid　の3つで削除を指定します。
+//* 機能説明：tag,group にて、欠けてる内容に応じて、削除範囲を変えます。
 //***************************************************************************************************
 void __stdcall RemoveToastNotification(ToastNotificationParams* ToastConfigData) {
-    try {
+    try
+    {
+        // 頻繁に使うので、変数に入れておく
+        winrt::hstring tag = ToastConfigData->Tag ? ToastConfigData->Tag : L"";
+        winrt::hstring group = ToastConfigData->Group ? ToastConfigData->Group : L"";
+        winrt::hstring aumid = ToastConfigData->AppUserModelID ? ToastConfigData->AppUserModelID : L"";
+        winrt::hstring collectionId = ToastConfigData->CollectionID ? ToastConfigData->CollectionID : L"";
 
-        //値Check用
-        //MessageBoxW(nullptr, ToastConfigData->AppUserModelID, L"AppUserModelID", MB_OK);
-        //MessageBoxW(nullptr, ToastConfigData->Tag, L"Tag", MB_OK);
-        //MessageBoxW(nullptr, ToastConfigData->Group, L"Group", MB_OK);
-
-        //コレクションIDが指定されてあったら、そっちの処理を行う
-        if (ToastConfigData->CollectionID) {
-            // コレクションIDに紐づく指定の通知IDを削除
-            ToastNotificationManager::GetDefault().GetHistoryForToastCollectionIdAsync(ToastConfigData->CollectionID).get().Remove(ToastConfigData->Tag, ToastConfigData->Group);
+        // まず、操作対象となるHistoryオブジェクトを取得する
+        ToastNotificationHistory history{ nullptr };
+        if (!collectionId.empty()) {
+            history = ToastNotificationManager::GetDefault().GetHistoryForToastCollectionIdAsync(collectionId).get();
         }
         else {
-            // ToastNotificationManagerからToastNotificationHistory.Remove メソッドを使用し、該当の通知を削除する
-            ToastNotificationManager::History().Remove(ToastConfigData->Tag, ToastConfigData->Group, ToastConfigData->AppUserModelID);
+            history = ToastNotificationManager::History();
+        }
+
+        // ★★★ ここからが条件分岐のロジック ★★★
+
+        if (!tag.empty()) {
+            // ケース1: Tagが指定されている場合 -> ピンポイント削除
+            // Groupが空でも、AUMIDが空でも、このメソッドは安全に動作する
+            history.Remove(tag, group, aumid);
+            // MessageBoxW(nullptr, L"Tagを指定して削除しました。", L"Remove Info", MB_OK);
+
+        }
+        else if (!group.empty()) {
+            // ケース2: Tagが空で、Groupが指定されている場合 -> グループごと削除
+            history.RemoveGroup(group, aumid);
+            // MessageBoxW(nullptr, L"Groupを指定して削除しました。", L"Remove Info", MB_OK);
+
+        }
+        else {
+            // ケース3: TagもGroupも空の場合 -> 全て削除
+            history.Clear(aumid);
+            // MessageBoxW(nullptr, L"全ての通知を削除しました。", L"Remove Info", MB_OK);
         }
     }
-    catch (const hresult_error& ex) {
+    catch (const winrt::hresult_error& ex){
         // エラー処理: 必要に応じてエラーメッセージを表示
-        MessageBox(nullptr, ex.message().c_str(), L"Error", MB_OK);
+        MessageBoxW(nullptr, ex.message().c_str(), L"Error", MB_OK);
     }
 }

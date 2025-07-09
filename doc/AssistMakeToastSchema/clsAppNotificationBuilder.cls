@@ -2613,19 +2613,27 @@ End Property
 '* 処理名　：RunDll_ToastNotificationHistoryRemove
 '* 機能　　：タグから、トースト通知を削除します
 '---------------------------------------------------------------------------------------------------
-'* 引数　　：ToastTag           削除するToastTagを指定します。
+'* 引数　　：CollectionID       コレクション通知IDの方を削除したい時に指定
+'            ToastTag           削除するToastTagを指定します。指定しない場合、アクティブExcelで出したトースト通知を全て削除します。
+'            AllDel             True で、AppUserModelID に紐づく全てのトースト通知を削除します
 '---------------------------------------------------------------------------------------------------
-'* 注意事項：これを実行すると、即座にDll内で処理を行います。
+'* 注意事項：AllDel が True になると、ToastTag を無視します。
 '**************************************************************************************************
-Public Sub RunDll_ToastNotificationHistoryRemove(ByVal ToastTag As String, Optional ByVal CollectionID As String)
+Public Sub RunDll_ToastNotificationHistoryRemove(Optional ByVal ToastTag As String, Optional ByVal CollectionID As String, Optional AllDel As Boolean)
     '設定値をまとめる
     With ToastConfig
         .AppUserModelID = DecisionAppUserModelID(True)
         '.AllowUse_InternetImageFlag                     '事前に、設定済み
         .XmlSchema = vbNullString
 
-        .Tag = ToastTag
-        .Group = Application.hwnd
+        'AllDelモードなら、NULL 指定
+        If AllDel Then
+            .Tag = vbNullString
+            .Group = vbNullString
+        Else
+            .Tag = ToastTag
+            .Group = Application.hwnd
+        End If
         .Schedule_ID = vbNullString
         .CollectionID = CollectionID
         
