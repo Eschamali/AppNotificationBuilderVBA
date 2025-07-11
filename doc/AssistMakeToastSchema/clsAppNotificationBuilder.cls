@@ -1469,7 +1469,7 @@ End Property
 Public Property Let SetToastHeader(Optional ByVal ArgID As String, Optional ByVal ArgArguments As String, Optional ByVal ArgActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, ByVal ArgTitle As String)
     With ElementHeader
         '省略時：このExcelのファイル名
-        If StrPtr(ArgID) Then .id = ArgID Else .id = ThisWorkbook.Name
+        If StrPtr(ArgID) Then .id = ArgID Else .id = ThisWorkbook.Name & "|" & GetCurrentProcessId()
         
         '省略時：このExcelの保存フォルダパス
         If StrPtr(ArgArguments) Then .Arguments = ArgArguments Else .Arguments = ThisWorkbook.Path
@@ -3234,7 +3234,9 @@ End Property
 '* 機能　　：最後のレジストリ操作にて、ユーザーアカウント制御の反応を返します
 '---------------------------------------------------------------------------------------------------
 '* 返り値  ：結果コード
-'               -1：ユーザーアカウント制御にて許可しました。または、既に管理者権限状態で実行された
+'                2：キーが見つかりません
+'                0：成功
+'               -1：ユーザーアカウント制御にて許可しました。または、既に管理者権限状態で実行されたがうまく行ってない
 '               -2：ユーザーアカウント制御にて拒否しました
 '               他：エラーコード
 '***************************************************************************************************
