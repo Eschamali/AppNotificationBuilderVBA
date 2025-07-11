@@ -74,6 +74,3 @@ extern "C" AppNotificationBuilderVBA_API long __stdcall CreateToastCollection(To
 extern "C" AppNotificationBuilderVBA_API long __stdcall DeleteToastCollection(ToastNotificationParams* ToastConfigData);  //トーストCollectionを削除
 //wpndatabase.db を SQLite で操作する関数
 extern "C" AppNotificationBuilderVBA_API BSTR __stdcall ExecuteSQLite(const wchar_t* dbPath, const wchar_t* sql);
-//レジストリエディター を操作する関数
-extern "C" AppNotificationBuilderVBA_API long __stdcall AttemptToWriteRegistry(HWND hwnd, HINSTANCE hinst, LPWSTR lpszCmdLine, int nCmdShow);   //VBAから呼び出す用
-extern "C" AppNotificationBuilderVBA_API void __stdcall WriteRegistryAsAdmin(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCmdShow);      //rundll32 から管理者権限で呼び出される関数のための専用プロトタイプ
