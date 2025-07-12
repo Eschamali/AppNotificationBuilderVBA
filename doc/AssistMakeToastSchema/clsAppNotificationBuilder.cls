@@ -649,6 +649,7 @@ End Type
 '***************************************************************************************************
 Private Const AppUserModelID_Excel  As String = "Microsoft.Office.EXCEL.EXE.15" 'DeskTopアプリ：Excel
 Private AppUserModelID_Any          As String                                   '任意のAppID設定用変数
+Private ThisExcelPID                As Long                                     'このClassファイル構築時のプロセスID
 
 
 
@@ -1458,7 +1459,7 @@ End Property
 '***************************************************************************************************
 '* 機能　　：header要素の各属性にセットしたものをtoast要素に挿入します
 '---------------------------------------------------------------------------------------------------
-'* 引数　　：ArgID            ：このヘッダーを一意に識別します。 2 つの通知が同じヘッダー ID を持つ場合、アクション センターで同じヘッダーの下に表示されます。(省略時：このExcelのファイル名)
+'* 引数　　：ArgID            ：このヘッダーを一意に識別します。 2 つの通知が同じヘッダー ID を持つ場合、アクション センターで同じヘッダーの下に表示されます。(省略時：このExcelのファイル名|起動中のExcelPID)
 '            ArgArguments     ：起動スキーマ。URLやファイルパスなど(省略時：このExcelの保存フォルダパス)
 '            ArgActivationType：このヘッダーがクリックされた場合に使用するアクティブ化の種類
 '            ArgTitle         ：ヘッダーのタイトルです。(推奨：このExcelのBook名　ThisWorkbook.Name)
@@ -1468,8 +1469,8 @@ End Property
 '***************************************************************************************************
 Public Property Let SetToastHeader(Optional ByVal ArgID As String, Optional ByVal ArgArguments As String, Optional ByVal ArgActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, ByVal ArgTitle As String)
     With ElementHeader
-        '省略時：このExcelのファイル名
-        If StrPtr(ArgID) Then .id = ArgID Else .id = ThisWorkbook.Name & "|" & GetCurrentProcessId()
+        '省略時：このExcelのファイル名|起動中のExcelPID
+        If StrPtr(ArgID) Then .id = ArgID Else .id = ThisWorkbook.Name & "|" & ThisExcelPID
         
         '省略時：このExcelの保存フォルダパス
         If StrPtr(ArgArguments) Then .Arguments = ArgArguments Else .Arguments = ThisWorkbook.Path
@@ -2275,7 +2276,7 @@ Public Property Get GenerateCmd_ToastNotifierShow(ByVal ToastTag As String, Opti
         .XmlSchema = MakeXmlToastContentBuilder(UseDataBinding)
         
         .Tag = ToastTag
-        .Group = ThisWorkbook.Name & "|" & GetCurrentProcessId()
+        .Group = ThisWorkbook.Name & "|" & ThisExcelPID
         .Schedule_ID = "ExcelSchedule"
         .CollectionID = CollectionID
         .ExpiresOnReboot = ExpiresOnReboot
@@ -2334,7 +2335,7 @@ Public Property Get GenerateCmd_ToastNotifierUpdate(ByVal ToastTag As String) As
         .XmlSchema = vbNullString
 
         .Tag = ToastTag
-        .Group = ThisWorkbook.Name & "|" & GetCurrentProcessId()
+        .Group = ThisWorkbook.Name & "|" & ThisExcelPID
         .Schedule_ID = vbNullString
         .CollectionID = vbNullString
         
@@ -2473,7 +2474,7 @@ Public Property Get GenerateCmd_ToastNotificationHistoryRemove(RemoveTag As Stri
         '.AllowUse_InternetImageFlag                      '事前に、設定済み
 
         .Tag = RemoveTag
-        .Group = ThisWorkbook.Name & "|" & GetCurrentProcessId()
+        .Group = ThisWorkbook.Name & "|" & ThisExcelPID
 
         '削除コマンドを生成
         GenerateCmd_ToastNotificationHistoryRemove = ActionPS & Run__Windows_UI_Notifications__ToastRemove(.Tag, .Group, .AppUserModelID) & Chr(34)
@@ -2565,7 +2566,7 @@ Public Sub RunDll_ToastNotifierShow(ByVal ToastTag As String, Optional ByVal Col
         .XmlSchema = MakeXmlToastContentBuilder(UseDataBinding)
         
         .Tag = ToastTag
-        .Group = ThisWorkbook.Name & "|" & GetCurrentProcessId()
+        .Group = ThisWorkbook.Name & "|" & ThisExcelPID
         .Schedule_ID = "ExcelSchedule"
         .CollectionID = CollectionID
         
@@ -2602,7 +2603,7 @@ Public Property Get RunDll_ToastNotifierUpdate(ByVal ToastTag As String, Optiona
         .XmlSchema = vbNullString
 
         .Tag = ToastTag
-        .Group = ThisWorkbook.Name & "|" & GetCurrentProcessId()
+        .Group = ThisWorkbook.Name & "|" & ThisExcelPID
         .Schedule_ID = vbNullString
         .CollectionID = CollectionID
         
@@ -2641,7 +2642,7 @@ Public Sub RunDll_ToastNotificationHistoryRemove(Optional ByVal ToastTag As Stri
             .Group = vbNullString
         Else
             .Tag = ToastTag
-            .Group = ThisWorkbook.Name & "|" & GetCurrentProcessId()
+            .Group = ThisWorkbook.Name & "|" & ThisExcelPID
         End If
         .Schedule_ID = vbNullString
         .CollectionID = CollectionID
@@ -3259,6 +3260,9 @@ End Property
 Private Sub Class_Initialize()
     '必ず設定
     ElementBinding.template = "ToastGeneric"
+
+    '構築時に埋め込む
+    ThisExcelPID = GetCurrentProcessId()
     
     With ThisWorkbook
         '拡張子の位置を調べる
