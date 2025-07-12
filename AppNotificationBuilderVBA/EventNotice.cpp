@@ -23,6 +23,7 @@
 //***************************************************************************************************
 //                                  ■■■ 静的定数 ■■■
 //***************************************************************************************************
+constexpr const wchar_t* EXCEL_MAIN_CLASS_NAME = L"XLMAIN";                 //"XLMAIN"ウィンドウの名称
 constexpr const wchar_t* EXCEL_DESK_CLASS_NAME = L"XLDESK";                 //"XLMAIN"ウィンドウの子名称
 constexpr const wchar_t* EXCEL_SHEET_CLASS_NAME = L"EXCEL7";                //"XLDESK"の子名称
 constexpr const wchar_t* EXCEL_APPLICATION_CLASS_NAME = L"Application";     //"Application"のオブジェクト名称
@@ -31,6 +32,10 @@ constexpr const wchar_t* EXCEL_APPLICATION_RUN_MethodName = L"Run";         //"A
 constexpr const wchar_t* EventTriggerMacroName_ToastDismissed = L"ExcelToast_Dismissed";    //トースト通知の Dismissed イベント時に使うプロシージャ名
 constexpr const wchar_t* EventTriggerMacroName_ToastFailed = L"ExcelToast_Failed";          //トースト通知の Failed イベント時に使うプロシージャ名
 
+// EnumThreadWindowsのためのコールバック関数
+struct EnumThreadWndData {
+    HWND foundHwnd;
+};
 
 
 //***************************************************************************************************
@@ -50,6 +55,101 @@ static HRESULT GetProperty(IDispatch* pDisp, const wchar_t* propName, CComVarian
     if (FAILED(hr)) return hr;
     DISPPARAMS params = { NULL, NULL, 0, 0 };
     return pDisp->Invoke(dispID, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_PROPERTYGET, &params, &result, NULL, NULL);
+}
+
+//***************************************************************************************************
+//* 機能　　：EnumThreadWindows 用のコールバック関数
+//---------------------------------------------------------------------------------------------------
+//* 引数　　：※割愛します
+//---------------------------------------------------------------------------------------------------
+//* 注意事項：Excel の hwnd 取得に限ります。
+//***************************************************************************************************
+BOOL CALLBACK EnumThreadWndProc(HWND hwnd, LPARAM lParam) {
+    auto& data = *reinterpret_cast<EnumThreadWndData*>(lParam);
+    wchar_t className[256];
+    if (GetClassNameW(hwnd, className, 256) > 0) {
+        if (wcscmp(className, EXCEL_MAIN_CLASS_NAME) == 0) {
+            data.foundHwnd = hwnd;
+            return FALSE; // 発見したので終了
+        }
+    }
+    return TRUE;
+}
+
+//***************************************************************************************************
+//* 機能　　：PIDからHWNDを見つける関数です
+//---------------------------------------------------------------------------------------------------
+//* 返り値  ：PID に基づく、Excel の HWND
+//* 引数　　：取得したプロセスID
+//---------------------------------------------------------------------------------------------------
+//* 注意事項：「#include <tlhelp32.h>」のインクルードが必要です
+//***************************************************************************************************
+HWND FindMainWindowFromPid(DWORD pid) {
+    HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+    if (hSnap == INVALID_HANDLE_VALUE) return NULL;
+
+    THREADENTRY32 te;
+    te.dwSize = sizeof(te);
+
+    HWND foundHwnd = NULL;
+
+    if (Thread32First(hSnap, &te)) {
+        do {
+            if (te.th32OwnerProcessID == pid) {
+                // PIDが一致するスレッドを発見
+                EnumThreadWndData data = { 0 };
+                EnumThreadWindows(te.th32ThreadID, EnumThreadWndProc, reinterpret_cast<LPARAM>(&data));
+                if (data.foundHwnd) {
+                    foundHwnd = data.foundHwnd;
+                    break; // 見つかったのでループを抜ける
+                }
+            }
+        } while (Thread32Next(hSnap, &te));
+    }
+
+    CloseHandle(hSnap);
+    return foundHwnd;
+}
+
+//***************************************************************************************************
+//* 機能　　：トーストオブジェクトにある Group から、埋め込まれてるであろう PID を抽出し、そこから HWND を抽出します
+//---------------------------------------------------------------------------------------------------
+//* 返り値  ：PID に基づく、HWND
+//* 引数　　：トーストオブジェクト
+//***************************************************************************************************
+HWND GetHwndFromPID(ToastNotification const& Target) {
+    // 1. Groupプロパティから、複合文字列を取得
+    winrt::hstring groupHString = Target.Group();
+    std::wstring combinedString = groupHString.c_str();
+
+    // 2. rfind()で、最後の '|' の位置を探す
+    size_t lastPipePos = combinedString.rfind(L'|');
+
+    // 3. '|' が見つかったかどうかをチェック
+    if (lastPipePos != std::wstring::npos) {
+        // 見つかった場合
+
+        // 4. substr()で、'|' の次の文字から最後までを切り出す
+        std::wstring pidString = combinedString.substr(lastPipePos + 1);
+
+        // (オプション) ブック名の部分も取得する場合
+        std::wstring bookNameString = combinedString.substr(0, lastPipePos);
+
+        // デバッグ用に表示
+        //MessageBoxW(nullptr, pidString.c_str(), L"抽出したPID", MB_OK);
+        //MessageBoxW(nullptr, bookNameString.c_str(), L"抽出したブック名", MB_OK);
+
+        // 5. 抽出した文字列を数値に変換
+        DWORD targetPID = std::stoul(pidString);
+
+        // 6. PIDからHWNDを見つけて、返す
+        return FindMainWindowFromPid(targetPID);
+    }
+    else {
+        // '|' が見つからなかった場合のエラー処理
+        MessageBoxW(nullptr, L"Groupプロパティの形式が正しくありません。(区切り文字'|'が見つかりません)", L"エラー", MB_OK);
+        return 0;
+    }
 }
 
 
@@ -213,8 +313,7 @@ void OnActivated(ToastNotification const& sender, IInspectable const& args) {
     if (activatedArgs) {
         try {
             // GroupプロパティからHWNDを取得(VBA側で必ず設定すること)
-            winrt::hstring group = sender.Group();
-            HWND targetHwnd = (HWND)std::stoull(group.c_str());
+            HWND targetHwnd = GetHwndFromPID(sender);
 
             // UserInput()からすべてのキーと値のペアを取得(ここに、Input要素にて入力したパラメーター一式があります)
             auto userInputs = activatedArgs.UserInput();
@@ -281,8 +380,7 @@ void OnActivated(ToastNotification const& sender, IInspectable const& args) {
 void OnDismissed(ToastNotification const& sender, ToastDismissedEventArgs const& args){
     try {
         // GroupプロパティからHWNDを取得(VBA側で必ず設定すること)
-        winrt::hstring group = sender.Group();
-        HWND targetHwnd = (HWND)std::stoull(group.c_str());
+        HWND targetHwnd = GetHwndFromPID(sender);
 
         // 閉じられた理由を取得
         ToastDismissalReason reason = args.Reason();
@@ -339,8 +437,7 @@ void OnDismissed(ToastNotification const& sender, ToastDismissedEventArgs const&
 void OnFailed(ToastNotification const& sender, ToastFailedEventArgs const& args){
     try {
         // GroupプロパティからHWNDを取得(VBA側で必ず設定すること)
-        winrt::hstring group = sender.Group();
-        HWND targetHwnd = (HWND)std::stoull(group.c_str());
+        HWND targetHwnd = GetHwndFromPID(sender);
 
         // なぜ失敗したのか、HRESULT形式のエラーコードを取得
         winrt::hresult errorCode = args.ErrorCode();
