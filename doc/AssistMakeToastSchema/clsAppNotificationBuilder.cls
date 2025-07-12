@@ -1881,7 +1881,7 @@ End Function
 '---------------------------------------------------------------------------------------------------
 '* 返り値　：ブック名|プロセスID　という形式
 '***************************************************************************************************
-Function GetUniqueBookInfo() As String
+Private Function GetUniqueBookInfo() As String
     GetUniqueBookInfo = ThisWorkbook.Name & "|" & ThisExcelPID
 End Function
 
