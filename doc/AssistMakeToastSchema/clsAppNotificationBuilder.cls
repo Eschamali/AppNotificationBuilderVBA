@@ -3192,21 +3192,21 @@ End Function
  Public Property Let PresetRegistry(PresetID As RegistrySetting, ByVal valueData As String)
     Select Case PresetID
         'コンピューター\HKEY_CURRENT_USER\Software\Classes\AppUserModelId 用
-        Case RegistrySetting.ShowInSettings: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "ShowInSettings", REG_DWORD, CBool(valueData) * -1)
+        Case RegistrySetting.ShowInSettings: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "ShowInSettings", REG_DWORD, valueData)
         Case RegistrySetting.DisplayName: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "DisplayName", REG_SZ, valueData)
         Case RegistrySetting.IconUri: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "IconUri", REG_SZ, valueData)
         Case RegistrySetting.IconBackgroundColor: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "IconBackgroundColor", REG_SZ, valueData)
         
         'コンピューター\HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings 用
         '--wpndatabase.db 連携必須--
-        Case RegistrySetting.Enabled: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "Enabled", REG_DWORD, CBool(valueData) * -1)
-        Case RegistrySetting.ShowBanner: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "ShowBanner", REG_DWORD, 0) '値は常に0とします。
+        Case RegistrySetting.Enabled: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "Enabled", REG_DWORD, valueData)
+        Case RegistrySetting.ShowBanner: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "ShowBanner", REG_DWORD, valueData) '値0で、効果発揮
         '--wpndatabase.db 連携不要--
-        Case RegistrySetting.SoundFile: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "SoundFile", REG_SZ, "") '値は常に空文字とします。
-        Case RegistrySetting.AllowContentAboveLock: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "AllowContentAboveLock", REG_DWORD, CBool(valueData) * -1)
+        Case RegistrySetting.SoundFile: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "SoundFile", REG_SZ, valueData) '値は空文字で、効果発揮
+        Case RegistrySetting.AllowContentAboveLock: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "AllowContentAboveLock", REG_DWORD, valueData)
         Case RegistrySetting.Rank: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "Rank", REG_DWORD, valueData)
-        Case RegistrySetting.ShowInActionCenter: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "ShowInActionCenter", REG_DWORD, 0) '値は常に0とします。
-        Case RegistrySetting.AllowUrgentNotifications: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "AllowUrgentNotifications", REG_DWORD, CBool(valueData) * -1)
+        Case RegistrySetting.ShowInActionCenter: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "ShowInActionCenter", REG_DWORD, valueData) '値0で、効果発揮
+        Case RegistrySetting.AllowUrgentNotifications: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "AllowUrgentNotifications", REG_DWORD, valueData)
 
         '未定義
         Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
@@ -3221,23 +3221,26 @@ End Function
 '* 注意事項：この"hoge"に、意味はありません。何も使いません。インデックス不足エラー回避用です。
 '***************************************************************************************************
 Public Property Let PresetDelRegistry(PresetID As RegistrySetting)
+    'ダミー値
+    Const DummyValue As String = "hoge"
+
     Select Case PresetID
         'コンピューター\HKEY_CURRENT_USER\Software\Classes\AppUserModelId 用
-        Case RegistrySetting.ShowInSettings: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "ShowInSettings", REG_Delete, "hoge")
-        Case RegistrySetting.DisplayName: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "DisplayName", REG_Delete, "hoge")
-        Case RegistrySetting.IconUri: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "IconUri", REG_Delete, "hoge")
-        Case RegistrySetting.IconBackgroundColor: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "IconBackgroundColor", REG_Delete, "hoge")
+        Case RegistrySetting.ShowInSettings: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "ShowInSettings", REG_Delete, DummyValue)
+        Case RegistrySetting.DisplayName: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "DisplayName", REG_Delete, DummyValue)
+        Case RegistrySetting.IconUri: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "IconUri", REG_Delete, DummyValue)
+        Case RegistrySetting.IconBackgroundColor: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "IconBackgroundColor", REG_Delete, DummyValue)
         
         'コンピューター\HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings 用
         '--wpndatabase.db 連携必須--
-        Case RegistrySetting.Enabled: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "Enabled", REG_Delete, "hoge")
-        Case RegistrySetting.ShowBanner: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "ShowBanner", REG_Delete, "hoge")
+        Case RegistrySetting.Enabled: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "Enabled", REG_Delete, DummyValue)
+        Case RegistrySetting.ShowBanner: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "ShowBanner", REG_Delete, DummyValue)
         '--wpndatabase.db 連携不要--
-        Case RegistrySetting.SoundFile: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "SoundFile", REG_Delete, "hoge")
-        Case RegistrySetting.AllowContentAboveLock: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "AllowContentAboveLock", REG_Delete, "hoge")
+        Case RegistrySetting.SoundFile: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "SoundFile", REG_Delete, DummyValue)
+        Case RegistrySetting.AllowContentAboveLock: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "AllowContentAboveLock", REG_Delete, DummyValue)
         Case RegistrySetting.Rank: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "Rank", REG_Delete, "hoge")
-        Case RegistrySetting.ShowInActionCenter: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "ShowInActionCenter", REG_Delete, "hoge")
-        Case RegistrySetting.AllowUrgentNotifications: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "AllowUrgentNotifications", REG_Delete, "hoge")
+        Case RegistrySetting.ShowInActionCenter: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "ShowInActionCenter", REG_Delete, DummyValue)
+        Case RegistrySetting.AllowUrgentNotifications: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "AllowUrgentNotifications", REG_Delete, DummyValue)
 
         '未定義
         Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
