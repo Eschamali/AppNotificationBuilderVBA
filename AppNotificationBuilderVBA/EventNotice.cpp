@@ -114,10 +114,10 @@ HWND FindMainWindowFromPid(DWORD pid) {
 //***************************************************************************************************
 //* 機能　　：トーストオブジェクトにある Group から、埋め込まれてるであろう PID を抽出し、そこから HWND を抽出します
 //---------------------------------------------------------------------------------------------------
-//* 返り値  ：PID に基づく、HWND
+//* 返り値  ：ブック名と、PID に基づくHWND
 //* 引数　　：トーストオブジェクト
 //***************************************************************************************************
-HWND GetHwndFromPID(ToastNotification const& Target) {
+std::pair<std::wstring, HWND> GetBookInfoFromGroup(ToastNotification const& Target) {
     // 1. Groupプロパティから、複合文字列を取得
     winrt::hstring groupHString = Target.Group();
     std::wstring combinedString = groupHString.c_str();
@@ -129,10 +129,10 @@ HWND GetHwndFromPID(ToastNotification const& Target) {
     if (lastPipePos != std::wstring::npos) {
         // 見つかった場合
 
-        // 4. substr()で、'|' の次の文字から最後までを切り出す
+        // 4-1. substr()で、'|' の次の文字から最後までを切り出す
         std::wstring pidString = combinedString.substr(lastPipePos + 1);
 
-        // (オプション) ブック名の部分も取得する場合
+        // 4-2. ブック名の部分も取得
         std::wstring bookNameString = combinedString.substr(0, lastPipePos);
 
         // デバッグ用に表示
@@ -142,13 +142,14 @@ HWND GetHwndFromPID(ToastNotification const& Target) {
         // 5. 抽出した文字列を数値に変換
         DWORD targetPID = std::stoul(pidString);
 
-        // 6. PIDからHWNDを見つけて、返す
-        return FindMainWindowFromPid(targetPID);
+        // 6. ブック名と見つけたHWNDをペアにして返す
+        return { bookNameString, FindMainWindowFromPid(targetPID) };
+
     }
     else {
         // '|' が見つからなかった場合のエラー処理
         MessageBoxW(nullptr, L"Groupプロパティの形式が正しくありません。(区切り文字'|'が見つかりません)", L"エラー", MB_OK);
-        return 0;
+        return { L"", NULL };
     }
 }
 
@@ -159,7 +160,7 @@ HWND GetHwndFromPID(ToastNotification const& Target) {
 //***************************************************************************************************
 //* 機能　　：Excel マクロを実行する関数
 //---------------------------------------------------------------------------------------------------
-//* 引数　　：ExcelMacroPass    Action要素のarguments。{マクロ名}を想定してます。
+//* 引数　　：ExcelMacroPass    '{ブック名}'!{マクロ名}を想定してます。
 //            UserInputs        Input要素で入力した内容、あるいはSelect要素のID名称とそれに紐づくInput要素のIDとのセットとなる2次元配列                             
 //            targetHWND        プロシージャ起動先のExcel ハンドル値。ToastNotification.Group プロパティ から得る設計にしてます
 //---------------------------------------------------------------------------------------------------
@@ -312,16 +313,22 @@ void OnActivated(ToastNotification const& sender, IInspectable const& args) {
     //トーストからの args.try_as<ToastActivatedEventArgs> があれば、Excelマクロを動かす準備に入る
     if (activatedArgs) {
         try {
-            // GroupプロパティからHWNDを取得(VBA側で必ず設定すること)
-            HWND targetHwnd = GetHwndFromPID(sender);
+            //---------- 1. 実行先プロシージャを特定する準備 ----------
+            // 1-1. GroupプロパティからHWNDとBook名を取得(VBA側で必ずブック名とPIDを設定すること)
+            auto [bookName, targetHwnd] = GetBookInfoFromGroup(sender); // ★構造化束縛(C++17↑)
 
+            // 1-2. ボタン押下によるAction要素のarguments属性値あるいは、toast要素のlaunch属性値の内容を取得(マクロ名を想定)
+            winrt::hstring argument = activatedArgs.Arguments();
+
+            // 1-3. 完全修飾マクロ名を組み立てる
+            std::wstring qualifiedMacroName = L"'" + bookName + L"'!" + argument.c_str();
+
+
+            //---------- 2.Input要素のIDと値を格納するための2次元配列を作成する準備(SAFEARRAY) ----------    
             // UserInput()からすべてのキーと値のペアを取得(ここに、Input要素にて入力したパラメーター一式があります)
             auto userInputs = activatedArgs.UserInput();
 
-            // ボタン押下によるAction要素のarguments属性値あるいは、toast要素のlaunch属性値の内容を取得
-            winrt::hstring argument = activatedArgs.Arguments();
-
-            // Input要素のIDと値を格納するための2次元配列を作成する準備(SAFEARRAY)
+            // 変数準備
             long inputCount = userInputs.Size();  // 入力フィールドの数を取得
             SAFEARRAYBOUND bounds[2];                            // 2次元配列として設定
             bounds[0].lLbound = 0;                               // 行数-最小要素番号
@@ -357,8 +364,8 @@ void OnActivated(ToastNotification const& sender, IInspectable const& args) {
                 rowIndex++;
             }
 
-            //Action要素のarguments属性値あるいは、toast要素のlaunch属性値の内容と、Input要素一式、Groupプロパティから得たHWNDをExcelマクロ処理用に渡す
-            ExecuteExcelMacro(argument.c_str(), InputElementsArray, targetHwnd);
+            //Action要素のarguments属性値あるいは、toast要素のlaunch属性値の内容と、Input要素一式、Groupプロパティから得たHWNDとブック名を基に、Excelマクロ処理用に渡す
+            ExecuteExcelMacro(qualifiedMacroName.c_str(), InputElementsArray, targetHwnd);
         }
         catch (const hresult_error& e)
         {
@@ -379,9 +386,15 @@ void OnActivated(ToastNotification const& sender, IInspectable const& args) {
 //***************************************************************************************************
 void OnDismissed(ToastNotification const& sender, ToastDismissedEventArgs const& args){
     try {
-        // GroupプロパティからHWNDを取得(VBA側で必ず設定すること)
-        HWND targetHwnd = GetHwndFromPID(sender);
+        //---------- 1. 実行先プロシージャを特定する準備 ----------
+        // 1-1. GroupプロパティからHWNDとBook名を取得(VBA側で必ずブック名とPIDを設定すること)
+        auto [bookName, targetHwnd] = GetBookInfoFromGroup(sender); // ★構造化束縛(C++17↑)
 
+        // 1-2. 完全修飾マクロ名を組み立てる
+        std::wstring qualifiedMacroName = L"'" + bookName + L"'!" + EventTriggerMacroName_ToastDismissed;
+
+
+        //---------- 2.閉じられた理由を取得を作成する準備(SAFEARRAY) ----------    
         // 閉じられた理由を取得
         ToastDismissalReason reason = args.Reason();
         long reasonValue = static_cast<long>(reason);
@@ -417,7 +430,7 @@ void OnDismissed(ToastNotification const& sender, ToastDismissedEventArgs const&
         SafeArrayPutElement(dismissedInfoArray, indices, bstrReasonValue);
 
         //決められたプロシージャ名、閉じられた理由情報の2次元配列、Groupプロパティから得たHWNDをExcelマクロ処理用に渡す
-        ExecuteExcelMacro(EventTriggerMacroName_ToastDismissed, dismissedInfoArray, targetHwnd);
+        ExecuteExcelMacro(qualifiedMacroName.c_str(), dismissedInfoArray, targetHwnd);
     }
     catch (const hresult_error& e)
     {
@@ -436,10 +449,15 @@ void OnDismissed(ToastNotification const& sender, ToastDismissedEventArgs const&
 //***************************************************************************************************
 void OnFailed(ToastNotification const& sender, ToastFailedEventArgs const& args){
     try {
-        // GroupプロパティからHWNDを取得(VBA側で必ず設定すること)
-        HWND targetHwnd = GetHwndFromPID(sender);
+        //---------- 1. 実行先プロシージャを特定する準備 ----------
+        // 1-1. GroupプロパティからHWNDとBook名を取得(VBA側で必ずブック名とPIDを設定すること)
+        auto [bookName, targetHwnd] = GetBookInfoFromGroup(sender); // ★構造化束縛(C++17↑)
 
-        // なぜ失敗したのか、HRESULT形式のエラーコードを取得
+        // 1-2. 完全修飾マクロ名を組み立てる
+        std::wstring qualifiedMacroName = L"'" + bookName + L"'!" + EventTriggerMacroName_ToastFailed;
+
+
+        //---------- 2.なぜ失敗したのか、HRESULT形式のエラーコードを取得を作成する準備(SAFEARRAY) ----------    
         winrt::hresult errorCode = args.ErrorCode();
 
         // デバッグやロギングのためにエラー情報を文字列化
@@ -472,7 +490,7 @@ void OnFailed(ToastNotification const& sender, ToastFailedEventArgs const& args)
         SafeArrayPutElement(failedInfoArray, indices, bstrErrorDetails);
 
         //決められたプロシージャ名、エラー情報の2次元配列、Groupプロパティから得たHWNDをExcelマクロ処理用に渡す
-        ExecuteExcelMacro(EventTriggerMacroName_ToastFailed, failedInfoArray, targetHwnd);
+        ExecuteExcelMacro(qualifiedMacroName.c_str(), failedInfoArray, targetHwnd);
     }
     catch (const hresult_error& e)
     {
