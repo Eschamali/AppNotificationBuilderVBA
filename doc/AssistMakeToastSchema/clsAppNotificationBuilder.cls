@@ -3173,8 +3173,8 @@ Private Function CurrentUserRegistryValue(ByVal 書き込み先 As ToastRegistryPathM
     ' 4. 値の型に応じて、適切なWMIメソッドを呼び出す
     Select Case valueType
         Case REG_DWORD: lResult = regProvider.SetDWORDValue(HKEY_CURRENT_USER, strKeyPath, valueName, CLng(valueData))
-        Case REG_SZ: lResult = regProvider.SetStringValue(HKEY_CURRENT_USER, strKeyPath, valueName, CStr(valueData))
-        Case REG_EXPAND_SZ: lResult = regProvider.SetExpandedStringValue(HKEY_CURRENT_USER, strKeyPath, valueName, CStr(valueData))
+        Case REG_SZ: lResult = regProvider.SetStringValue(HKEY_CURRENT_USER, strKeyPath, valueName, valueData)
+        Case REG_EXPAND_SZ: lResult = regProvider.SetExpandedStringValue(HKEY_CURRENT_USER, strKeyPath, valueName, valueData)
         Case REG_Delete: lResult = regProvider.DeleteValue(HKEY_CURRENT_USER, strKeyPath, valueName)
         Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
     End Select
