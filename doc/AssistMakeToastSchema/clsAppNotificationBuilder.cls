@@ -1470,7 +1470,7 @@ End Property
 Public Property Let SetToastHeader(Optional ByVal ArgID As String, Optional ByVal ArgArguments As String, Optional ByVal ArgActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, ByVal ArgTitle As String)
     With ElementHeader
         '省略時：このExcelのファイル名|起動中のExcelPID
-        If StrPtr(ArgID) Then .id = ArgID Else .id = ThisWorkbook.Name & "|" & ThisExcelPID
+        If StrPtr(ArgID) Then .id = ArgID Else .id = GetUniqueBookInfo
         
         '省略時：このExcelの保存フォルダパス
         If StrPtr(ArgArguments) Then .Arguments = ArgArguments Else .Arguments = ThisWorkbook.Path
@@ -1875,7 +1875,20 @@ End Function
 
 
 '***************************************************************************************************
-' ■■■ メンバ変数を元に、設定用の変数コマンド文字列を生成 ■■■
+'                              ■■■ ヘルパー関連の機能 ■■■
+'***************************************************************************************************
+'* 機能　　：トーストからマクロ実行するためのブック情報を提供します
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：ブック名|プロセスID　という形式
+'***************************************************************************************************
+Function GetUniqueBookInfo() As String
+    GetUniqueBookInfo = ThisWorkbook.Name & "|" & ThisExcelPID
+End Function
+
+
+
+'***************************************************************************************************
+'               ■■■ メンバ変数を元に、設定用の変数コマンド文字列を生成 ■■■
 '***************************************************************************************************
 '* 機能　　：コマンドプロンプト(shell関数など)で認識できるように、xmlコンテンツを整形(エスケープ)し、それをセットするコマンド文字列を生成します
 '---------------------------------------------------------------------------------------------------
@@ -1983,7 +1996,7 @@ End Function
 
 
 '***************************************************************************************************
-'               ■■■ [Windows.UI.Notifications]に関する動的設定 ■■■
+'            ■■■ [Windows.UI.Notifications]に関するPowerShellコマンド動的設定 ■■■
 '***************************************************************************************************
 '* 機能　　：トースト通知のコンテンツ、関連するメタデータとイベント、有効期限を定義します。
 '---------------------------------------------------------------------------------------------------
@@ -2276,7 +2289,7 @@ Public Property Get GenerateCmd_ToastNotifierShow(ByVal ToastTag As String, Opti
         .XmlSchema = MakeXmlToastContentBuilder(UseDataBinding)
         
         .Tag = ToastTag
-        .Group = ThisWorkbook.Name & "|" & ThisExcelPID
+        .Group = GetUniqueBookInfo
         .Schedule_ID = "ExcelSchedule"
         .CollectionID = CollectionID
         .ExpiresOnReboot = ExpiresOnReboot
@@ -2335,7 +2348,7 @@ Public Property Get GenerateCmd_ToastNotifierUpdate(ByVal ToastTag As String) As
         .XmlSchema = vbNullString
 
         .Tag = ToastTag
-        .Group = ThisWorkbook.Name & "|" & ThisExcelPID
+        .Group = GetUniqueBookInfo
         .Schedule_ID = vbNullString
         .CollectionID = vbNullString
         
@@ -2474,7 +2487,7 @@ Public Property Get GenerateCmd_ToastNotificationHistoryRemove(RemoveTag As Stri
         '.AllowUse_InternetImageFlag                      '事前に、設定済み
 
         .Tag = RemoveTag
-        .Group = ThisWorkbook.Name & "|" & ThisExcelPID
+        .Group = GetUniqueBookInfo
 
         '削除コマンドを生成
         GenerateCmd_ToastNotificationHistoryRemove = ActionPS & Run__Windows_UI_Notifications__ToastRemove(.Tag, .Group, .AppUserModelID) & Chr(34)
@@ -2566,7 +2579,7 @@ Public Sub RunDll_ToastNotifierShow(ByVal ToastTag As String, Optional ByVal Col
         .XmlSchema = MakeXmlToastContentBuilder(UseDataBinding)
         
         .Tag = ToastTag
-        .Group = ThisWorkbook.Name & "|" & ThisExcelPID
+        .Group = GetUniqueBookInfo
         .Schedule_ID = "ExcelSchedule"
         .CollectionID = CollectionID
         
@@ -2603,7 +2616,7 @@ Public Property Get RunDll_ToastNotifierUpdate(ByVal ToastTag As String, Optiona
         .XmlSchema = vbNullString
 
         .Tag = ToastTag
-        .Group = ThisWorkbook.Name & "|" & ThisExcelPID
+        .Group = GetUniqueBookInfo
         .Schedule_ID = vbNullString
         .CollectionID = CollectionID
         
@@ -2642,7 +2655,7 @@ Public Sub RunDll_ToastNotificationHistoryRemove(Optional ByVal ToastTag As Stri
             .Group = vbNullString
         Else
             .Tag = ToastTag
-            .Group = ThisWorkbook.Name & "|" & ThisExcelPID
+            .Group = GetUniqueBookInfo
         End If
         .Schedule_ID = vbNullString
         .CollectionID = CollectionID
