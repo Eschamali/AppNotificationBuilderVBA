@@ -1,10 +1,14 @@
 # パンドラの箱へようこそ
 
-これは、気弱な者のためのガイドではない。我々は、WinRT APIという安全な境界線を越え、Windowsの内部設定という未踏の領域へと旅に出る。  
-直接的なレジストリ操作とSQLiteベースのデータベースハッキングを通じて、OSがサードパーティ開発者には決して意図しなかった通知の挙動を、いかにして強制するかを実証する。  
-**自己責任で読み進めよ。**
+ほとんどの人間は、メインページで足を止める。だが、君は掘り続けた。気に入ったよ。これが本当にどう動いているのかに興味を持ってくれて、ありがとう🦊
+
+その探求心への褒美として、今から公のページには書かれていないことを君に共有しよう。Windowsレジストリとwpndatabase.dbの間の、繊細な舞踏を操作するための、私の研究と手法だ。  
+これには、標準APIを超える能力を授ける、禁断のコードも含まれている。この知識は、責任を持って使うように。
+
+なぜなら君は今、他の誰も知らないことを知るのだから。🤫
+
 > [!IMPORTANT]
-> 以降の解説は全て、DLLファイル前提の解説とします。  
+> 以降の解説は全て、DLLファイル使用前提の解説とします。  
 > グループポリシーによる制限下での動作確認は取れてません。
 
 ## レジストリ操作編
@@ -416,7 +420,7 @@ End Sub
 |ShowInActionCenter|HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings|<ul><li>[ ] </li></ul>|通知センターに通知を表示する|
 |AllowUrgentNotifications|HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings|<ul><li>[ ] </li></ul>|設定画面から、切り替えができなくなる|
 
-## 高度な設定の解放：wpndatabase.dbによる直接制御
+## 高度な設定の解放：`wpndatabase.db`による直接制御
 
 なぜ、ある通知機能はUWPアプリでは動くのに、自分のVBAプロジェクトでは動かないのか、不思議に思ったことはないだろうか？  
 その答えは`wpndatabase.db`の中にある。  
@@ -594,3 +598,291 @@ UPDATE NotificationHandler SET HandlerType='app:system' WHERE PrimaryId='Microso
 
 > [!TIP]
 > もとに戻す場合は、`.SetWpndatabase_HandlerType = htDesktop`にすればOKです。
+
+### Wpndatabase_SettingKeyValue
+
+現在の AppUserModelID の`SettingKey`に対する`Value`の状態を確認/設定を行います。
+
+#### 使える設定値
+
+|設定値|処理内容|
+|---|---|
+|TRUE|Value に 1 を設定します|
+|FALSE|Value に 0 を設定します|
+
+#### 使える引数
+
+> [!CAUTION]
+> 顕著な変化がない項目は、推測扱いとなります。
+
+|引数値|顕著な変化|意味|詳細解説|
+|---|---|---|---|
+|skC_badge|<ul><li>[ ] </li></ul>|バッジ通知の能力|バッジ通知機能を持たせるか設定だと思いますが、<br>この設定値は無視されるっぽいようで、s:badge が真のスイッチングです。|
+|skC_cloud|<ul><li>[ ] </li></ul>|クラウド同期|Microsoftアカウントを介した、デバイス間での通知の同期（クラウド同期）を許可/停止するフラグ。|
+|skC_internet|<ul><li>[x] </li></ul>|インターネット画像の許可|http(インターネット上)ソース画像の使用を許可します|
+|skC_ringing|<ul><li>[ ] </li></ul>|着信音/アラーム音の能力|通常の通知音とは異なる、特別な「呼び出し音」やアラーム音を鳴らす能力。<br>いわゆる、カスタム オーディオ機能を使うためのフラグと思われます。<br><br>WindowsAPI：mciSendString を使ったほうが手っ取り早いです|
+|skC_storage_tile|<ul><li>[ ] </li></ul>|ストレージベースのタイル|ローカルファイルなど、ストレージ起点の通知を許可するか。オフライン機能関連。|
+|skC_storage_toast|<ul><li>[ ] </li></ul>|ストレージベースの通知|ローカルファイルなど、ストレージ起点の通知を許可するか。オフライン機能関連。|
+|skC_tile|<ul><li>[x] </li></ul>|アプリのライブタイル能力|タイル通知機能を持たせるか設定します。<br>OFF にすると、NotificationSetting 列挙型：DisabledByManifest　扱いになります。<br><br>残念ながら、デスクトップアプリに対しては、ここをいじっても無視です😭<br>これはガチで、UWP版限定です|
+|skC_toast|<ul><li>[x] </li></ul>|アプリのトースト通知能力|トースト通知機能を持たせるか設定します。<br>OFF にすると、NotificationSetting 列挙型：DisabledByManifest　扱いになります。|
+|skC_voip|<ul><li>[ ] </li></ul>|VoIPアプリとしての認識|このアプリがVoIPアプリとしてOSに認識されているか。<br>どちらかというと、scenario：IncomingCall が優先されそう|
+|skC_tickle|<ul><li>[ ] </li></ul>|プッシュ通知のトリガー|Tickleは、サーバーからクライアントを「つつく」ことで、何かのアクションを起動させるプッシュ通知の専門用語。<br>WNS (Windows Push Notification Service) からのサイレントなプッシュ通知を受け取る能力に関連する可能性が高い。|
+|skM_SecondaryTileMigrationComplete|<ul><li>[ ] </li></ul>|セカンダリタイルの移行完了|Windows 8.1からWindows 10へのアップグレード、あるいはWindows 10のメジャーアップデートが行われた際に、古い形式のセカンダリタイル（ユーザーがアプリ内からスタートメニューにピン留めしたタイル）の情報を、新しいOSのデータベース形式に移行（マイグレーション）する処理が完了したかどうかを示す、一度きりのフラグだと思われます。|
+|skR_badge|※未検証|現在のバッジ状態を読み取れるか|実行時のバッジの状態（読み取り専用）。XMLを読み取る？|
+|skR_tile|※未検証|現在のタイル状態を読み取れるか|実行時のライブタイルの状態（読み取り専用）。XMLを読み取る？|
+|skS_audio|<ul><li>[ ] </li></ul>|通知音の有効/無効|トースト通知が到着した際に、サウンドを再生するかの設定。<br>だと思うのですが、レジストリ：SoundFile が優先されるようです。|
+|skS_badge|<ul><li>[x] </li></ul>|バッジ通知の有効/無効 (全体)|UWP用のバッジ通知アイコンの編集を許可します。<br>なお、ITaskbarList3::SetOverlayIcon の設定よりも優先して表示されます。<br>※上書きされることはなく、このバッチを消すと、ITaskbarList3::SetOverlayIcon の設定が復活します|
+|skS_banner|<ul><li>[x] </li></ul>|バナー表示の有効/無効|トースト通知を画面右下にポップアップ（バナー表示）させるかの設定。<br>ただし、レジストリ：ShowBanner と連携が必要です|
+|skS_cycle_large|※未検証|コンテンツのサイクリング（巡回表示）を許可するか|大サイズタイルの巡回表示をON/OFFする。|
+|skS_cycle_medium|※未検証|コンテンツのサイクリング（巡回表示）を許可するか|中サイズタイルの巡回表示をON/OFFする。|
+|skS_cycle_wide|※未検証|コンテンツのサイクリング（巡回表示）を許可するか|横長サイズタイルの巡回表示をON/OFFする。|
+|skS_listenerEnabled|<ul><li>[ ] </li></ul>|リスナーの有効状態|アプリが通知のイベントをリッスンする（受け取る）機能全体が有効になっているか。<br>オフにしても普通に、「Activated」はできるので謎|
+|skS_lock_badge|※未検証|ロック画面でのバッジ表示|ロック画面にバッジを表示するかの設定。|
+|skS_lock_tile|※未検証|ロック画面でのタイル表示|ロック画面にこのアプリのタイル情報を表示するか（天気など）。|
+|skS_lock_toast|<ul><li>[ ] </li></ul>|ロック画面でのトースト通知表示|PCがロックされている状態でも、トースト通知を表示するかの設定。<br>だと思うのですが、レジストリ：AllowContentAboveLock が優先されるようです。|
+|skS_stopCloud|<ul><li>[ ] </li></ul>|クラウド同期|Microsoftアカウントを介した、デバイス間での通知の同期（クラウド同期）を許可/停止するフラグ。|
+|skS_tickle|<ul><li>[ ] </li></ul>|プッシュ通知のトリガー|Tickleは、サーバーからクライアントを「つつく」ことで、何かのアクションを起動させるプッシュ通知の専門用語。WNS (Windows Push Notification Service) からのサイレントなプッシュ通知を受け取る能力に関連する可能性が高い。|
+|skS_tile|<ul><li>[x] </li></ul>|ライブタイルの有効/無効|タイル通知のON/OFFを切り替えます。<br>OFF にすると、NotificationSetting 列挙型：DisabledForApplication　扱いになります。|
+|skS_toast|<ul><li>[x] </li></ul>|トースト通知の有効/無効 (基本)|ユーザーが「設定」でON/OFFする、最も基本的なトースト通知の許可フラグ。<br>ただし、レジストリ：Enabled と連携が必要です|
+|skS_voip|<ul><li>[ ] </li></ul>|VoIP通知の許可|電話の着信のような、VoIP（Voice over IP）関連の特別な通知を許可するか。<br>どちらかというと、scenario：IncomingCall が優先されそう|
+
+> [!WARNING]
+> SettingKeyValueテーブルは、ドキュメント化されていないフラグが眠る地雷原だ。そのほとんどは過去のWindowsバージョンの休眠した遺物だが、一握りのフラグは今も生きており、あなたのアプリケーションに本来意図されていなかった能力を授ける力を持っている。  
+> 警告する。ここから我々は、単なるカスタマイズを超え、直接的なシステム操作の領域へと足を踏み入れる。我々は、本当に意味を持つ、数少ない強力なフラグを探求し、通知システムのルールをあなたの意のままに曲げる方法を実証する。この知識を以てすれば、ユーザー自身の設定にさえ抗うシナリオを構築することも可能だ。自らが振るう力の意味を、明確に理解した上で進め。
+
+### サンプルコード：HTTP画像：面倒な方法 vs 簡単な方法
+
+このサンプルは、インターネット上の画像付きトーストを表示する。  
+このClassファイルには既に`AllowUse_InternetImage`メソッドというのがあるがこれは、
+1. URLDownloadToFile APIを呼ぶ。
+2. 画像を一時フォルダに保存する。
+3. ローカルファイルパスをトーストに渡す。
+
+…といった手順を踏む。まぁ割と面倒😣。だから、その方法はやめておこう。  
+実は、この機能はWindows通知システムに元々組み込まれているが、デスクトップアプリケーションでは[公式上、無効化](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/send-local-toast-desktop-cpp-wrl#step-7-send-a-notification)されている。  
+しかし、`wpndatabase.db`にある、たった一つの小さな設定`c:internet`を変更することで、我々はこの制限を完全にバイパスできる。  
+手動ダウンロードも、一時ファイルも不要だ。ただ、データベースへの一度の書き込みで解放される、純粋な、ネイティブのHTTP画像サポート。システムを、我々のために働かせようではないか😎
+
+```bas
+Sub httpソース画像の使用をアンロック()
+    'クラスオブジェクトを作成
+    Dim TestToast As New clsAppNotificationBuilder
+    Const TagName As String = "httpソース画像の使用をアンロック"
+
+    With TestToast
+        'タイトルテキストを用意
+        .SetToastGenericTitleText = TagName
+        .SetToastGenericContentsText = "まだ、ネット上の画像は使えない"
+        
+        'httpソースを付与
+        .SetToastGenericInlineImage = "https://kemono-friends-20170110.jp/wp-content/themes/kemono-friends/assets/movie/img/img_cm25.png"
+
+        '通知発行
+        .RunDll_ToastNotifierShow TagName
+        
+        
+        Stop
+        
+
+        'アンロック
+        .Wpndatabase_SettingKeyValue(skC_internet) = True
+        
+        'メッセージ変更
+        .SetToastGenericContentsText = "ネット上の画像が使えたよ" & WorksheetFunction.Unichar(129418)
+
+        '再度通知発行
+        .RunDll_ToastNotifierShow TagName
+        
+        
+        Stop
+
+
+        'もとに戻す
+        .Wpndatabase_SettingKeyValue(skC_internet) = False
+
+    End With
+End Sub
+```
+
+> [!TIP]
+> WorksheetFunction.Unichar を利用すれば、VBAで絵文字の埋め込みが可能です。
+
+処理結果の画像はここでは見せれないが是非、自分の目で確かめていただきたい。
+
+なお、内部的に`wpndatabase.db`に対して、下記のSQL文を順番に実行して、更新します。
+
+```sql
+-- 1. AppUserModelID を基に、HandlerId(RecordId) を取得
+SELECT RecordId FROM NotificationHandler WHERE PrimaryId='Microsoft.Office.EXCEL.EXE.15';
+
+-- 2. 入手した HandlerId で、c:internet の設定値を有効(1)にする
+UPDATE HandlerSettings SET Value='1' WHERE HandlerId='72' AND SettingKey='c:internet';
+```
+
+### サンプルコード：ITaskbarList3::SetOverlayIcon の限界を超えて
+
+我々は皆、[ITaskbarList3::SetOverlayIcon](https://learn.microsoft.com/ja-jp/windows/win32/shell/taskbar-extensions#icon-overlays)を使ったことがある。そして皆、その限界を感じてきた。
+
+- 完璧なオーバーレイアイコンを作り上げても、アプリを閉じた瞬間にそれは消え去る。  
+- ただシンプルな「新着メッセージ」のシンボルが欲しかっただけなのに、アイコンのデザインに何時間も費やす。  
+
+我々は、古いやり方に縛られていた。今まで、は。
+
+このコードは、その鎖を断ち切るハックを明らかにする。  
+通知データベースの`s:badge`フラグを直接操作することで、我々はUWPアプリ専用のはずだった、永続的で、グリフベースのバッジシステムを解放する。
+
+あなたのステータス更新は、今やアプリケーションの再起動を生き延び、自作する代わりにクリーンな組み込みのWindowsグリフを活用できる。  
+単なるアイコンのオーバーレイはやめて、真の、モダンな[バッジ](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/badges)を使い始める時だ。
+
+> [!IMPORTANT]
+> 検証前に[こちらにある](https://github.com/Eschamali/TaskbarExtensionsVBA)DLLファイルを読み込ませる必要があります
+
+```bas
+Private Declare PtrSafe Sub SetTaskbarOverlayBadge Lib "TaskbarExtensions" (ByVal badgeValue As Long, ByVal AppID As LongPtr)           'UWPアプリ向けバッチ通知
+
+Sub バッジ通知機能をアンロック()
+    'クラスオブジェクトを作成
+    Dim TestToast As New clsAppNotificationBuilder
+
+    With TestToast
+        'アンロック前
+        SetTaskbarOverlayBadge 50, StrPtr("Microsoft.Office.EXCEL.EXE.15")
+        Stop
+        
+        
+        'アンロック
+        .Wpndatabase_SettingKeyValue(skS_badge) = True
+        SetTaskbarOverlayBadge 50, StrPtr("Microsoft.Office.EXCEL.EXE.15")
+        Stop
+
+
+        'もとに戻す
+        SetTaskbarOverlayBadge 0, StrPtr("Microsoft.Office.EXCEL.EXE.15")
+        .Wpndatabase_SettingKeyValue(skS_badge) = False
+    End With
+End Sub
+```
+
+これで、お分かりだろう。変更前は、バッジ通知が何も起こさなかったのを。(1つ目の`Stop`)  
+![alt text](../Special012.png)
+
+しかし、`c:badge`フラグが`1`に反転された後、それが生命を吹き込まれたのが分かっただろうか？🙂(2つ目の`Stop`)  
+![alt text](../Special013.png)
+
+そのたった1ビットのデータが、標準的なデスクトップアプリと、このモダンなUI機能とを隔てる、唯一のものなのだ。それは、能力そのものは既にそこにあり、ただ我々がそれを解き放つのを待っているだけだったことの証明だ。
+
+> [!CAUTION]
+> この機能は、「タスクバーのボタンをまとめ、ラベルを非表示にする」で「常時」にしないと、不自然な感じになるかもです。
+> - ITaskbarList3::SetOverlayIcon　→　ウィンドウ単位
+> - CreateBadgeUpdaterForApplication　→　アプリ単位
+
+## 禁断の知識：HandlerSettings × レジストリの秘密 を駆使した 禁断のチートコード
+
+最後にこのチートコードを共有しよう。
+
+このコードは、あなたのExcelからの通知が常に見られることを保証するための、禁断の知識が含まれている。  
+これは小手先のトリックではない。Windowsがあなたのアプリケーションをどう認識するかを、根本的に改変するものだ。  
+なお、元の設定に戻す機能も入れてるので、ご安心いただきたい。
+
+```bas
+Sub Excelの通知を絶対にOFFにさせない()
+    'クラスオブジェクトを作成
+    Dim TestToast As New clsAppNotificationBuilder
+    Const TagName As String = "Excelの通知を絶対にOFFにさせない"
+
+    With TestToast
+        '準備を促す
+        MsgBox "Excelの通知と全体の通知をOFFにしてみてください。", vbInformation
+    
+        'タイトルテキストを用意
+        .SetToastGenericTitleText = TagName
+        .SetToastGenericContentsText = "これは見えないはず"
+        
+        'まずは普通に出す
+        .RunDll_ToastNotifierShow TagName
+        
+        '確認
+        Dim 中断 As Long: 中断 = MsgBox("通知は出なかったですか？" & vbCrLf & "出た場合は、「いいえ」を押して、やり直してください", vbYesNo + vbQuestion, "どう？")
+        If 中断 = vbNo Then Exit Sub
+        
+        
+        '-------　通知無効貫通処理　-------
+        'システムアプリとして認識させる
+        .SetWpndatabase_WNSId = wsSystem
+        .SetWpndatabase_HandlerType = htSystem
+        
+        '通知を強制ONにする
+        .Wpndatabase_SettingKeyValue(skS_toast) = True
+        .PresetDelRegistry = Enabled
+        
+        'スイッチングを無効化
+        .PresetRegistry(ShowInSettings) = 0
+        
+        'これで、通知が出る！ﾌﾌﾌ…
+        .SetToastGenericContentsText = "通知無効を貫通成功しました" & WorksheetFunction.Unichar(128526)
+        .RunDll_ToastNotifierShow TagName
+        
+        MsgBox "書き換え完了しました。どう、通知でたかな？あと、設定画面からも見れないようにしたよ。" & vbCrLf & "ご安心ください。OK を押して、元のパラメーターに戻します。", vbInformation
+        
+        
+        '-------　もとに戻す　-------
+        'デスクトップアプリとして認識させる
+        .SetWpndatabase_WNSId = wsNonImmersivePackage
+        .SetWpndatabase_HandlerType = htDesktop
+        
+         'スイッチングを有効化
+        .PresetDelRegistry = ShowInSettings
+        MsgBox "元のパラメーターに戻しました。設定画面にも表れているはずです。", vbInformation
+    End With
+End Sub
+```
+
+3つ目の`msgbox`で、その効果を観察せよ
+
+- 貫通： 通知OFFやユーザーによる無効化設定を突破する😮
+- 不可視： Excelは設定リストから消え去り、ユーザーは手出しできなくなる😣（通知メニューから抜け出して再度通知メニューに入ると消えます）
+- 無敵： トースト自体をミュートしたり、設定変更したりすることができなくなる😫（完全に反映するにはExplorer.exeの再起動が必要な場合がある）
+![alt text](../Special011.png)
+
+その仕組みはシンプルだが強力だ。  
+我々はドキュメント化されていないメカニズムを利用し、ExcelをWindowsセキュリティのような重要システムコンポーネントに偽装しているのだ。この「システムステータス」を獲得することで、通常のアプリケーションのルールを超越した特権――ブロック不可能な通知の配信を含む――を手に入れる。  
+この力は、賢明に使え。
+
+### 応答不可も貫通させる場合は？
+
+現時点では、応答不可 そのものを切り替える方法はないが、回避法はある。  
+以下の2パターンがあるので、お好みで使い分けてほしい
+1. 重要な通知で発行する
+
+この場合は、下記を前述のチートコードに追加すればOK
+
+```bas
+'ついでに、応答不可も貫通させる
+.SetToastContent_Scenario = tsUrgent
+.PresetRegistry(AllowUrgentNotifications) = 1
+```
+
+`.PresetRegistry(AllowUrgentNotifications) = 1`により、Windowsから「重要な通知のリクエスト」を出さずに、通知を表示できます。
+
+2. アラームとして発行
+
+この場合は、下記を前述のチートコードに追加すればOK
+
+```bas
+'ついでに、応答不可も貫通させる
+.SetToastContent_Scenario = tsAlarm
+.SetIToastActions("閉じる", "") = 1
+.SetToastAudio = NotificationMute        'うるさいので、ミュートにしておく
+```
+
+レジストリ等の危険行為をせずとも、貫通できる仕様を突いたものです。  
+なお、アラームとして通知を出すには、ボタンを1つ以上用意する必要があります。
+
+## 最後に
+
+そして、禁断の魔導書は閉じられる。
+
+あなたは今、閉ざされているべきだった王国の鍵を手にした。通知システムをあなたの意のままに曲げる方法、ルールをバイパスする方法、そしてAPIの影で操作する方法を知っている。
+
+最後に、これだけは忘れないでほしい  
+それができるからといって、それをすべきだとは限らない。賢いハックと、通知システムを破壊するエクスプロイトとの境界線は、紙一重だ。力は、今やあなたの手の中にある。その責任もまた、同様に。
