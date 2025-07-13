@@ -653,7 +653,7 @@ UPDATE NotificationHandler SET HandlerType='app:system' WHERE PrimaryId='Microso
 ### サンプルコード：HTTP画像：面倒な方法 vs 簡単な方法
 
 このサンプルは、インターネット上の画像付きトーストを表示する。  
-このClassファイルには既に`AllowUse_InternetImage`メソッドというのがあるがこれは、
+このClassファイルには既に`AllowUse_InternetImage`プロパティというのがあるがこれは、
 1. URLDownloadToFile APIを呼ぶ。
 2. 画像を一時フォルダに保存する。
 3. ローカルファイルパスをトーストに渡す。
