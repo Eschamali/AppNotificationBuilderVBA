@@ -416,9 +416,181 @@ End Sub
 |ShowInActionCenter|HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings|<ul><li>[ ] </li></ul>|通知センターに通知を表示する|
 |AllowUrgentNotifications|HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings|<ul><li>[ ] </li></ul>|設定画面から、切り替えができなくなる|
 
-## 高度な設定の解放：wpndatabase.dbによる直接制御 Coming soon…
+## 高度な設定の解放：wpndatabase.dbによる直接制御
 
 なぜ、ある通知機能はUWPアプリでは動くのに、自分のVBAプロジェクトでは動かないのか、不思議に思ったことはないだろうか？  
 その答えは`wpndatabase.db`の中にある。  
-初期のWindowsが独自形式を使っていたのに対し、現代のシステムは、アプリごとの通知設定を、アクセス可能なSQLiteデータベースに保存しているのだ。  
+初期のWindowsが[独自形式](https://www.swiftforensics.com/2016/06/prasing-windows-10-notification-database.html)を使っていたのに対し、現代のシステムは、アプリごとの通知設定を、アクセス可能な[SQLiteデータベース](https://inc0x0.com/2018/10/windows-10-notification-database/)に保存しているのだ。  
 このセクションは、究極の回避策を提供する。C++ DLLを使ってこのデータベースを直接読み書きし、インターネット画像やバッジ通知といった機能を有効化し、さらには**ユーザー設定すらもExcel VBAコードから直接上書きする方法**をお見せしよう。あなたの通知ゲームを、レベルアップさせる時が来た。
+
+### 1分で理解！`wpndatabase.db`ってな～に？
+
+Windows通知システムの真の「脳」として機能する、ユーザーごとのSQLiteデータベースです。
+
+Q: 中には何が？  
+A: すべてです。通知の履歴、ユーザー向けの設定、そして最も重要なことに、各アプリが「本当に」何をすることが許されているか（例：インターネット画像の使用、バッジの表示）を定義する、隠されたフラグのセットが含まれています。  
+
+Q: なぜSQLiteなのですか？  
+A: 推測の領域ですが、クロスプラットフォーム互換性（PC、Xboxなど）と信頼性のためと思われます。Microsoftは、独自形式よりも、実績のあるオープンソースを選んだもようです。  
+
+Q: 編集できますか？  
+A: 技術的には出来ます。このガイドは、まさにそのためのものです。  
+
+Q: 編集すべきですか？  
+A: 製品環境では、絶対にやめてください。これは未サポートのリバースエンジニアリングの試みです。データベースの構造は、Windows Updateでも変更される可能性があり、あなたのアプリや通知システム自体を破壊するかもしれません。好奇心と共に、慎重に進めてください。
+
+### GetWpndatabase_WNSId
+
+現在の AppUserModelID の WNSID を取得します。
+#### サンプルコード
+
+次のコードは、`Microsoft.Office.EXCEL.EXE.15` の WNSID を取得します
+
+```bas
+Sub WNSIDの確認()
+    'クラスオブジェクトを作成
+    Dim TestToast As New clsAppNotificationBuilder
+
+    With TestToast
+        'ここに、任意のAppUserModelIDを指定できます
+        'デフォルトは、Microsoft.Office.EXCEL.EXE.15 です
+        '.SetAppUserModelID = "Microsoft.WindowsTerminal_8wekyb3d8bbwe!App"  'ちなみにこれは、Windows Terminal
+
+        Debug.Print .GetWpndatabase_WNSId
+    End With
+End Sub
+```
+
+上記のサンプルコードを実行すると、`wpndatabase.db`に対して、下記のSQL文を実行して、取得します。  
+`PrimaryId`が、AppUserModelID にあたります。
+
+```sql
+SELECT WNSId FROM NotificationHandler WHERE PrimaryId='Microsoft.Office.EXCEL.EXE.15';
+```
+
+`Microsoft.Office.EXCEL.EXE.15`の場合、イミディエイトには、`NonImmersivePackage`と出るはずです。
+
+### SetWpndatabase_WNSId
+
+現在の AppUserModelID に 任意の WNSID を設定します。
+
+#### 使える設定値
+
+|設定値|処理内容|パラメーターの意味|
+|---|---|---|
+|wsCustom|WNSId に、引数の内容で書き換えます。<br>・.SetWpndatabase_WNSId = wsCustom　→　NULL で書き換え<br>・.SetWpndatabase_WNSId("Vulpes") = wsCustom　→　Vulpes で書き換え|主に、UWP (Universal Windows Platform) アプリまたはMSIXでパッケージ化されたモダンアプリに使われます。|
+|wsSystem|WNSId に、「System」と書き換えます|OSのコアコンポーネント自身によって生成・処理される、最も特権的な通知ハンドラであることを示します。|
+|wsNonImmersivePackage|WNSId に、「NonImmersivePackage」と書き換えます|伝統的なWin32デスクトップアプリケーション（UWP/モダンアプリではない、"非没入型"のパッケージ）であることを示す、特別な識別子です。|
+
+#### サンプルコード
+
+次のコードは、`Microsoft.Office.EXCEL.EXE.15` の WNSID に、`System`として書き換えます。
+
+```bas
+Sub WNSIDの設定()
+    'クラスオブジェクトを作成
+    Dim TestToast As New clsAppNotificationBuilder
+
+    With TestToast
+        'ここに、任意のAppUserModelIDを指定できます
+        'デフォルトは、Microsoft.Office.EXCEL.EXE.15 です
+        '.SetAppUserModelID = "Microsoft.WindowsTerminal_8wekyb3d8bbwe!App"  'ちなみにこれは、Windows Terminal
+
+        'System で書き換え
+        .SetWpndatabase_WNSId = wsSystem
+        Debug.Print "書き換え後:" & .GetWpndatabase_WNSId
+    End With
+End Sub
+```
+
+上記のサンプルコードを実行すると、`wpndatabase.db`に対して、下記のSQL文を実行して、更新します。  
+
+```sql
+UPDATE NotificationHandler SET WNSId='System' WHERE PrimaryId='Microsoft.Office.EXCEL.EXE.15';
+```
+
+そして、イミディエイトに`書き換え後:System`と出てきて、書き換わったのが確認できます。  
+もちろん、実際のSQLiteのビュアーを見ても変わっております。  
+![alt text](../Special009.png)
+
+> [!TIP]
+> もとに戻す場合は、`.SetWpndatabase_WNSId = wsNonImmersivePackage`にすればOKです。
+
+### GetWpndatabase_HandlerType
+
+現在の AppUserModelID の HandlerType を取得します。
+
+#### サンプルコード
+
+次のコードは、`Microsoft.Office.EXCEL.EXE.15` の HandlerType を取得します
+
+```bas
+Sub HandlerTypeの確認()
+    'クラスオブジェクトを作成
+    Dim TestToast As New clsAppNotificationBuilder
+
+    With TestToast
+        'ここに、任意のAppUserModelIDを指定できます
+        'デフォルトは、Microsoft.Office.EXCEL.EXE.15 です
+        '.SetAppUserModelID = "Microsoft.WindowsTerminal_8wekyb3d8bbwe!App"  'ちなみにこれは、Windows Terminal
+
+        Debug.Print .GetWpndatabase_HandlerType
+    End With
+End Sub
+```
+
+上記のサンプルコードを実行すると、`wpndatabase.db`に対して、下記のSQL文を実行して、取得します。  
+
+```sql
+SELECT HandlerType FROM NotificationHandler WHERE PrimaryId='Microsoft.Office.EXCEL.EXE.15';
+```
+
+`Microsoft.Office.EXCEL.EXE.15`の場合、イミディエイトには、`app:desktop`と出るはずです。
+
+### SetWpndatabase_HandlerType
+
+現在の AppUserModelID に 任意の HandlerType を設定します。
+
+#### 使える設定値
+
+|設定値|処理内容|パラメーターの意味|
+|---|---|---|
+|htDesktop|HandlerType に、「app:desktop」と書き換えます|伝統的なWin32デスクトップアプリケーションを指します。|
+|htImmersive|HandlerType に、「app:immersive」と書き換えます|UWP (Universal Windows Platform) アプリ、またはMSIXでパッケージ化されたモダンアプリを指します。|
+|htSystem|HandlerType に、「app:system」と書き換えます|OSのコアコンポーネント、またはOSと一体化した特権的なプロセスを指します。|
+
+
+#### サンプルコード
+
+次のコードは、`Microsoft.Office.EXCEL.EXE.15` の WNSID に、`System`として書き換えます。
+
+```bas
+Sub HandlerTypeの設定()
+    'クラスオブジェクトを作成
+    Dim TestToast As New clsAppNotificationBuilder
+
+    With TestToast
+        'ここに、任意のAppUserModelIDを指定できます
+        'デフォルトは、Microsoft.Office.EXCEL.EXE.15 です
+        '.SetAppUserModelID = "Microsoft.WindowsTerminal_8wekyb3d8bbwe!App"  'ちなみにこれは、Windows Terminal
+
+        
+        'System として書き換えます
+        .SetWpndatabase_HandlerType = htSystem
+        Debug.Print "書き換え後:" & .GetWpndatabase_HandlerType
+    End With
+End Sub
+```
+
+上記のサンプルコードを実行すると、`wpndatabase.db`に対して、下記のSQL文を実行して、更新します。  
+
+```sql
+UPDATE NotificationHandler SET HandlerType='app:system' WHERE PrimaryId='Microsoft.Office.EXCEL.EXE.15';
+```
+
+そして、イミディエイトに`書き換え後:app:system`と出てきて、書き換わったのが確認できます。  
+もちろん、実際のSQLiteのビュアーを見ても変わっております。  
+![alt text](../Special010.png)
+
+> [!TIP]
+> もとに戻す場合は、`.SetWpndatabase_HandlerType = htDesktop`にすればOKです。
