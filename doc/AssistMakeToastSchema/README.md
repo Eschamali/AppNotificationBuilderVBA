@@ -236,8 +236,6 @@ Sub 通知センターに通知を表示する()
     End With
 End Sub
 
-Option Explicit
-
 Sub ロック画面で通知を受け取ったときに内容を表示しない()
     '実行後、すぐに 田 + L でロック！
 
@@ -815,6 +813,16 @@ Sub Excelの通知を絶対にOFFにさせない()
         .Wpndatabase_SettingKeyValue(skS_toast) = True
         .PresetDelRegistry = Enabled
         
+        '通知バナーを強制表示
+        .Wpndatabase_SettingKeyValue(skS_banner) = True
+        .PresetDelRegistry = ShowBanner
+
+        '通知センターに通知を表示する
+        .PresetDelRegistry = ShowInActionCenter
+
+        '通知が届いたら絶対に音を鳴らす(※スキーマ自体のミュート設定は回避不可)
+        .PresetDelRegistry = SoundFile
+
         'スイッチングを無効化
         .PresetRegistry(ShowInSettings) = 0
         
@@ -825,13 +833,15 @@ Sub Excelの通知を絶対にOFFにさせない()
         MsgBox "書き換え完了しました。どう、通知でたかな？あと、設定画面からも見れないようにしたよ。" & vbCrLf & "ご安心ください。OK を押して、元のパラメーターに戻します。", vbInformation
         
         
-        '-------　もとに戻す　-------
+        '-------　弄り辛い箇所のみ、もとに戻す　-------
         'デスクトップアプリとして認識させる
         .SetWpndatabase_WNSId = wsNonImmersivePackage
         .SetWpndatabase_HandlerType = htDesktop
         
-         'スイッチングを有効化
+        'スイッチングを有効化
         .PresetDelRegistry = ShowInSettings
+        
+        'Done
         MsgBox "元のパラメーターに戻しました。設定画面にも表れているはずです。", vbInformation
     End With
 End Sub

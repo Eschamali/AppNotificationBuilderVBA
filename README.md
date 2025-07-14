@@ -349,8 +349,8 @@ Sub シナリオテスト()
         .SetIToastInput(ReminderID, True, , "選択肢から、再通知する時間を選択", 10) = 1
 
         '再通知用と、解除用を用意(解説は後述)
-        .SetIToastActions("", "snooze", system, , , , ReminderID) = 1
-        .SetIToastActions("", "dismiss", system) = 2
+        .SetIToastActions("", "snooze", taSystem, , , , ReminderID) = 1
+        .SetIToastActions("", "dismiss", taSystem) = 2
 
         'テキスト要素を用意
         .SetToastGenericTitleText = "Hello World"
@@ -468,7 +468,7 @@ Sub インライン画像()
         '通常
         .SetToastGenericInlineImage(False, , "win の壁紙") = "C:\Windows\Web\Screen\img100.jpg"
         '円にトリミング
-        ''.SetToastGenericInlineImage(True, , "win の壁紙") = "C:\Windows\Web\Screen\img100.jpg"
+        '.SetToastGenericInlineImage(True, , "win の壁紙") = "C:\Windows\Web\Screen\img100.jpg"
 
 
 
@@ -1057,6 +1057,7 @@ End Sub
 | [ScheduleDate](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.scheduledtoastnotification.-ctor)                                          | Windows でトースト通知を表示する日付と時刻。<br>設定日時になるまで、トーストは表示されません。<br><br>・過去にするとエラーになります。<br>・省略(0) で、即日通知です。                        | シリアル値 | 0            | 
 | [ExpirationDate](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.scheduledtoastnotification.expirationtime)                               | 通知の有効期限。<br>設定日時を超えると、アクションセンターから削除されます。<br><br>・過去にすると、通知が来ません。<br>・省略(0) で、3日後の有効期限になります。これはシステムで決められた[上限](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/send-local-toast-cpp-uwp?tabs=builder-syntax#set-an-expiration-time)です。<br>・負に設定すると、[再起動時、通知が消える](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.expiresonreboot)ようになります。                                                                     | シリアル値 | 0            | 
 | [Suppress](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.suppresspopup)                                               | トーストのポップアップ UI をユーザーの画面に表示するかどうかを取得または設定します。 | フラグ値   | False        | 
+| [ExpiresOnReboot](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.expiresonreboot)| `True`で、再起動後にトースト通知が通知センターから消えます。|フラグ地|False|
 
 #### サンプルコード
 次の例では、10秒後に通知が来ます。
@@ -1308,7 +1309,7 @@ Sub UpdateProgressBar()
 
         'トーストのすべてのコンテンツ/レイアウトを完全に変更し、終了メッセージとして表示
         .SetToastContent_Scenario = Default     'シナリオを通常に
-        .SetAdaptiveProgressBar = ""            'Progress要素を除外する
+        .SetAdaptiveProgressBar = vbNullString            'Progress要素を除外する
     
         .SetToastGenericContentsText = "プログレスバーの更新処理を終えました"
         Shell .GenerateCmd_ToastNotifierShow(ToastTag), vbHide
@@ -1372,7 +1373,7 @@ Sub UpdateProgressBar()
 
         'トーストのすべてのコンテンツ/レイアウトを完全に変更し、終了メッセージとして表示
         .SetToastContent_Scenario = Default     'シナリオを通常に
-        .SetAdaptiveProgressBar = ""            'Progress要素を除外する
+        .SetAdaptiveProgressBar = vbNullString            'Progress要素を除外する
     
         .SetToastGenericContentsText = "プログレスバーの更新処理を終えました"
         .RunDll_ToastNotifierShow ToastTag
@@ -1683,7 +1684,7 @@ Sub ExcelToast_Dismissed(理由)
         Case 0: Debug.Print "理由：ユーザーはトースト通知を無視しました。"
         Case 1: Debug.Print "理由：アプリは、 ToastNotifier.hide メソッドを呼び出して、トースト通知を明示的に隠しました。"
         Case 2: Debug.Print "理由：トースト通知は最大許容時間で表示され、フェードアウトされました。トースト通知を表示する最大時間は 7 秒ですが、長時間のトーストの場合は 25 秒です。"
-        Case Else: Debug.Print "理由：予期せぬエラー　Code：" & 理由(0, 0)
+        Case Else: Debug.Print "理由：予期せぬエラー　Code：" & 理由(0, 1)
     End Select
     
     Debug.Print ""
