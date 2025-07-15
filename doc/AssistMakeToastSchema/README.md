@@ -279,31 +279,35 @@ Sub 応答不可がオンのときにアプリが重要な通知を送信でき�
         '重要な通知モード
         .SetToastContent_Scenario = tsUrgent
 
+
+        '---通常動作の初重要通知---
         .SetToastGenericContentsText = "1. 初めての重要な通知による「重要な通知の要求」"
         .PresetDelRegistry = AllowUrgentNotifications
         .RunDll_ToastNotifierShow TagName
 
 
         MsgBox "右下に出る「重要な通知の要求」をアクションセンターから削除後、OKを押します。", vbInformation, "お願い"
-
-
-        .SetToastGenericContentsText = "2. 初めての重要な通知だが、「重要な通知の要求」を出さない"
         .PresetDelRegistry = AllowUrgentNotifications   'リセット
+
+
+        '---OFF---
+        .SetToastGenericContentsText = "2. 初めての重要な通知だが、「重要な通知の要求」を出さない"
         .PresetRegistry(AllowUrgentNotifications) = 0
         .RunDll_ToastNotifierShow TagName
 
 
-         MsgBox "[応答不可]テストを行います。[応答不可]をONにしてください。", vbInformation, "お願い"
+        MsgBox "[応答不可]テストを行います。[応答不可]をONにしてください。", vbInformation, "お願い"
 
 
-        .SetToastGenericContentsText = "3. [応答不可]ON 重要な通知OFF"
+        .SetToastGenericContentsText = "3. [応答不可]ON 重要な通知を出せない"
         .RunDll_ToastNotifierShow TagName
        
        
         Stop
         
         
-        .SetToastGenericContentsText = "4. [応答不可]ON 重要な通知ON"
+        '---ON---
+        .SetToastGenericContentsText = "4. [応答不可]ON 重要な通知を出せる"
         .PresetRegistry(AllowUrgentNotifications) = 1
         .RunDll_ToastNotifierShow TagName
     End With
@@ -888,9 +892,7 @@ End Sub
 レジストリ等の危険行為をせずとも、貫通できる仕様を突いたものです。  
 なお、アラームとして通知を出すには、ボタンを1つ以上用意する必要があります。
 
-## 最後に
-
-そして、禁断の魔導書は閉じられる。
+## そして、禁断の魔導書は閉じられる
 
 あなたは今、閉ざされているべきだった王国の鍵を手にした。通知システムをあなたの意のままに曲げる方法、ルールをバイパスする方法、そしてAPIの影で操作する方法を知っている。
 
