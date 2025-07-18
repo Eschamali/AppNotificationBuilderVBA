@@ -336,6 +336,7 @@ Enum RegistrySetting
     DisplayName
     IconUri
     IconBackgroundColor
+    CustomActivator
     
     'コンピューター\HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings
     '--wpndatabase.db 連携必須--
@@ -3196,6 +3197,7 @@ End Function
         Case RegistrySetting.DisplayName: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "DisplayName", REG_SZ, valueData)
         Case RegistrySetting.IconUri: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "IconUri", REG_SZ, valueData)
         Case RegistrySetting.IconBackgroundColor: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "IconBackgroundColor", REG_SZ, valueData)
+        Case RegistrySetting.CustomActivator: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "CustomActivator", REG_SZ, valueData)
         
         'コンピューター\HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings 用
         '--wpndatabase.db 連携必須--
@@ -3230,6 +3232,7 @@ Public Property Let PresetDelRegistry(PresetID As RegistrySetting)
         Case RegistrySetting.DisplayName: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "DisplayName", REG_Delete, DummyValue)
         Case RegistrySetting.IconUri: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "IconUri", REG_Delete, DummyValue)
         Case RegistrySetting.IconBackgroundColor: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "IconBackgroundColor", REG_Delete, DummyValue)
+        Case RegistrySetting.CustomActivator: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "CustomActivator", REG_Delete, DummyValue)
         
         'コンピューター\HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings 用
         '--wpndatabase.db 連携必須--
