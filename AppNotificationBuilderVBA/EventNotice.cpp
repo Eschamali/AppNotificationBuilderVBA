@@ -166,7 +166,7 @@ std::pair<std::wstring, HWND> GetBookInfoFromGroup(ToastNotification const& Targ
 //---------------------------------------------------------------------------------------------------
 //* 詳細説明：ExcelのHWNDを渡すことで、複数プロセスで起動してるExcel環境でも対応できます
 //***************************************************************************************************
-static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInputs, HWND targetHWND) {
+static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, IDispatch* UserInputs, HWND targetHWND) {
     //---------- 1. 孫ウィンドウ経由で、Excel Applicationオブジェクトを取得 ----------
     CComPtr<IDispatch> pExcelDispatch;
     HRESULT hr = E_FAIL; // 見つからなかった場合のデフォルト
@@ -230,15 +230,15 @@ static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, SAFEARRAY* UserInpu
     //---------- 3. Application.Run メソッドの引数を設定 ---------- 
     // 3-1. 実行したいマクロのフルパス(action要素のarguments属性値 ortoast要素のlaunch属性値 を想定)
     CComVariant macroName(ExcelMacroPass);
-
     // 3-2. 2次元配列(input要素一式)とマクロ名を引数として渡す設定をする
     CComVariant saVariant;
-    saVariant.vt = VT_ARRAY | VT_BSTR;
-    saVariant.parray = UserInputs;      //input要素一式 2次元配列
-    CComVariant macroArg1(saVariant);   //適用      
+    saVariant.vt = VT_DISPATCH;
+    saVariant.pdispVal = UserInputs;      //input要素一式 2次元配列
+    UserInputs->AddRef();                 // Dictionaryオブジェクトの参照カウントを増やしておく
 
-    // 4. 引数を配列として渡す(※これらの引数は逆の順序で表示されるため、それを考慮した代入を行うこと)
-    CComVariant argsArray[2] = { macroArg1,macroName };
+    //---------- 4. 引数を配列として渡す ----------   
+    //引数は逆の順序で表示されるため、それを考慮した代入を行う
+    CComVariant argsArray[2] = { UserInputs,macroName };
     DISPPARAMS params = { argsArray, nullptr, 2, 0 };
 
     // 5. マクロの呼び出し
@@ -324,48 +324,48 @@ void OnActivated(ToastNotification const& sender, IInspectable const& args) {
             std::wstring qualifiedMacroName = L"'" + bookName + L"'!" + argument.c_str();
 
 
-            //---------- 2.Input要素のIDと値を格納するための2次元配列を作成する準備(SAFEARRAY) ----------    
+            //---------- 2.Input要素のIDと値を格納するためのDictionaryを作成する準備 ----------    
             // UserInput()からすべてのキーと値のペアを取得(ここに、Input要素にて入力したパラメーター一式があります)
             auto userInputs = activatedArgs.UserInput();
 
             // 変数準備
-            long inputCount = userInputs.Size();  // 入力フィールドの数を取得
-            SAFEARRAYBOUND bounds[2];                            // 2次元配列として設定
-            bounds[0].lLbound = 0;                               // 行数-最小要素番号
-            bounds[0].cElements = inputCount;                    // 行数-最大要素番号 (入力フィールドの数)
-            bounds[1].lLbound = 0;                               // 列数-最小要素番号
-            bounds[1].cElements = 2;                             // 列数-最大要素番号 (キーと値のペア)
+            CComPtr<IDispatch> pDictionary;
+            CLSID clsid;
 
-            // 上記の設定を基に、2次元配列を作成
-            SAFEARRAY* InputElementsArray = SafeArrayCreate(VT_BSTR, 2, bounds);
+            // 2-1. "Scripting.Dictionary"のCLSIDを取得
+            HRESULT hr = CLSIDFromProgID(L"Scripting.Dictionary", &clsid);
+            if (SUCCEEDED(hr)) {
+                // 2-2. 空のDictionaryオブジェクトを生成！
+                hr = CoCreateInstance(clsid, NULL, CLSCTX_INPROC_SERVER, IID_IDispatch, (void**)&pDictionary);
+            }
+            if (pDictionary) {
+                // 2-3. ".Add" メソッドのIDを取得
+                OLECHAR* addMethodName = const_cast<OLECHAR*>(L"Add");
+                DISPID dispidAdd;
+                hr = pDictionary->GetIDsOfNames(IID_NULL, &addMethodName, 1, LOCALE_USER_DEFAULT, &dispidAdd);
 
-            long indices[2];
-            long rowIndex = 0;
-            for (auto const& input : userInputs) {
-                auto key = input.Key();                // 入力フィールドのID (キー)
-                auto value = input.Value();            // 入力された値 (IInspectable型)
-                auto inputValue = value.as<winrt::hstring>();
+                if (SUCCEEDED(hr)) {
+                    for (auto const& input : userInputs) {
+                        auto key = input.Key();                // 入力フィールドのID (キー)
+                        auto value = input.Value();            // 入力された値 (IInspectable型)
+                        auto inputValue = value.as<winrt::hstring>();  //扱いやすいように変換
 
-                // 配列にキーを追加する準備
-                indices[0] = rowIndex;  //現時点のInput要素位置
-                indices[1] = 0;  // キーは0列目に
-                CComBSTR bstrKey(key.c_str()); //Input要素のID属性を取得
+                        // 2-4. キーと値を準備
+                        CComBSTR bstrKey(key.c_str());          //Input要素のID属性を取得
+                        CComBSTR bstrValue(inputValue.c_str()); //Input要素の値または、Select要素のIDを取得
 
-                //上記の設定で配列にキーを追加
-                SafeArrayPutElement(InputElementsArray, indices, bstrKey);
+                        // 2-5. Invokeのための引数配列を作成（逆順！）
+                        CComVariant addArgs[2] = { bstrValue, bstrKey };
+                        DISPPARAMS params = { addArgs, NULL, 2, 0 };
 
-                // 配列に値を追加する準備
-                indices[1] = 1;  // 値は1列目に
-                CComBSTR bstrValue(inputValue.c_str());//Input要素の値を取得
-
-                //上記の設定で配列にキーを追加
-                SafeArrayPutElement(InputElementsArray, indices, bstrValue);
-
-                rowIndex++;
+                        // 2-6. .Addメソッドを呼び出して、データを詰める！
+                        pDictionary->Invoke(dispidAdd, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_METHOD, &params, NULL, NULL, NULL);
+                    }
+                }
             }
 
             //Action要素のarguments属性値あるいは、toast要素のlaunch属性値の内容と、Input要素一式、Groupプロパティから得たHWNDとブック名を基に、Excelマクロ処理用に渡す
-            ExecuteExcelMacro(qualifiedMacroName.c_str(), InputElementsArray, targetHwnd);
+            ExecuteExcelMacro(qualifiedMacroName.c_str(), pDictionary, targetHwnd);
         }
         catch (const hresult_error& e)
         {
@@ -430,7 +430,7 @@ void OnDismissed(ToastNotification const& sender, ToastDismissedEventArgs const&
         SafeArrayPutElement(dismissedInfoArray, indices, bstrReasonValue);
 
         //決められたプロシージャ名、閉じられた理由情報の2次元配列、Groupプロパティから得たHWNDをExcelマクロ処理用に渡す
-        ExecuteExcelMacro(qualifiedMacroName.c_str(), dismissedInfoArray, targetHwnd);
+        //ExecuteExcelMacro(qualifiedMacroName.c_str(), dismissedInfoArray, targetHwnd);
     }
     catch (const hresult_error& e)
     {
@@ -490,7 +490,7 @@ void OnFailed(ToastNotification const& sender, ToastFailedEventArgs const& args)
         SafeArrayPutElement(failedInfoArray, indices, bstrErrorDetails);
 
         //決められたプロシージャ名、エラー情報の2次元配列、Groupプロパティから得たHWNDをExcelマクロ処理用に渡す
-        ExecuteExcelMacro(qualifiedMacroName.c_str(), failedInfoArray, targetHwnd);
+        //ExecuteExcelMacro(qualifiedMacroName.c_str(), failedInfoArray, targetHwnd);
     }
     catch (const hresult_error& e)
     {
