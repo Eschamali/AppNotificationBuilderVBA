@@ -161,18 +161,18 @@ std::pair<std::wstring, HWND> GetBookInfoFromGroup(ToastNotification const& Targ
 //* 機能　　：Excel マクロを実行する関数
 //---------------------------------------------------------------------------------------------------
 //* 引数　　：ExcelMacroPass    '{ブック名}'!{マクロ名}を想定してます。
-//            UserInputs        Input要素で入力した内容、あるいはSelect要素のID名称とそれに紐づくInput要素のIDとのセットとなる2次元配列                             
-//            targetHWND        プロシージャ起動先のExcel ハンドル値。ToastNotification.Group プロパティ から得る設計にしてます
+//            UserInputs        Input要素で入力した内容、あるいはSelect要素のID名称とそれに紐づくInput要素のIDとのセットとなるDictionaryオブジェクト                             
+//            targetPID        プロシージャ起動先のExcel プロセスID。ToastNotification.Group プロパティ から得る設計にしてます
 //---------------------------------------------------------------------------------------------------
 //* 詳細説明：ExcelのHWNDを渡すことで、複数プロセスで起動してるExcel環境でも対応できます
 //***************************************************************************************************
-static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, IDispatch* UserInputs, HWND targetHWND) {
+static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, IDispatch* UserInputs, HWND targetPID) {
     //---------- 1. 孫ウィンドウ経由で、Excel Applicationオブジェクトを取得 ----------
     CComPtr<IDispatch> pExcelDispatch;
     HRESULT hr = E_FAIL; // 見つからなかった場合のデフォルト
 
     // 1-1. XLMAINウィンドウの子である「XLDESK」ウィンドウを探す
-    HWND hXlDesk = FindWindowExW(targetHWND, NULL, EXCEL_DESK_CLASS_NAME, NULL);
+    HWND hXlDesk = FindWindowExW(targetPID, NULL, EXCEL_DESK_CLASS_NAME, NULL);
     if (hXlDesk) {
         // 1-2. XLDESKの子である「EXCEL7」ウィンドウを探す
         HWND hExcel7 = FindWindowExW(hXlDesk, NULL, EXCEL_SHEET_CLASS_NAME, NULL);
@@ -228,12 +228,12 @@ static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, IDispatch* UserInpu
     }
 
     //---------- 3. Application.Run メソッドの引数を設定 ---------- 
-    // 3-1. 実行したいマクロのフルパス(action要素のarguments属性値 ortoast要素のlaunch属性値 を想定)
+    // 3-1. 実行したいマクロのフルパス(action要素のarguments属性値 or toast要素のlaunch属性値 を想定)
     CComVariant macroName(ExcelMacroPass);
-    // 3-2. 2次元配列(input要素一式)とマクロ名を引数として渡す設定をする
+    // 3-2. Dictionaryオブジェクト(input要素一式)とマクロ名を引数として渡す設定をする
     CComVariant saVariant;
     saVariant.vt = VT_DISPATCH;
-    saVariant.pdispVal = UserInputs;      //input要素一式 2次元配列
+    saVariant.pdispVal = UserInputs;      //input要素一式 Dictionaryオブジェクト
     UserInputs->AddRef();                 // Dictionaryオブジェクトの参照カウントを増やしておく
 
     //---------- 4. 引数を配列として渡す ----------   
@@ -314,8 +314,8 @@ void OnActivated(ToastNotification const& sender, IInspectable const& args) {
     if (activatedArgs) {
         try {
             //---------- 1. 実行先プロシージャを特定する準備 ----------
-            // 1-1. GroupプロパティからHWNDとBook名を取得(VBA側で必ずブック名とPIDを設定すること)
-            auto [bookName, targetHwnd] = GetBookInfoFromGroup(sender); // ★構造化束縛(C++17↑)
+            // 1-1. GroupプロパティからPIDとBook名を取得(VBA側で必ずブック名とPIDを設定すること)
+            auto [bookName, targetPID] = GetBookInfoFromGroup(sender); // ★構造化束縛(C++17↑)
 
             // 1-2. ボタン押下によるAction要素のarguments属性値あるいは、toast要素のlaunch属性値の内容を取得(マクロ名を想定)
             winrt::hstring argument = activatedArgs.Arguments();
@@ -364,8 +364,8 @@ void OnActivated(ToastNotification const& sender, IInspectable const& args) {
                 }
             }
 
-            //Action要素のarguments属性値あるいは、toast要素のlaunch属性値の内容と、Input要素一式、Groupプロパティから得たHWNDとブック名を基に、Excelマクロ処理用に渡す
-            ExecuteExcelMacro(qualifiedMacroName.c_str(), pDictionary, targetHwnd);
+            //Action要素のarguments属性値あるいは、toast要素のlaunch属性値の内容と、Input要素一式、Groupプロパティから得たPIDとブック名を基に、Excelマクロ処理用に渡す
+            ExecuteExcelMacro(qualifiedMacroName.c_str(), pDictionary, targetPID);
         }
         catch (const hresult_error& e)
         {
@@ -387,8 +387,8 @@ void OnActivated(ToastNotification const& sender, IInspectable const& args) {
 void OnDismissed(ToastNotification const& sender, ToastDismissedEventArgs const& args){
     try {
         //---------- 1. 実行先プロシージャを特定する準備 ----------
-        // 1-1. GroupプロパティからHWNDとBook名を取得(VBA側で必ずブック名とPIDを設定すること)
-        auto [bookName, targetHwnd] = GetBookInfoFromGroup(sender); // ★構造化束縛(C++17↑)
+        // 1-1. GroupプロパティからPIDとBook名を取得(VBA側で必ずブック名とPIDを設定すること)
+        auto [bookName, targetPID] = GetBookInfoFromGroup(sender); // ★構造化束縛(C++17↑)
 
         // 1-2. 完全修飾マクロ名を組み立てる
         std::wstring qualifiedMacroName = L"'" + bookName + L"'!" + EventTriggerMacroName_ToastDismissed;
@@ -429,8 +429,8 @@ void OnDismissed(ToastNotification const& sender, ToastDismissedEventArgs const&
         CComBSTR bstrReasonValue(std::to_wstring(reasonValue).c_str());
         SafeArrayPutElement(dismissedInfoArray, indices, bstrReasonValue);
 
-        //決められたプロシージャ名、閉じられた理由情報の2次元配列、Groupプロパティから得たHWNDをExcelマクロ処理用に渡す
-        //ExecuteExcelMacro(qualifiedMacroName.c_str(), dismissedInfoArray, targetHwnd);
+        //決められたプロシージャ名、閉じられた理由情報の2次元配列、Groupプロパティから得たPIDをExcelマクロ処理用に渡す
+        //ExecuteExcelMacro(qualifiedMacroName.c_str(), dismissedInfoArray, targetPID);
     }
     catch (const hresult_error& e)
     {
@@ -450,8 +450,8 @@ void OnDismissed(ToastNotification const& sender, ToastDismissedEventArgs const&
 void OnFailed(ToastNotification const& sender, ToastFailedEventArgs const& args){
     try {
         //---------- 1. 実行先プロシージャを特定する準備 ----------
-        // 1-1. GroupプロパティからHWNDとBook名を取得(VBA側で必ずブック名とPIDを設定すること)
-        auto [bookName, targetHwnd] = GetBookInfoFromGroup(sender); // ★構造化束縛(C++17↑)
+        // 1-1. GroupプロパティからPIDとBook名を取得(VBA側で必ずブック名とPIDを設定すること)
+        auto [bookName, targetPID] = GetBookInfoFromGroup(sender); // ★構造化束縛(C++17↑)
 
         // 1-2. 完全修飾マクロ名を組み立てる
         std::wstring qualifiedMacroName = L"'" + bookName + L"'!" + EventTriggerMacroName_ToastFailed;
@@ -489,8 +489,8 @@ void OnFailed(ToastNotification const& sender, ToastFailedEventArgs const& args)
         CComBSTR bstrErrorDetails(detailedErrorMessage.c_str());
         SafeArrayPutElement(failedInfoArray, indices, bstrErrorDetails);
 
-        //決められたプロシージャ名、エラー情報の2次元配列、Groupプロパティから得たHWNDをExcelマクロ処理用に渡す
-        //ExecuteExcelMacro(qualifiedMacroName.c_str(), failedInfoArray, targetHwnd);
+        //決められたプロシージャ名、エラー情報の2次元配列、Groupプロパティから得たPIDをExcelマクロ処理用に渡す
+        //ExecuteExcelMacro(qualifiedMacroName.c_str(), failedInfoArray, targetPID);
     }
     catch (const hresult_error& e)
     {
