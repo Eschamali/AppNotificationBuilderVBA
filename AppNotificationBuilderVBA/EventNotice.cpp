@@ -424,7 +424,7 @@ void OnDismissed(ToastNotification const& sender, ToastDismissedEventArgs const&
         std::wstring qualifiedMacroName = L"'" + bookName + L"'!" + EventTriggerMacroName_ToastDismissed;
 
 
-        //---------- 2.閉じられた理由を取得を作成する準備(SAFEARRAY) ----------    
+        //---------- 2.閉じられた理由を取得を作成する準備(Dictionary) ----------    
         // 閉じられた理由を取得
         ToastDismissalReason reason = args.Reason();
         long reasonValue = static_cast<long>(reason);
@@ -441,26 +441,25 @@ void OnDismissed(ToastNotification const& sender, ToastDismissedEventArgs const&
         //std::wstring message = L"通知が閉じられました。\n理由: " + reasonName;
         //MessageBoxW(nullptr, message.c_str(), L"Dismissedイベント発生", MB_OK);
 
-        // 閉じられた理由を格納するSAFEARRAYを準備
-        SAFEARRAYBOUND bounds[2];long indices[2];
-        bounds[0].lLbound = 0;
-        bounds[0].cElements = 1; // 1行
-        bounds[1].lLbound = 0;
-        bounds[1].cElements = 2; // 2列 (Tag, 理由値)
-        SAFEARRAY* dismissedInfoArray = SafeArrayCreate(VT_BSTR, 2, bounds);
+        // 閉じられた理由を格納するDictionaryを作成する準備
+        // 2-1. "Scripting.Dictionary"のCLSIDを取得
+        //　変数準備
+        CComPtr<IDispatch> pDictionary;
+        CLSID clsid;
 
-        // 1列目にTagプロパティを設定
-        indices[0] = 0; indices[1] = 0;
-        CComBSTR bstrReasonName(sender.Tag().c_str());
-        SafeArrayPutElement(dismissedInfoArray, indices, bstrReasonName);
-
-        // 2列目に理由値を設定
-        indices[0] = 0; indices[1] = 1;
-        CComBSTR bstrReasonValue(std::to_wstring(reasonValue).c_str());
-        SafeArrayPutElement(dismissedInfoArray, indices, bstrReasonValue);
+        HRESULT hr = CLSIDFromProgID(ObjectName_Dictionary, &clsid);
+        if (SUCCEEDED(hr)) {
+            // 2-2. 空のDictionaryオブジェクトを生成！
+            hr = CoCreateInstance(clsid, NULL, CLSCTX_INPROC_SERVER, IID_IDispatch, (void**)&pDictionary);
+        }
+        if (pDictionary) {
+            // 2-3. キーと値のペアを使って、Dismissed情報を、Dictionaryオブジェクトへ格納していく
+            AddToDictionary(pDictionary, L"ToastNotification.Tag", sender.Tag().c_str());                       //Tag名
+            AddToDictionary(pDictionary, L"ToastDismissalReason", std::to_wstring(reasonValue).c_str());        //理由値
+        }
 
         //決められたプロシージャ名、閉じられた理由情報の2次元配列、Groupプロパティから得たPIDをExcelマクロ処理用に渡す
-        //ExecuteExcelMacro(qualifiedMacroName.c_str(), dismissedInfoArray, targetPID);
+        ExecuteExcelMacro(qualifiedMacroName.c_str(), pDictionary, targetPID);
     }
     catch (const hresult_error& e)
     {
@@ -487,40 +486,37 @@ void OnFailed(ToastNotification const& sender, ToastFailedEventArgs const& args)
         std::wstring qualifiedMacroName = L"'" + bookName + L"'!" + EventTriggerMacroName_ToastFailed;
 
 
-        //---------- 2.なぜ失敗したのか、HRESULT形式のエラーコードを取得を作成する準備(SAFEARRAY) ----------    
+        //---------- 2.なぜ失敗したのか、HRESULT形式のエラーコードを取得を作成する準備(Dictionary) ----------    
         winrt::hresult errorCode = args.ErrorCode();
 
         // デバッグやロギングのためにエラー情報を文字列化
         _com_error err(errorCode);
 
-        // エラー理由を格納するSAFEARRAYを準備
-        SAFEARRAYBOUND bounds[2]; long indices[2];
-        bounds[0].lLbound = 0;
-        bounds[0].cElements = 1; // 1行
-        bounds[1].lLbound = 0;
-        bounds[1].cElements = 2; // 2列 (Tag, エラー内容)
-        SAFEARRAY* failedInfoArray = SafeArrayCreate(VT_BSTR, 2, bounds);
+        // エラー理由を格納するDictionaryを準備
+        // 2-1. "Scripting.Dictionary"のCLSIDを取得
+        //　変数準備
+        CComPtr<IDispatch> pDictionary;
+        CLSID clsid;
 
-        // 1列目にTagプロパティを設定
-        indices[0] = 0; indices[1] = 0;
-        CComBSTR bstrReasonName(sender.Tag().c_str());
-        SafeArrayPutElement(failedInfoArray, indices, bstrReasonName);
-
-        // 2列目にエラー内容を設定
-        wchar_t hresultStr[20]; // "0x" + 8桁の16進数 + NULL文字
-        swprintf_s(hresultStr, L"0x%08X", errorCode);
-
-        std::wstring detailedErrorMessage = hresultStr;
-        detailedErrorMessage += L"\n"; // 改行を追加
-        detailedErrorMessage += err.ErrorMessage();
-
-        // 組み立てた文字列をBSTRとして設定
-        indices[0] = 0; indices[1] = 1;
-        CComBSTR bstrErrorDetails(detailedErrorMessage.c_str());
-        SafeArrayPutElement(failedInfoArray, indices, bstrErrorDetails);
+        HRESULT hr = CLSIDFromProgID(ObjectName_Dictionary, &clsid);
+        if (SUCCEEDED(hr)) {
+            // 2-2. 空のDictionaryオブジェクトを生成！
+            hr = CoCreateInstance(clsid, NULL, CLSCTX_INPROC_SERVER, IID_IDispatch, (void**)&pDictionary);
+        }
+        if (pDictionary) {
+            // 2-3. キーと値のペアを使って、Dismissed情報を、Dictionaryオブジェクトへ格納していく
+            AddToDictionary(pDictionary, L"ToastNotification.Tag", sender.Tag().c_str());   //Tag名
+            
+            //　エラーコードを文字列化
+            wchar_t hresultStr[20]; // "0x" + 8桁の16進数 + NULL文字
+            swprintf_s(hresultStr, L"0x%08X", errorCode);
+            AddToDictionary(pDictionary, L"ErrorCode", hresultStr);                         //エラーコード
+            
+            AddToDictionary(pDictionary, L"ErrorDetail", err.ErrorMessage());               //エラー内容
+        }
 
         //決められたプロシージャ名、エラー情報の2次元配列、Groupプロパティから得たPIDをExcelマクロ処理用に渡す
-        //ExecuteExcelMacro(qualifiedMacroName.c_str(), failedInfoArray, targetPID);
+        ExecuteExcelMacro(qualifiedMacroName.c_str(), pDictionary, targetPID);
     }
     catch (const hresult_error& e)
     {
