@@ -920,8 +920,8 @@ selection要素の配置順。1~5まで有効です。
 #### 利用可能な引数
 | 引数名         | 説明                                               | 備考                       | 
 | -------------- | -------------------------------------------------- | -------------------------- | 
-| ReminderMinute | 何分後にリマインダー通知させるか、値で指定します。 | vbnullstringで未定義扱いとします。 | 
-| ArgChoseName   | 選択項目の内容                                     |                            | 
+| ArgSelectionID | 識別子。<br>「ToastNotification.Activated」を利用する場合、これが"UserInput"の値として返されます。<br>なお、数値のみの指定にすると、リマインダー用途としても使用可能です(単位：分) | `vbnullstring` で、選択肢に載せないようにします。 | 
+| ArgChoseName   | 選択肢名称                                     |                            | 
 
 #### [リマインダーの設定方法](https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/adaptive-interactive-toasts?tabs=xml#snoozedismiss)
 Input要素と、selection要素を使ったリマインダー方法を紹介します。<br>
@@ -1541,22 +1541,27 @@ action要素のarguments属性にマクロ名、activationType属性に`taForegr
 #### 引数
 | 順番 | 型      | 説明                                                                            | 
 | ---- | ------- | ------------------------------------------------------------------------------- | 
-| 1    | Variant | 2次元配列<br>・行数：入力フィールド(Input要素)の数。最大5つ<br>・列数：2（キーと値のペア） | 
+| 1    | Dictionary | Dictionary 形式で格納されます | 
 
-#### 配列の構造について
+> [!IMPORTANT]
+> `as Dictionary` としなくても、動くことは動きますが、インテリセンスが使えるのでしておくと便利です
+
+
+
+#### Dictionaryの構造について
 ![alt text](doc/ToastActived1.png)
-| 列位置  | 説明                                                                            | 
-| ----  | ------------------------------------------------------------------------------- | 
-| 0     | Input要素のID属性の名称 |
-| 1     | Input要素のID属性に紐づく入力値。<br> selection要素での入力値の場合、そのID属性の名称となります。|
 
-- 最小要素数：0
-- 入力フィールドがない場合は行数が、-1
-- 利用時には、CreateObject("Scripting.Dictionary") で整理することをおすすめします。
-- 引数を扱わないプロシージャでも、用意する必要があります。
+[SetIToastInput](#setitoastinput) で、事前定義した`ArgID`がそのまんま格納されています。  
+少し先にあるサンプルコードを見ていただくとわかる通り、`UserInputs("地学問題")`という風に書くことで、そのinput要素に入力した値を取り出すことが出来ます。  
+> [!CAUTION]
+> 選択肢の場合は、Selection要素のID属性値となるので、注意してください。
+
+> [!IMPORTANT]
+> Input要素が1つもない場合も、引数を用意する必要があります。  
+> この場合、`Dictionary`の`Count`は、`0`となります。
 
 #### プロシージャの種類
-Sub,Function 問いませんが、publicとして設定する必要があります。
+`Sub`,`Function` 問いませんが、`public`として設定する必要があります。
 
 ### サンプルコード
 いくつかのアクティブ化パターンを体験できるサンプルコードを提示します。<br>
@@ -1613,21 +1618,9 @@ Sub ToastTrigger_Click(UserInputs As Variant)
 End Sub
 
 '1つ目のボタン押下時
-Sub ToastTrigger_Answer(UserInputs As Variant)
-    Dim Dict_UserInputs As Object
-    Dim keyToFind As String
-    Dim foundValue As Variant
-    
-    ' Scripting.Dictionaryオブジェクトを作成
-    Set Dict_UserInputs = CreateObject("Scripting.Dictionary")
-    Dim i As Long
-    For i = 0 To UBound(UserInputs)
-        'キーと値を設定
-        Dict_UserInputs.Add UserInputs(i, 0), UserInputs(i, 1)
-    Next
-
+Sub ToastTrigger_Answer(UserInputs As Dictionary)
     'AnswerCheck1
-    If Dict_UserInputs("地学問題") = "選択肢C" Then
+    If UserInputs("地学問題") = "選択肢C" Then
         MsgBox "正解！", vbInformation, "問題1の結果"
     Else
         MsgBox "不正解", vbCritical, "問題1の結果"
@@ -1635,7 +1628,7 @@ Sub ToastTrigger_Answer(UserInputs As Variant)
     End If
     
     'AnswerCheck2
-    If Dict_UserInputs("冥王星とは") = "準惑星" Then
+    If UserInputs("冥王星とは") = "準惑星" Then
         MsgBox "正解！", vbInformation, "問題2の結果"
     Else
         MsgBox "不正解", vbCritical, "問題2の結果"
@@ -1643,11 +1636,10 @@ Sub ToastTrigger_Answer(UserInputs As Variant)
     End If
     
     MsgBox "全問正解！", vbInformation, "All Clear!"
-    
 End Sub
 
 '2つ目のボタン押下時
-Sub ToastTrigger_Close(UserInputs As Variant)
+Sub ToastTrigger_Close(UserInputs)
     'メッセージを表示するだけ
     MsgBox "回答をキャンセルしました", vbExclamation, "回答辞退"
 End Sub
@@ -1678,15 +1670,15 @@ Sub DismissedTest()
 End Sub
 
 Sub ExcelToast_Dismissed(理由)
-    Debug.Print "Toast.Tag：" & 理由(0, 0) & "　にて、Dismissed 発生"
+    Debug.Print "Toast.Tag：" & 理由("ToastNotification.Tag") & "　にて、Dismissed 発生"
 
-    Select Case 理由(0, 1)
+    Select Case 理由("ToastDismissalReason")
         Case 0: Debug.Print "理由：ユーザーはトースト通知を無視しました。"
         Case 1: Debug.Print "理由：アプリは、 ToastNotifier.hide メソッドを呼び出して、トースト通知を明示的に隠しました。"
         Case 2: Debug.Print "理由：トースト通知は最大許容時間で表示され、フェードアウトされました。トースト通知を表示する最大時間は 7 秒ですが、長時間のトーストの場合は 25 秒です。"
         Case Else: Debug.Print "理由：予期せぬエラー　Code：" & 理由(0, 1)
     End Select
-    
+
     Debug.Print ""
 End Sub
 ```
@@ -1699,9 +1691,9 @@ Toast.Tag：Hello World　にて、Dismissed 発生
 とイミディエイトに表示されます。
 
 ### 引数について
-2次元配列ですが、1行分のみです。
-- 1列目：Dismissed になった Tag名
-- 2列目：[ToastDismissalReason 列挙型](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastdismissalreason)
+下記の`Dictionary`となっています
+- ToastNotification.Tag：Dismissed になった Tag名
+- ToastDismissalReason：[ToastDismissalReason 列挙型](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastdismissalreason)
 
 ## [Failed イベント](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.failed)
 Windows がトースト通知を生成しようとしたときにエラーが発生したときに発生します。
@@ -1721,9 +1713,8 @@ Sub FailedTest()
 End Sub
 
 Sub ExcelToast_Failed(エラー理由)
-    Debug.Print "Toast.Tag：" & エラー理由(0, 0) & "　にて、Failed 発生"
-
-    Debug.Print "原因：" & エラー理由(0, 1) & vbcrlf
+    Debug.Print "Toast.Tag：" & エラー理由("ToastNotification.Tag") & "　にて、Failed 発生"
+    Debug.Print "原因：" & エラー理由("ErrorCode") & vbCrLf & エラー理由("ErrorDetail") & vbCrLf
 End Sub
 ```
 
@@ -1739,9 +1730,10 @@ Toast.Tag：Hello World　にて、Failed 発生
 とイミディエイトに表示されます。
 
 ### 引数について
-2次元配列ですが、1行分のみです。
-- 1列目：Failed になった Tag名
-- 2列目：エラーコードとエラー内容
+下記の`Dictionary`となっています
+- ToastNotification.Tag：Failed になった Tag名
+- ErrorCode：エラーコード
+- ErrorDetail：エラー内容
 
 # 設定値確認
 ## [RunDll_CheckNotificationSetting](https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.notificationsetting)
