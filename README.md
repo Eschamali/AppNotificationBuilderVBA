@@ -1645,7 +1645,6 @@ Sub ToastTrigger_Close(UserInputs)
 End Sub
 ```
 ![alt text](doc/ToastActived2.png)<br>
-アプリ通知で選択した選択肢や、入力テキストを扱う場合は、予め辞書型（Scripting.Dictionary）で内容をインポートして処理することをおすすめします。
 
 # イベント一覧機能
 ひらめき次第では使えるかも…? な、現時点で扱えるイベント機能を紹介します。
