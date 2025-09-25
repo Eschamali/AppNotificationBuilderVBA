@@ -29,6 +29,8 @@ constexpr const wchar_t* EXCEL_SHEET_CLASS_NAME = L"EXCEL7";                //"X
 constexpr const wchar_t* EXCEL_APPLICATION_CLASS_NAME = L"Application";     //"Application"のオブジェクト名称
 constexpr const wchar_t* EXCEL_APPLICATION_RUN_MethodName = L"Run";         //"Application.Run"のメソッド名称
 
+constexpr const wchar_t* ObjectName_Dictionary = L"Scripting.Dictionary";          //データ キー/アイテムのペアを保存するオブジェクト名称
+
 constexpr const wchar_t* EventTriggerMacroName_ToastDismissed = L"ExcelToast_Dismissed";    //トースト通知の Dismissed イベント時に使うプロシージャ名
 constexpr const wchar_t* EventTriggerMacroName_ToastFailed = L"ExcelToast_Failed";          //トースト通知の Failed イベント時に使うプロシージャ名
 
@@ -64,7 +66,7 @@ static HRESULT GetProperty(IDispatch* pDisp, const wchar_t* propName, CComVarian
 //---------------------------------------------------------------------------------------------------
 //* 注意事項：Excel の hwnd 取得に限ります。
 //***************************************************************************************************
-BOOL CALLBACK EnumThreadWndProc(HWND hwnd, LPARAM lParam) {
+static BOOL CALLBACK EnumThreadWndProc(HWND hwnd, LPARAM lParam) {
     auto& data = *reinterpret_cast<EnumThreadWndData*>(lParam);
     wchar_t className[256];
     if (GetClassNameW(hwnd, className, 256) > 0) {
@@ -84,7 +86,7 @@ BOOL CALLBACK EnumThreadWndProc(HWND hwnd, LPARAM lParam) {
 //---------------------------------------------------------------------------------------------------
 //* 注意事項：「#include <tlhelp32.h>」のインクルードが必要です
 //***************************************************************************************************
-HWND FindMainWindowFromPid(DWORD pid) {
+static HWND FindMainWindowFromPid(DWORD pid) {
     HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
     if (hSnap == INVALID_HANDLE_VALUE) return NULL;
 
@@ -117,7 +119,7 @@ HWND FindMainWindowFromPid(DWORD pid) {
 //* 返り値  ：ブック名と、PID に基づくHWND
 //* 引数　　：トーストオブジェクト
 //***************************************************************************************************
-std::pair<std::wstring, HWND> GetBookInfoFromGroup(ToastNotification const& Target) {
+static std::pair<std::wstring, HWND> GetBookInfoFromGroup(ToastNotification const& Target) {
     // 1. Groupプロパティから、複合文字列を取得
     winrt::hstring groupHString = Target.Group();
     std::wstring combinedString = groupHString.c_str();
@@ -151,6 +153,48 @@ std::pair<std::wstring, HWND> GetBookInfoFromGroup(ToastNotification const& Targ
         MessageBoxW(nullptr, L"Groupプロパティの形式が正しくありません。(区切り文字'|'が見つかりません)", L"エラー", MB_OK);
         return { L"", NULL };
     }
+}
+
+//************************************************************************************
+// 機能　　：指定されたDictionaryオブジェクトに、キーと値のペアを追加する
+//------------------------------------------------------------------------------------
+// 返り値　：成功すれば true, 失敗すれば false
+// 引数　　：pDict      (ByRef) 対象のDictionaryオブジェクトのIDispatchポインタ
+//            key        追加するキー (ワイド文字列)
+//            value      追加する値 (ワイド文字列)
+//------------------------------------------------------------------------------------
+//* 注意事項：Value 部分は、文字列に限ります。
+//************************************************************************************
+bool AddToDictionary(IDispatch* pDict, const wchar_t* key, const wchar_t* value)
+{
+    // --- 引数の有効性をチェック ---
+    if (pDict == nullptr || key == nullptr || value == nullptr) {
+        return false;
+    }
+
+    // --- 1. ".Add" メソッドのID (DISPID) を取得 ---
+    OLECHAR* addMethodName = const_cast<OLECHAR*>(L"Add");
+    DISPID dispidAdd;
+    HRESULT hr = pDict->GetIDsOfNames(IID_NULL, &addMethodName, 1, LOCALE_USER_DEFAULT, &dispidAdd);
+
+    if (FAILED(hr)) {
+        // .Addメソッドが見つからなかった (Dictionaryじゃないオブジェクトの可能性)
+        return false;
+    }
+
+    // --- 2. Invokeに渡すための引数を準備 ---
+    CComVariant varKey(key);
+    CComVariant varValue(value);
+
+    // 引数は逆順で配列に格納する (Key, Item) -> {Item, Key}
+    CComVariant addArgs[2] = { varValue, varKey };
+    DISPPARAMS params = { addArgs, NULL, 2, 0 };
+
+    // --- 3. .Addメソッドを呼び出す (Invoke) ---
+    hr = pDict->Invoke(dispidAdd, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_METHOD, &params, NULL, NULL, NULL);
+
+    // --- 4. 結果を返す ---
+    return SUCCEEDED(hr);
 }
 
 
@@ -234,9 +278,9 @@ static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, IDispatch* UserInpu
     CComVariant saVariant;
     saVariant.vt = VT_DISPATCH;
     saVariant.pdispVal = UserInputs;      //input要素一式 Dictionaryオブジェクト
-    UserInputs->AddRef();                 // Dictionaryオブジェクトの参照カウントを増やしておく
+    UserInputs->AddRef();                 //Dictionaryオブジェクトの参照カウントを増やしておく
 
-    //---------- 4. 引数を配列として渡す ----------   
+    //---------- 4. 引数をDictionaryオブジェクトとして渡す ----------   
     //引数は逆の順序で表示されるため、それを考慮した代入を行う
     CComVariant argsArray[2] = { UserInputs,macroName };
     DISPPARAMS params = { argsArray, nullptr, 2, 0 };
@@ -328,39 +372,25 @@ void OnActivated(ToastNotification const& sender, IInspectable const& args) {
             // UserInput()からすべてのキーと値のペアを取得(ここに、Input要素にて入力したパラメーター一式があります)
             auto userInputs = activatedArgs.UserInput();
 
-            // 変数準備
+            // 2-1. "Scripting.Dictionary"のCLSIDを取得
+            //　変数準備
             CComPtr<IDispatch> pDictionary;
             CLSID clsid;
 
-            // 2-1. "Scripting.Dictionary"のCLSIDを取得
-            HRESULT hr = CLSIDFromProgID(L"Scripting.Dictionary", &clsid);
+            HRESULT hr = CLSIDFromProgID(ObjectName_Dictionary, &clsid);
             if (SUCCEEDED(hr)) {
                 // 2-2. 空のDictionaryオブジェクトを生成！
                 hr = CoCreateInstance(clsid, NULL, CLSCTX_INPROC_SERVER, IID_IDispatch, (void**)&pDictionary);
             }
             if (pDictionary) {
-                // 2-3. ".Add" メソッドのIDを取得
-                OLECHAR* addMethodName = const_cast<OLECHAR*>(L"Add");
-                DISPID dispidAdd;
-                hr = pDictionary->GetIDsOfNames(IID_NULL, &addMethodName, 1, LOCALE_USER_DEFAULT, &dispidAdd);
+                // 2-3. キーと値のペアを順次取り出し、Dictionaryオブジェクトへ格納していく
+                for (auto const& input : userInputs) {
+                    auto key = input.Key();                // 入力フィールドのID (キー)
+                    auto value = input.Value();            // 入力された値 (IInspectable型)
+                    auto inputValue = value.as<winrt::hstring>();  //扱いやすいように変換
 
-                if (SUCCEEDED(hr)) {
-                    for (auto const& input : userInputs) {
-                        auto key = input.Key();                // 入力フィールドのID (キー)
-                        auto value = input.Value();            // 入力された値 (IInspectable型)
-                        auto inputValue = value.as<winrt::hstring>();  //扱いやすいように変換
-
-                        // 2-4. キーと値を準備
-                        CComBSTR bstrKey(key.c_str());          //Input要素のID属性を取得
-                        CComBSTR bstrValue(inputValue.c_str()); //Input要素の値または、Select要素のIDを取得
-
-                        // 2-5. Invokeのための引数配列を作成（逆順！）
-                        CComVariant addArgs[2] = { bstrValue, bstrKey };
-                        DISPPARAMS params = { addArgs, NULL, 2, 0 };
-
-                        // 2-6. .Addメソッドを呼び出して、データを詰める！
-                        pDictionary->Invoke(dispidAdd, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_METHOD, &params, NULL, NULL, NULL);
-                    }
+                    // ★★★ ヘルパー関数を呼び出すだけ！ ★★★
+                    AddToDictionary(pDictionary, key.c_str(), inputValue.c_str());
                 }
             }
 
