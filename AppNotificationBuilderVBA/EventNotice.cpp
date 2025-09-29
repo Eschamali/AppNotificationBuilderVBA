@@ -251,7 +251,7 @@ static void ExecuteExcelMacro(const wchar_t* ExcelMacroPass, IDispatch* UserInpu
         wchar_t buf[512];
         const wchar_t* reason = L"不明なエラー";
         if (!hXlDesk) reason = L"子ウィンドウ 'XLDESK' が見つかりません";
-        else if (!FindWindowExW(hXlDesk, NULL, L"EXCEL7", NULL)) reason = L"孫ウィンドウ 'EXCEL7' が見つかりません";
+        else if (!FindWindowExW(hXlDesk, NULL,EXCEL_SHEET_CLASS_NAME, NULL)) reason = L"孫ウィンドウ 'EXCEL7' が見つかりません";
         else reason = L"EXCEL7からオブジェクト取得に失敗しました";
 
         swprintf_s(buf, L"エラー理由: %s\nHRESULT=0x%08X\n%s", reason, hr, err.ErrorMessage());
