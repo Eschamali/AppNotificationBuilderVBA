@@ -9,7 +9,7 @@ Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
 '***************************************************************************************************
 '   VBAから、Windows PowerShell を経由して、デスクトップ通知【トースト通知】を表示させます
-'   また、DLLファイルを経由した通知手段も提供します。Ver1.5.1
+'   また、DLLファイルを経由した通知手段も提供します。Ver1.5.1.1
 
 ' MIT License
 '
@@ -1460,7 +1460,7 @@ End Property
 '***************************************************************************************************
 '* 機能　　：header要素の各属性にセットしたものをtoast要素に挿入します
 '---------------------------------------------------------------------------------------------------
-'* 引数　　：ArgID            ：このヘッダーを一意に識別します。 2 つの通知が同じヘッダー ID を持つ場合、アクション センターで同じヘッダーの下に表示されます。(省略時：このExcelのファイル名|起動中のExcelPID)
+'* 引数　　：ArgID            ：このヘッダーを一意に識別します。 2 つの通知が同じヘッダー ID を持つ場合、アクション センターで同じヘッダーの下に表示されます。(省略時：このExcelのファイルフルパス)
 '            ArgArguments     ：起動スキーマ。URLやファイルパスなど(省略時：このExcelの保存フォルダパス)
 '            ArgActivationType：このヘッダーがクリックされた場合に使用するアクティブ化の種類
 '            ArgTitle         ：ヘッダーのタイトルです。(推奨：このExcelのBook名　ThisWorkbook.Name)
@@ -1470,8 +1470,8 @@ End Property
 '***************************************************************************************************
 Public Property Let SetToastHeader(Optional ByVal ArgID As String, Optional ByVal ArgArguments As String, Optional ByVal ArgActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, ByVal ArgTitle As String)
     With ElementHeader
-        '省略時：このExcelのファイル名|起動中のExcelPID
-        If StrPtr(ArgID) Then .id = ArgID Else .id = GetUniqueBookInfo
+        '省略時：このExcelのファイルフルパス
+        If StrPtr(ArgID) Then .id = ArgID Else .id = ThisWorkbook.FullName
         
         '省略時：このExcelの保存フォルダパス
         If StrPtr(ArgArguments) Then .Arguments = ArgArguments Else .Arguments = ThisWorkbook.Path
@@ -3280,7 +3280,7 @@ Private Sub Class_Initialize()
     '必ず設定
     ElementBinding.template = "ToastGeneric"
 
-    '構築時に埋め込む
+    'クラスオブジェクト構築時の、ExcelのPIDを取得する
     ThisExcelPID = GetCurrentProcessId()
     
     With ThisWorkbook
