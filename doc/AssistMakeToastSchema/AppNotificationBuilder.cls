@@ -9,7 +9,7 @@ Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
 '***************************************************************************************************
 '   VBAから、Windows PowerShell を経由して、デスクトップ通知【トースト通知】を表示させます
-'   また、DLLファイルを経由した通知手段も提供します。Ver1.5.1.1
+'   また、DLLファイルを経由した通知手段も提供します。Ver1.5.1.2
 
 ' MIT License
 '
@@ -1868,9 +1868,9 @@ Private Function MakeXmlToastContentBuilder(DataBindingMode As Boolean) As Strin
 
 
 
-    '上記の処理で生成されたxmlコンテンツを返します(末尾に改行が入らないように置換を行います)
+    '上記の処理で生成されたxmlコンテンツを返します(末尾に改行が入らないように抽出文字数を調整します)
     'Debug.Print ToastContents.XML
-    MakeXmlToastContentBuilder = Replace(ToastContents.XML, "</toast>" & vbCrLf, "</toast>")
+    MakeXmlToastContentBuilder = Mid(ToastContents.XML, 1, Len(ToastContents.XML) - Len(vbCrLf))
 End Function
 
 
@@ -1883,7 +1883,7 @@ End Function
 '* 返り値　：ブック名|プロセスID　という形式
 '***************************************************************************************************
 Private Function GetUniqueBookInfo() As String
-    GetUniqueBookInfo = ThisWorkbook.Name & "|" & ThisExcelPID
+    GetUniqueBookInfo = ThisWorkbook.Name & パラメーター区切り文字 & ThisExcelPID
 End Function
 
 
