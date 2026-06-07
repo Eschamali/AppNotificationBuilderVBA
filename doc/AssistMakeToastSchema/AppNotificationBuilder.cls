@@ -10,6 +10,7 @@ Attribute VB_Exposed = False
 '***************************************************************************************************
 '   VBAから、Windows PowerShell を経由して、デスクトップ通知【トースト通知】を表示させます
 '   また、DLLファイルを経由した通知手段も提供します。Ver1.5.1.2
+'   (WinRT 直呼び出し: Show / Update / Remove / CheckNotificationSetting)
 
 ' MIT License
 '
@@ -44,16 +45,13 @@ Option Explicit
 
 
 '***************************************************************************************************
-'               ■■■ VBA用にカスタマイズした専用DLL 内部関数宣言セクション ■■■
+'               ■■■ VBA用 WinRT 直呼び出し / 残存DLL 内部関数宣言セクション ■■■
 '***************************************************************************************************
-' 機能     ：C++で書かれたDLLに、 Windows.UI.Notifications 関連の処理を埋め込ませ、Shell経由より高速に処理できます
+' 機能     ：Show / Update / Remove / CheckNotificationSetting は modWinRTToast 経由で WinRT を直接呼び出します。
+'            Collection 操作と SQLite 操作のみ、従来どおり C++ DLL を使用します。
 '---------------------------------------------------------------------------------------------------
-Private Declare PtrSafe Sub ShowToastNotification Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams, ByRef Params_Binding As ToastNotificationVariable) '通知表示
-Private Declare PtrSafe Function UpdateToastNotification Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams, ByRef Params_Binding As ToastNotificationVariable) As Long  '通知更新
-Private Declare PtrSafe Sub RemoveToastNotification Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams)  '通知を削除
 Private Declare PtrSafe Function CreateToastCollection Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams, ByVal DisplayName As LongPtr, ByVal LaunchArgs As LongPtr, ByVal IconUri As LongPtr) As Long 'ToastCollectionの作成
 Private Declare PtrSafe Function DeleteToastCollection Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams) As Long 'ToastCollectionの削除
-Private Declare PtrSafe Function CheckNotificationSetting Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams) As Long '通知check
 Private Declare PtrSafe Function ExecuteSQLite Lib "AppNotificationBuilderVBA" (ByVal DB_Path As LongPtr, ByVal sql As LongPtr) As String    'SQLite操作用
 Private Declare PtrSafe Function GetCurrentProcessId Lib "kernel32" () As Long      'アクティブExcelのプロセスID取得用
 
@@ -727,24 +725,41 @@ Private Function ParamsConvertForDLL(ToastSetting As ToastNotification) As Toast
 End Function
 
 '===================================================================================================
-'* 機能    ：DLLで扱えるユーザー定義型：ToastNotificationVariable　に変換します
+'* 機能    ：WinRT 直呼び出し用の設定構造体へ変換します
 '---------------------------------------------------------------------------------------------------
-'* 注意事項：Windows API の文字列関係は、ポインターで取得するパターンが多いので、StrPtrで経由する必要があります
-'---------------------------------------------------------------------------------------------------
-Private Function ReturnDataBinding() As ToastNotificationVariable
-    With ReturnDataBinding
-        '最上位レベルのテキスト要素
-        .TitleText = StrPtr(ElementsText.Title.Value)
-        .ContentsText = StrPtr(ElementsText.Body.Value)
-        .AttributionText = StrPtr(ElementsText.Attribution.Value)
+Private Function ParamsConvertForWinRT(ToastSetting As ToastNotification) As WinRT_ToastConfig
+    With ParamsConvertForWinRT
+        .AppUserModelID = ToastSetting.AppUserModelID
+        .XmlTemplate = ToastSetting.XmlSchema
+        .Tag = ToastSetting.Tag
+        .Group = ToastSetting.Group
+        .Schedule_ID = ToastSetting.Schedule_ID
+        .CollectionID = ToastSetting.CollectionID
+        .ExpiresOnReboot = ToastSetting.ExpiresOnReboot
+        .SuppressPopup = ToastSetting.SuppressPopup
         
-        '進行状況バー要素
-        '  Statusが設定済みの場合のみ定義する(公式ドキュメント準拠)
-        If StrPtr(ElementProgress.Status) Then
-            .ProgressTitle = StrPtr(ElementProgress.Title)
-            .ProgressStatus = StrPtr(ElementProgress.Status)
+        .Schedule_DeliveryTime = DateAdd("h", TargetTimeZone.Hour * -1, ToastSetting.Schedule_DeliveryTime)
+        .Schedule_DeliveryTime = DateAdd("n", TargetTimeZone.Minute * -1, .Schedule_DeliveryTime)
+        
+        .ExpirationTime = DateAdd("h", TargetTimeZone.Hour * -1, ToastSetting.ExpirationTime)
+        .ExpirationTime = DateAdd("n", TargetTimeZone.Minute * -1, .ExpirationTime)
+    End With
+End Function
+
+'===================================================================================================
+'* 機能    ：WinRT 直呼び出し用のデータバインディング構造体へ変換します
+'---------------------------------------------------------------------------------------------------
+Private Function DataBindingConvertForWinRT() As WinRT_DataBinding
+    With DataBindingConvertForWinRT
+        .TitleText = ElementsText.Title.Value
+        .ContentsText = ElementsText.Body.Value
+        .AttributionText = ElementsText.Attribution.Value
+        
+        If Len(ElementProgress.Status) > 0 Then
+            .ProgressTitle = ElementProgress.Title
+            .ProgressStatus = ElementProgress.Status
             .ProgressValue = ElementProgress.Value
-            .ProgressValueStringOverride = StrPtr(ElementProgress.ValueStringOverride)
+            .ProgressValueStringOverride = ElementProgress.ValueStringOverride
         End If
     End With
 End Function
@@ -2091,8 +2106,8 @@ Public Sub RunDll_ToastNotifierShow(ByVal ToastTag As String, Optional ByVal Col
         .ExpirationTime = ExpirationDate
     End With
 
-    'データバインディングを設定しつつ、Dll内の「ShowToastNotification」関数を実行します
-    ShowToastNotification ParamsConvertForDLL(ToastConfig), ReturnDataBinding
+    'データバインディングを設定しつつ、WinRT 直呼び出しで通知を表示します
+    WinRT_ShowToastNotification ParamsConvertForWinRT(ToastConfig), DataBindingConvertForWinRT()
 End Sub
 
 '***************************************************************************************************
@@ -2129,8 +2144,8 @@ Public Property Get RunDll_ToastNotifierUpdate(ByVal ToastTag As String, Optiona
     End With
 
 
-    'Dll内の「UpdateToastNotification」関数を実行します
-    RunDll_ToastNotifierUpdate = UpdateToastNotification(ParamsConvertForDLL(ToastConfig), ReturnDataBinding)
+    'WinRT 直呼び出しで通知を更新します
+    RunDll_ToastNotifierUpdate = WinRT_UpdateToastNotification(ParamsConvertForWinRT(ToastConfig), DataBindingConvertForWinRT())
 End Property
 
 '**************************************************************************************************
@@ -2169,8 +2184,8 @@ Public Sub RunDll_ToastNotificationHistoryRemove(Optional ByVal ToastTag As Stri
     End With
 
 
-    'Dll内の「RemoveToastNotification」関数を実行します
-    RemoveToastNotification ParamsConvertForDLL(ToastConfig)
+    'WinRT 直呼び出しで通知を削除します
+    WinRT_RemoveToastNotification ParamsConvertForWinRT(ToastConfig)
 End Sub
 
 '***************************************************************************************************
@@ -2272,7 +2287,7 @@ Public Property Get RunDll_CheckNotificationSetting(Optional ByVal CollectionID 
     End With
     
     'チェック
-    RunDll_CheckNotificationSetting = CheckNotificationSetting(ParamsConvertForDLL(ToastConfig))
+    RunDll_CheckNotificationSetting = WinRT_CheckNotificationSetting(ParamsConvertForWinRT(ToastConfig))
 End Property
 
 
