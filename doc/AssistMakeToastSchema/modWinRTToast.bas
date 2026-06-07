@@ -776,13 +776,15 @@ Private Sub WinRT_ScheduleDateToWinRTDateTimeFillFromConfig(ByRef Config As WinR
 #If WRT_USE_TLB_SCHEDULE Then
     WinRT_ScheduleDateToWinRTDateTimeFillViaTlb deliveryLocal, outDt
 #Else
-    minutes = DateDiff("n", Now, deliveryLocal)
-    If minutes < 1 Then
-        Err.Raise 5, "WinRT_ScheduleDateToWinRTDateTimeFillFromConfig", "Schedule delivery time must be in the future."
-    End If
-    WinRT_DateTimeFromMinutesFromNow minutes, outDt
+    ' 指定された絶対時刻（ローカル wall clock）を秒精度でそのまま UTC FILETIME へ変換する（誤差なし）
+    WinRT_LocalSerialToWinRTDateTimeFill deliveryLocal, outDt
+    ' TZ 変換に失敗した場合のみ「現在 + 分差」でフォールバック（秒は丸められる）
     If WRT_DateTimeIsZero(outDt) Then
-        WinRT_LocalSerialToWinRTDateTimeFill deliveryLocal, outDt
+        minutes = DateDiff("n", Now, deliveryLocal)
+        If minutes < 1 Then
+            Err.Raise 5, "WinRT_ScheduleDateToWinRTDateTimeFillFromConfig", "Schedule delivery time must be in the future."
+        End If
+        WinRT_DateTimeFromMinutesFromNow minutes, outDt
     End If
 #End If
 
@@ -884,6 +886,7 @@ Private Sub WinRT_LocalSerialToWinRTDateTimeFill(ByVal deliveryLocal As Date, By
     If deliveryLocal <= 0 Then Exit Sub
 
     VariantTimeToSystemTime CDbl(deliveryLocal), stLocal
+    stLocal.wMilliseconds = 0
     If TzSpecificLocalTimeToSystemTime(0&, stLocal, stUtc) = 0 Then Exit Sub
     If SystemTimeToFileTime(stUtc, ft) = 0 Then Exit Sub
     WRT_CopyFileTimeToDateTime ft, outDt
