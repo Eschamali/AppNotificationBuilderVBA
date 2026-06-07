@@ -65,6 +65,7 @@ End Type
 Private Const VT_QI As Long = 0
 Private Const VT_RELEASE As Long = 2
 Private Const VT_IToastNotifier_Show As Long = 6
+Private Const VT_IToastNotifier_GetSetting As Long = 8
 Private Const VT_IToastNotifier_AddToSchedule As Long = 9
 Private Const VT_IScheduledToastNotificationFactory_Create As Long = 6
 Private Const VT_IScheduledToastNotification_SetId As Long = 10
@@ -259,7 +260,10 @@ Public Function WinRT_CheckNotificationSetting(ByRef Config As WinRT_ToastConfig
     pNotifier = WinRT_CreateToastNotifier(Config.AppUserModelID, Config.CollectionID)
     If pNotifier = 0 Then Err.Raise 513, , "CreateToastNotifier failed."
 
-    settingValue = CLng(WinRT_CallComMethod(pNotifier, 8, vbLong))
+    ' IToastNotifier.Setting は HRESULT get_Setting(NotificationSetting* out)。
+    ' 出力ポインタを渡さないと out 引数がゴミ値になりアクセス違反でクラッシュする。
+    settingValue = 0
+    WinRT_CallComMethod pNotifier, VT_IToastNotifier_GetSetting, vbLong, WinRT_vbPtr, VarPtr(settingValue)
     WinRT_CheckNotificationSetting = settingValue
 
 Cleanup:
