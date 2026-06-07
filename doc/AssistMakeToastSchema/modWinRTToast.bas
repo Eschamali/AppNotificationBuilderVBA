@@ -108,7 +108,6 @@ Public Type WinRT_ToastConfig
     Schedule_DeliveryTime As Date
     Schedule_DeliveryTimeLocal As Date
     ExpirationTime As Date
-    ExpirationTimeLocal As Date
 End Type
 
 Public Type WinRT_DataBinding
@@ -393,7 +392,7 @@ Private Sub WinRT_ShowScheduledToast(ByRef Config As WinRT_ToastConfig)
         pScheduled2 = 0
     End If
 
-    If Config.ExpirationTime > 0 Or Config.ExpirationTimeLocal > 0 Then
+    If Config.ExpirationTime > 0 Then
         ' IScheduledToastNotification4（1D4761FD...）。98429E8B... は v3 で ExpirationTime は存在しない
         IIDFromString StrPtr("{1D4761FD-BDEF-4E4A-96BE-0101369B58D2}"), iidScheduled4
         WinRT_CallComMethod pScheduled, VT_QI, vbLong, WinRT_vbPtr, VarPtr(iidScheduled4), WinRT_vbPtr, VarPtr(pScheduled4)
@@ -682,14 +681,8 @@ Private Function WinRT_CreateDateTimeReferenceFromConfig(ByRef Config As WinRT_T
     Dim dateTimeValue As WRT_DateTime
 
     ' DLL (GeneralNotice.cpp) と同一: UTC 補正済みシリアル → VariantTimeToSystemTime → SystemTimeToFileTime。
-    ' ExpirationTimeLocal（新フィールド）に依存しないので .cls 再インポートの有無に左右されない。
-    If Config.ExpirationTime > 0 Then
-        WinRT_DateSerialToWinRTDateTimeFill Config.ExpirationTime, dateTimeValue
-    ElseIf Config.ExpirationTimeLocal > 0 Then
-        WinRT_LocalSerialToWinRTDateTimeFill Config.ExpirationTimeLocal, dateTimeValue
-    Else
-        Exit Function
-    End If
+    If Config.ExpirationTime <= 0 Then Exit Function
+    WinRT_DateSerialToWinRTDateTimeFill Config.ExpirationTime, dateTimeValue
     If WRT_DateTimeIsZero(dateTimeValue) Then Exit Function
 
     WinRT_CreateDateTimeReferenceFromConfig = WinRT_CreateDateTimeReferenceFromDateTime(dateTimeValue)
@@ -699,7 +692,7 @@ Private Sub WinRT_ApplyExpirationTime(ByVal pNotification As LongPtr, ByVal vTab
     Dim pExpirationRef As LongPtr
 
     If pNotification = 0 Then Exit Sub
-    If Config.ExpirationTime <= 0 And Config.ExpirationTimeLocal <= 0 Then Exit Sub
+    If Config.ExpirationTime <= 0 Then Exit Sub
 
     pExpirationRef = WinRT_CreateDateTimeReferenceFromConfig(Config)
     If pExpirationRef = 0 Then
