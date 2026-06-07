@@ -36,13 +36,20 @@ Private Const VT_RELEASE As Long = 2
 Private Const VT_IToastNotifier_Show As Long = 6
 Private Const VT_IToastNotifier_AddToSchedule As Long = 9
 Private Const VT_IToastNotification2_SetTag As Long = 6
-Private Const VT_IToastNotification2_SetGroup As Long = 7
-Private Const VT_IToastNotification2_SetSuppressPopup As Long = 8
+Private Const VT_IToastNotification2_SetGroup As Long = 8
+Private Const VT_IToastNotification2_SetSuppressPopup As Long = 10
 Private Const VT_IToastNotification4_SetData As Long = 7
 Private Const VT_IToastNotification6_SetExpiresOnReboot As Long = 7
 Private Const VT_IToastNotificationHistory_RemoveGroupedTagWithId As Long = 8
 Private Const VT_IToastNotificationHistory_RemoveGroupWithId As Long = 7
 Private Const VT_IToastNotificationHistory_ClearWithId As Long = 12
+Private Const VT_IToastNotifier2_UpdateWithTagAndGroup As Long = 6
+Private Const VT_IToastNotifier2_UpdateWithTag As Long = 7
+Private Const VT_INotificationData_SetSequenceNumber As Long = 8
+
+' Excel セッション中は WinRT を維持し、Show→Update 間で RoUninitialize しない
+Private WinRT_RoInitialized As Boolean
+Private WinRT_ToastDataSequenceNumber As Long
 
 Public Type WinRT_ToastConfig
     AppUserModelID As String
@@ -65,12 +72,18 @@ Public Type WinRT_DataBinding
     ProgressValueStringOverride As String
     ProgressStatus As String
     ProgressValue As Double
+    SequenceNumber As Long
 End Type
 
 Public Sub WinRT_ShowToastNotification(ByRef Config As WinRT_ToastConfig, ByRef Binding As WinRT_DataBinding)
     Dim initialized As Boolean
     On Error GoTo Cleanup
     WinRT_EnsureRoInitialized initialized
+    WinRT_ValidateToastIdentity Config, "WinRT_ShowToastNotification"
+
+    If WinRT_DataBindingHasContent(Binding) Then
+        Binding.SequenceNumber = WinRT_NextToastDataSequence()
+    End If
 
     If Config.Schedule_DeliveryTime > 0 Then
         WinRT_ShowScheduledToast Config
@@ -95,6 +108,11 @@ Public Function WinRT_UpdateToastNotification(ByRef Config As WinRT_ToastConfig,
 
     On Error GoTo Cleanup
     WinRT_EnsureRoInitialized initialized
+    WinRT_ValidateToastIdentity Config, "WinRT_UpdateToastNotification"
+
+    If WinRT_DataBindingHasContent(Binding) Then
+        Binding.SequenceNumber = WinRT_NextToastDataSequence()
+    End If
 
     pNotifier = WinRT_CreateToastNotifier(Config.AppUserModelID, Config.CollectionID)
     If pNotifier = 0 Then Err.Raise 513, , "CreateToastNotifier failed."
@@ -108,7 +126,9 @@ Public Function WinRT_UpdateToastNotification(ByRef Config As WinRT_ToastConfig,
 
     hStrTag = WinRT_CreateHString(Config.Tag)
     hStrGroup = WinRT_CreateHString(Config.Group)
-    WinRT_CallComMethod pNotifier2, 6, vbLong, WinRT_vbPtr, pData, WinRT_vbPtr, hStrTag, WinRT_vbPtr, hStrGroup, WinRT_vbPtr, VarPtr(updateResult)
+    updateResult = 0
+    WinRT_CallComMethod pNotifier2, VT_IToastNotifier2_UpdateWithTagAndGroup, vbLong, WinRT_vbPtr, pData, WinRT_vbPtr, hStrTag, WinRT_vbPtr, hStrGroup, WinRT_vbPtr, VarPtr(updateResult)
+
     WinRT_UpdateToastNotification = updateResult
 
 Cleanup:
@@ -124,6 +144,23 @@ Cleanup:
     If pNotifier <> 0 Then WinRT_CallComMethod pNotifier, VT_RELEASE, vbLong
     WinRT_FinalizeRo initialized
     On Error GoTo 0
+End Function
+
+Public Sub WinRT_Shutdown()
+    If WinRT_RoInitialized Then
+        RoUninitialize
+        WinRT_RoInitialized = False
+    End If
+    WinRT_ToastDataSequenceNumber = 0
+End Sub
+
+Public Sub WinRT_ResetToastDataSequence()
+    WinRT_ToastDataSequenceNumber = 0
+End Sub
+
+Private Function WinRT_NextToastDataSequence() As Long
+    WinRT_ToastDataSequenceNumber = WinRT_ToastDataSequenceNumber + 1
+    WinRT_NextToastDataSequence = WinRT_ToastDataSequenceNumber
 End Function
 
 Public Sub WinRT_RemoveToastNotification(ByRef Config As WinRT_ToastConfig)
@@ -249,6 +286,12 @@ Private Sub WinRT_ShowImmediateToast(ByRef Config As WinRT_ToastConfig, ByRef Bi
     If hStrGroup <> 0 Then WindowsDeleteString hStrGroup
     If pNotifier <> 0 Then WinRT_CallComMethod pNotifier, VT_RELEASE, vbLong
     If pToast <> 0 Then WinRT_CallComMethod pToast, VT_RELEASE, vbLong
+End Sub
+
+Private Sub WinRT_ValidateToastIdentity(ByRef Config As WinRT_ToastConfig, ByVal procName As String)
+    If Len(Config.Tag) = 0 Then Err.Raise 513, procName, "Tag is required."
+    If Len(Config.Group) = 0 Then Err.Raise 513, procName, "Group is required."
+    If Len(Config.AppUserModelID) = 0 Then Err.Raise 513, procName, "AppUserModelID is required."
 End Sub
 
 Private Sub WinRT_ShowScheduledToast(ByRef Config As WinRT_ToastConfig)
@@ -518,26 +561,60 @@ Private Function WinRT_CreateNotificationData(ByRef Binding As WinRT_DataBinding
     WinRT_CallComMethod pInspectable, VT_RELEASE, vbLong
     If pData = 0 Then Exit Function
 
-    hasProgress = (Len(Binding.ProgressStatus) > 0)
-    WinRT_CallComMethod pData, 6, vbLong, WinRT_vbPtr, VarPtr(pMap)
-    If pMap <> 0 Then
-        If Len(Binding.TitleText) > 0 Then WinRT_InsertMapValue pMap, "TopTextTitle", Binding.TitleText
-        If Len(Binding.ContentsText) > 0 Then WinRT_InsertMapValue pMap, "TopTextContents", Binding.ContentsText
-        If Len(Binding.AttributionText) > 0 Then WinRT_InsertMapValue pMap, "TopTextAttribution", Binding.AttributionText
-        If hasProgress Then
-            If Len(Binding.ProgressTitle) > 0 Then WinRT_InsertMapValue pMap, "ProgressTitle", Binding.ProgressTitle
-            WinRT_InsertMapValue pMap, "ProgressStatus", Binding.ProgressStatus
-            If Binding.ProgressValue < 0 Then
-                WinRT_InsertMapValue pMap, "ProgressValue", "Indeterminate"
-            Else
-                WinRT_InsertMapValue pMap, "ProgressValue", CStr(Binding.ProgressValue)
-            End If
-            If Len(Binding.ProgressValueStringOverride) > 0 Then WinRT_InsertMapValue pMap, "ProgressValueString", Binding.ProgressValueStringOverride
-        End If
-        WinRT_CallComMethod pMap, VT_RELEASE, vbLong
+    If Binding.SequenceNumber > 0 Then
+        WinRT_CallComMethod pData, VT_INotificationData_SetSequenceNumber, vbLong, vbLong, Binding.SequenceNumber
     End If
 
+    hasProgress = (Len(Binding.ProgressStatus) > 0)
+    WinRT_CallComMethod pData, 6, vbLong, WinRT_vbPtr, VarPtr(pMap)
+    If pMap = 0 Then
+        WinRT_CallComMethod pData, VT_RELEASE, vbLong
+        Exit Function
+    End If
+
+    If Len(Binding.TitleText) > 0 Then WinRT_InsertMapValue pMap, "TopTextTitle", Binding.TitleText
+    If Len(Binding.ContentsText) > 0 Then WinRT_InsertMapValue pMap, "TopTextContents", Binding.ContentsText
+    If Len(Binding.AttributionText) > 0 Then WinRT_InsertMapValue pMap, "TopTextAttribution", Binding.AttributionText
+    If hasProgress Then
+        If Len(Binding.ProgressTitle) > 0 Then WinRT_InsertMapValue pMap, "ProgressTitle", Binding.ProgressTitle
+        WinRT_InsertMapValue pMap, "ProgressStatus", Binding.ProgressStatus
+        If Binding.ProgressValue < 0 Then
+            WinRT_InsertMapValue pMap, "ProgressValue", "Indeterminate"
+        Else
+            WinRT_InsertMapValue pMap, "ProgressValue", WinRT_FormatProgressValue(Binding.ProgressValue)
+        End If
+        If Len(Binding.ProgressValueStringOverride) > 0 Then
+            WinRT_InsertMapValue pMap, "ProgressValueString", Binding.ProgressValueStringOverride
+        Else
+            WinRT_InsertMapValue pMap, "ProgressValueString", WinRT_FormatProgressValueString(Binding.ProgressValue)
+        End If
+    End If
+    WinRT_CallComMethod pMap, VT_RELEASE, vbLong
+
     WinRT_CreateNotificationData = pData
+End Function
+
+Private Function WinRT_FormatProgressValue(ByVal progressValue As Double) As String
+    WinRT_FormatProgressValue = Replace(CStr(progressValue), ",", ".")
+End Function
+
+Private Function WinRT_FormatProgressValueString(ByVal progressValue As Double) As String
+    If progressValue < 0 Then
+        WinRT_FormatProgressValueString = "処理中"
+    Else
+        WinRT_FormatProgressValueString = Format$(progressValue, "0%")
+    End If
+End Function
+
+Private Function WinRT_CoerceLongResult(ByVal vResult As Variant) As Long
+    Select Case VarType(vResult)
+        Case vbLong, vbInteger, vbByte
+            WinRT_CoerceLongResult = CLng(vResult)
+        Case vbLongLong
+            WinRT_CoerceLongResult = CLng(vResult)
+        Case Else
+            WinRT_CoerceLongResult = 0
+    End Select
 End Function
 
 Private Function WinRT_DataBindingHasContent(ByRef Binding As WinRT_DataBinding) As Boolean
@@ -574,8 +651,8 @@ Private Sub WinRT_InsertMapValue(ByVal pMap As LongPtr, ByVal key As String, ByV
     hKey = WinRT_CreateHString(key)
     hVal = WinRT_CreateHString(val)
     WinRT_CallComMethod pMap, 10, vbLong, WinRT_vbPtr, hKey, WinRT_vbPtr, hVal, WinRT_vbPtr, VarPtr(replaced)
-    If hKey <> 0 Then WindowsDeleteString hKey
-    If hVal <> 0 Then WindowsDeleteString hVal
+    WindowsDeleteString hKey
+    WindowsDeleteString hVal
 End Sub
 
 Private Sub WinRT_GetActivationFactory(ByVal className As String, ByRef iid As WinRT_GUID, ByRef factory As LongPtr)
@@ -587,7 +664,16 @@ End Sub
 
 Private Function WinRT_CreateHString(ByVal s As String) As LongPtr
     Dim hStr As LongPtr
-    If Len(s) > 0 Then WindowsCreateString StrPtr(s), Len(s), hStr
+    Dim hr As Long
+    Dim length As Long
+
+    length = Len(s)
+    If length > 0 Then
+        hr = WindowsCreateString(StrPtr(s), length, hStr)
+    Else
+        hr = WindowsCreateString(StrPtr(""), 0, hStr)
+    End If
+    If hr < 0 Or hStr = 0 Then Err.Raise 513, "WinRT_CreateHString", "WindowsCreateString failed: 0x" & Hex$(hr)
     WinRT_CreateHString = hStr
 End Function
 
@@ -596,14 +682,15 @@ Private Function WinRT_VbaDateToUniversalTime(ByVal dt As Date) As Currency
 End Function
 
 Private Sub WinRT_EnsureRoInitialized(ByRef initialized As Boolean)
-    If Not initialized Then
+    If Not WinRT_RoInitialized Then
         RoInitialize 1
-        initialized = True
+        WinRT_RoInitialized = True
     End If
+    initialized = True
 End Sub
 
 Private Sub WinRT_FinalizeRo(ByVal initialized As Boolean)
-    If initialized Then RoUninitialize
+    ' 通知表示→更新の連続呼び出しで WinRT ランタイムを破棄しない
 End Sub
 
 Private Function WinRT_CallComMethod(ByVal pUnk As LongPtr, ByVal vTableIndex As Long, ByVal retType As Integer, ParamArray args() As Variant) As Variant
@@ -639,8 +726,13 @@ Private Function WinRT_CallComMethod(ByVal pUnk As LongPtr, ByVal vTableIndex As
     End If
 
     If hRes <> 0 Then Err.Raise hRes, "WinRT_CallComMethod", "DispCallFunc failed at vtable index " & vTableIndex & ": 0x" & Hex$(hRes)
-    If vTableIndex <> VT_RELEASE And VarType(vResult) = vbLong Then
-        If CLng(vResult) < 0 Then Err.Raise CLng(vResult), "WinRT_CallComMethod", "COM method failed at vtable index " & vTableIndex & ": 0x" & Hex$(CLng(vResult))
+    If vTableIndex <> VT_RELEASE Then
+        Select Case VarType(vResult)
+            Case vbLong, vbInteger, vbByte
+                If CLng(vResult) < 0 Then Err.Raise CLng(vResult), "WinRT_CallComMethod", "COM method failed at vtable index " & vTableIndex & ": 0x" & Hex$(CLng(vResult))
+            Case vbLongLong
+                If vResult < 0 Then Err.Raise CLng(vResult), "WinRT_CallComMethod", "COM method failed at vtable index " & vTableIndex & ": 0x" & Hex$(CLng(vResult))
+        End Select
     End If
     WinRT_CallComMethod = vResult
 End Function
