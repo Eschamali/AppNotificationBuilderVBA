@@ -741,7 +741,8 @@ Private Function ParamsConvertForWinRT(ToastSetting As ToastNotification) As Win
         .Schedule_DeliveryTimeLocal = ToastSetting.Schedule_DeliveryTime
         .Schedule_DeliveryTime = DateAdd("h", TargetTimeZone.Hour * -1, ToastSetting.Schedule_DeliveryTime)
         .Schedule_DeliveryTime = DateAdd("n", TargetTimeZone.Minute * -1, .Schedule_DeliveryTime)
-        
+
+        .ExpirationTimeLocal = ToastSetting.ExpirationTime
         .ExpirationTime = DateAdd("h", TargetTimeZone.Hour * -1, ToastSetting.ExpirationTime)
         .ExpirationTime = DateAdd("n", TargetTimeZone.Minute * -1, .ExpirationTime)
     End With

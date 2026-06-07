@@ -71,7 +71,9 @@ Private Const VT_IScheduledToastNotification_SetId As Long = 10
 Private Const VT_IToastNotification2_SetTag As Long = 6
 Private Const VT_IToastNotification2_SetGroup As Long = 8
 Private Const VT_IToastNotification2_SetSuppressPopup As Long = 10
+Private Const VT_IToastNotification_SetExpirationTime As Long = 7
 Private Const VT_IToastNotification4_SetData As Long = 7
+Private Const VT_IScheduledToastNotification4_SetExpirationTime As Long = 7
 Private Const VT_IToastNotification6_SetExpiresOnReboot As Long = 7
 Private Const VT_IToastNotificationHistory_RemoveGroupedTagWithId As Long = 8
 Private Const VT_IToastNotificationHistory_RemoveGroupWithId As Long = 7
@@ -106,6 +108,7 @@ Public Type WinRT_ToastConfig
     Schedule_DeliveryTime As Date
     Schedule_DeliveryTimeLocal As Date
     ExpirationTime As Date
+    ExpirationTimeLocal As Date
 End Type
 
 Public Type WinRT_DataBinding
@@ -325,6 +328,8 @@ Private Sub WinRT_ShowImmediateToast(ByRef Config As WinRT_ToastConfig, ByRef Bi
         End If
     End If
 
+    WinRT_ApplyExpirationTime pToast, VT_IToastNotification_SetExpirationTime, Config
+
     pNotifier = WinRT_CreateToastNotifier(Config.AppUserModelID, Config.CollectionID)
     If pNotifier = 0 Then Err.Raise 513, , "CreateToastNotifier failed."
     WinRT_CallComMethod pNotifier, VT_IToastNotifier_Show, vbLong, WinRT_vbPtr, pToast
@@ -388,16 +393,12 @@ Private Sub WinRT_ShowScheduledToast(ByRef Config As WinRT_ToastConfig)
         pScheduled2 = 0
     End If
 
-    If Config.ExpirationTime > 0 Then
-        IIDFromString StrPtr("{98429E8B-BD32-4A3B-9D15-22AEA49462A1}"), iidScheduled4
+    If Config.ExpirationTime > 0 Or Config.ExpirationTimeLocal > 0 Then
+        ' IScheduledToastNotification4（1D4761FD...）。98429E8B... は v3 で ExpirationTime は存在しない
+        IIDFromString StrPtr("{1D4761FD-BDEF-4E4A-96BE-0101369B58D2}"), iidScheduled4
         WinRT_CallComMethod pScheduled, VT_QI, vbLong, WinRT_vbPtr, VarPtr(iidScheduled4), WinRT_vbPtr, VarPtr(pScheduled4)
         If pScheduled4 <> 0 Then
-            Dim pExpirationRef As LongPtr
-            pExpirationRef = WinRT_CreateDateTimeReference(Config.ExpirationTime)
-            If pExpirationRef <> 0 Then
-                WinRT_CallComMethod pScheduled4, 7, vbLong, WinRT_vbPtr, pExpirationRef
-                WinRT_CallComMethod pExpirationRef, VT_RELEASE, vbLong
-            End If
+            WinRT_ApplyExpirationTime pScheduled4, VT_IScheduledToastNotification4_SetExpirationTime, Config
             WinRT_CallComMethod pScheduled4, VT_RELEASE, vbLong
             pScheduled4 = 0
         End If
@@ -677,24 +678,65 @@ Private Function WinRT_DataBindingHasContent(ByRef Binding As WinRT_DataBinding)
     If Len(Binding.ProgressStatus) > 0 Then WinRT_DataBindingHasContent = True
 End Function
 
-Private Function WinRT_CreateDateTimeReference(ByVal dt As Date) As LongPtr
+Private Function WinRT_CreateDateTimeReferenceFromConfig(ByRef Config As WinRT_ToastConfig) As LongPtr
+    Dim dateTimeValue As WRT_DateTime
+
+    ' DLL (GeneralNotice.cpp) と同一: UTC 補正済みシリアル → VariantTimeToSystemTime → SystemTimeToFileTime。
+    ' ExpirationTimeLocal（新フィールド）に依存しないので .cls 再インポートの有無に左右されない。
+    If Config.ExpirationTime > 0 Then
+        WinRT_DateSerialToWinRTDateTimeFill Config.ExpirationTime, dateTimeValue
+    ElseIf Config.ExpirationTimeLocal > 0 Then
+        WinRT_LocalSerialToWinRTDateTimeFill Config.ExpirationTimeLocal, dateTimeValue
+    Else
+        Exit Function
+    End If
+    If WRT_DateTimeIsZero(dateTimeValue) Then Exit Function
+
+    WinRT_CreateDateTimeReferenceFromConfig = WinRT_CreateDateTimeReferenceFromDateTime(dateTimeValue)
+End Function
+
+Private Sub WinRT_ApplyExpirationTime(ByVal pNotification As LongPtr, ByVal vTableIndex As Long, ByRef Config As WinRT_ToastConfig)
+    Dim pExpirationRef As LongPtr
+
+    If pNotification = 0 Then Exit Sub
+    If Config.ExpirationTime <= 0 And Config.ExpirationTimeLocal <= 0 Then Exit Sub
+
+    pExpirationRef = WinRT_CreateDateTimeReferenceFromConfig(Config)
+    If pExpirationRef = 0 Then
+        Err.Raise 513, "WinRT_ApplyExpirationTime", "PropertyValue.CreateDateTime failed for ExpirationTime."
+    End If
+
+    WinRT_CallComMethod pNotification, vTableIndex, vbLong, WinRT_vbPtr, pExpirationRef
+    WinRT_CallComMethod pExpirationRef, VT_RELEASE, vbLong
+End Sub
+
+Private Function WinRT_CreateDateTimeReferenceFromDateTime(ByRef dateTimeValue As WRT_DateTime) As LongPtr
     Dim hStrClass As LongPtr
     Dim pPropertyValueStatics As LongPtr
     Dim pPropertyValue As LongPtr
-    Dim dateTimeValue As WRT_DateTime
+    Dim pReference As LongPtr
     Dim iidPropertyValueStatics As WinRT_GUID
+    Dim iidReferenceDateTime As WinRT_GUID
 
-    IIDFromString StrPtr("{629DBDCF-4466-40FF-9A1A-484AFD159F5A}"), iidPropertyValueStatics
+    IIDFromString StrPtr("{629BDBC8-D932-4FF4-96B9-8D96C5C1E858}"), iidPropertyValueStatics
 
     hStrClass = WinRT_CreateHString("Windows.Foundation.PropertyValue")
     RoGetActivationFactory hStrClass, iidPropertyValueStatics, pPropertyValueStatics
     If hStrClass <> 0 Then WindowsDeleteString hStrClass
     If pPropertyValueStatics = 0 Then Exit Function
 
-    WinRT_DateSerialToWinRTDateTimeFill dt, dateTimeValue
     WinRT_PropertyValueCreateDateTime pPropertyValueStatics, dateTimeValue, pPropertyValue
     WinRT_CallComMethod pPropertyValueStatics, VT_RELEASE, vbLong
-    WinRT_CreateDateTimeReference = pPropertyValue
+    If pPropertyValue = 0 Then Exit Function
+
+    ' CreateDateTime は IPropertyValue を返すが、ExpirationTime は IReference<DateTime> を要求する。
+    ' 別 vtable なので必ず QueryInterface してから渡す（直接渡すと値が壊れる）。
+    IIDFromString StrPtr("{5541D8A7-497C-5AA4-86FC-7713ADBF2A2C}"), iidReferenceDateTime
+    WinRT_CallComMethod pPropertyValue, VT_QI, vbLong, WinRT_vbPtr, VarPtr(iidReferenceDateTime), WinRT_vbPtr, VarPtr(pReference)
+    WinRT_CallComMethod pPropertyValue, VT_RELEASE, vbLong
+    If pReference = 0 Then Exit Function
+
+    WinRT_CreateDateTimeReferenceFromDateTime = pReference
 End Function
 
 Private Sub WinRT_InsertMapValue(ByVal pMap As LongPtr, ByVal key As String, ByVal val As String)
@@ -947,39 +989,42 @@ End Sub
 
 Private Sub WinRT_PropertyValueCreateDateTime( _
     ByVal pPropertyValueStatics As LongPtr, _
-    ByRef deliveryTime As WRT_DateTime, _
+    ByRef dateTimeValue As WRT_DateTime, _
     ByRef pPropertyValue As LongPtr)
 
-    Dim argTypes(0 To 1) As Integer
-    Dim argValues(0 To 1) As Variant
-    Dim argPtrs(0 To 1) As LongPtr
-    Dim vResult As Variant
-    Dim hRes As Long
-    Dim vTableOffset As LongPtr
+    Dim deliveryCy As Currency
     Dim deliveryTicks As LongLong
+    Dim errNum As Long
 
     If pPropertyValueStatics = 0 Then Err.Raise 513, "WinRT_PropertyValueCreateDateTime", "PropertyValue statics is null."
 
-    deliveryTicks = WRT_DateTimeToLongLong(deliveryTime)
+    pPropertyValue = 0
+    RtlMoveMemory deliveryCy, dateTimeValue.dwLowDateTime, 8
 
-#If Win64 Then
-    vTableOffset = VT_IPropertyValueStatics_CreateDateTime * 8
-#Else
-    vTableOffset = VT_IPropertyValueStatics_CreateDateTime * 4
-#End If
+    On Error Resume Next
+    Err.Clear
+    WinRT_CallComMethod pPropertyValueStatics, VT_IPropertyValueStatics_CreateDateTime, vbLong, _
+        WinRT_vtCy, deliveryCy, WinRT_vbPtr, VarPtr(pPropertyValue)
+    If Err.Number = 0 And pPropertyValue <> 0 Then
+        On Error GoTo 0
+        Exit Sub
+    End If
 
-    argTypes(0) = WinRT_vbPtr
-    argValues(0) = deliveryTicks
-    argPtrs(0) = VarPtr(argValues(0))
-    If VarType(argValues(0)) <> vbLongLong Then Err.Raise 513, "WinRT_PropertyValueCreateDateTime", "DateTime tick must be LongLong."
-    argTypes(1) = WinRT_vbPtr
-    argValues(1) = VarPtr(pPropertyValue)
-    argPtrs(1) = VarPtr(argValues(1))
+    errNum = Err.Number
+    Err.Clear
+    pPropertyValue = 0
+    RtlMoveMemory deliveryTicks, dateTimeValue.dwLowDateTime, 8
+    WinRT_CallComMethod pPropertyValueStatics, VT_IPropertyValueStatics_CreateDateTime, vbLong, _
+        WinRT_vbPtr, deliveryTicks, WinRT_vbPtr, VarPtr(pPropertyValue)
+    If Err.Number = 0 And pPropertyValue <> 0 Then
+        On Error GoTo 0
+        Exit Sub
+    End If
 
-    hRes = DispCallFunc(pPropertyValueStatics, vTableOffset, 4, vbLong, 2, argTypes(0), argPtrs(0), vResult)
-    If hRes <> 0 Then Err.Raise hRes, "WinRT_PropertyValueCreateDateTime", "DispCallFunc failed: 0x" & Hex$(hRes)
-
-    If CLng(vResult) < 0 Then Err.Raise CLng(vResult), "WinRT_PropertyValueCreateDateTime", "CreateDateTime failed: 0x" & Hex$(CLng(vResult))
+    On Error GoTo 0
+    If errNum = 0 Then errNum = Err.Number
+    If errNum = 0 Then errNum = &H80070057
+    Err.Raise errNum, "WinRT_PropertyValueCreateDateTime", "CreateDateTime failed: 0x" & Hex$(errNum)
 End Sub
 
 Private Function WinRT_NormalizeScheduleId(ByVal scheduleId As String) As String
