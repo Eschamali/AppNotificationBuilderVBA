@@ -737,7 +737,8 @@ Private Function ParamsConvertForWinRT(ToastSetting As ToastNotification) As Win
         .CollectionID = ToastSetting.CollectionID
         .ExpiresOnReboot = ToastSetting.ExpiresOnReboot
         .SuppressPopup = ToastSetting.SuppressPopup
-        
+
+        .Schedule_DeliveryTimeLocal = ToastSetting.Schedule_DeliveryTime
         .Schedule_DeliveryTime = DateAdd("h", TargetTimeZone.Hour * -1, ToastSetting.Schedule_DeliveryTime)
         .Schedule_DeliveryTime = DateAdd("n", TargetTimeZone.Minute * -1, .Schedule_DeliveryTime)
         
@@ -2107,7 +2108,9 @@ Public Sub RunDll_ToastNotifierShow(ByVal ToastTag As String, Optional ByVal Col
     End With
 
     'データバインディングを設定しつつ、WinRT 直呼び出しで通知を表示します
-    WinRT_ShowToastNotification ParamsConvertForWinRT(ToastConfig), DataBindingConvertForWinRT()
+    Dim WinRTConfig As WinRT_ToastConfig
+    WinRTConfig = ParamsConvertForWinRT(ToastConfig)
+    WinRT_ShowToastNotification WinRTConfig, DataBindingConvertForWinRT()
 End Sub
 
 '***************************************************************************************************

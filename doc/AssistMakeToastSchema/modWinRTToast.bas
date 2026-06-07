@@ -4,6 +4,12 @@ Option Explicit
 ' modWinRTToast
 ' WinRT Interfaces x64.txt / ToastCompat_WinRT.bas に基づく VTable 直呼び出し。
 ' AppNotificationBuilderVBA.dll の Show / Update / Remove / CheckNotificationSetting を置き換える。
+'
+' スケジュール通知（no-TLB）:
+'   TLB 版 Calendar SetToNow + AddMinutes と同じく、Now からの分差で UTC tick を生成する。
+'   絶対日時のフォールバックは TzSpecificLocalTimeToSystemTime → SystemTimeToFileTime。
+' TLB 早期バインディングに切り替える場合は WRT_USE_TLB_SCHEDULE = 1（参照設定 → WinRT Interfaces x64）。
+#Const WRT_USE_TLB_SCHEDULE = 0
 
 Private Declare PtrSafe Function RoInitialize Lib "combase.dll" (ByVal initType As Long) As Long
 Private Declare PtrSafe Function RoUninitialize Lib "combase.dll" () As Long
@@ -11,8 +17,32 @@ Private Declare PtrSafe Function WindowsCreateString Lib "combase.dll" (ByVal so
 Private Declare PtrSafe Function WindowsDeleteString Lib "combase.dll" (ByVal hstring As LongPtr) As Long
 Private Declare PtrSafe Function RoGetActivationFactory Lib "combase.dll" (ByVal activatableClassId As LongPtr, ByRef iid As Any, ByRef factory As LongPtr) As Long
 Private Declare PtrSafe Function RoActivateInstance Lib "combase.dll" (ByVal activatableClassId As LongPtr, ByRef instance As LongPtr) As Long
+#If WRT_USE_TLB_SCHEDULE Then
+Private Declare PtrSafe Function RoActivateInstanceObj Lib "combase.dll" Alias "RoActivateInstance" (ByVal activatableClassId As LongPtr, ByRef instance As Any) As Long
+#End If
 Private Declare PtrSafe Function IIDFromString Lib "ole32.dll" (ByVal lpsz As LongPtr, ByRef lpiid As Any) As Long
 Private Declare PtrSafe Function DispCallFunc Lib "oleaut32.dll" (ByVal pvInstance As LongPtr, ByVal oVft As LongPtr, ByVal cc As Integer, ByVal vtReturn As Integer, ByVal cActuals As Long, ByRef prgvt As Any, ByRef prgpvarg As Any, ByRef pvargResult As Variant) As Long
+Private Declare PtrSafe Sub RtlMoveMemory Lib "kernel32" (Destination As Any, Source As Any, ByVal length As LongPtr)
+Private Declare PtrSafe Sub VariantTimeToSystemTime Lib "oleaut32.dll" (ByVal vtime As Double, ByRef lpSystemTime As WinRT_SYSTEMTIME)
+Private Declare PtrSafe Function SystemTimeToFileTime Lib "kernel32" (ByRef lpSystemTime As WinRT_SYSTEMTIME, ByRef lpFileTime As WinRT_FILETIME) As Long
+Private Declare PtrSafe Function TzSpecificLocalTimeToSystemTime Lib "kernel32" (ByVal lpTimeZoneInformation As LongPtr, ByRef lpLocalTime As WinRT_SYSTEMTIME, ByRef lpUniversalTime As WinRT_SYSTEMTIME) As Long
+Private Declare PtrSafe Sub GetSystemTime Lib "kernel32" (ByRef lpSystemTime As WinRT_SYSTEMTIME)
+
+Private Type WinRT_SYSTEMTIME
+    wYear As Integer
+    wMonth As Integer
+    wDayOfWeek As Integer
+    wDay As Integer
+    wHour As Integer
+    wMinute As Integer
+    wSecond As Integer
+    wMilliseconds As Integer
+End Type
+
+Private Type WinRT_FILETIME
+    dwLowDateTime As Long
+    dwHighDateTime As Long
+End Type
 
 Private Type WinRT_GUID
     Data1 As Long
@@ -21,8 +51,9 @@ Private Type WinRT_GUID
     Data4(0 To 7) As Byte
 End Type
 
-Private Type WinRT_DateTime
-    UniversalTime As Currency
+Private Type WRT_DateTime
+    dwLowDateTime As Long
+    dwHighDateTime As Long
 End Type
 
 #If Win64 Then
@@ -35,6 +66,8 @@ Private Const VT_QI As Long = 0
 Private Const VT_RELEASE As Long = 2
 Private Const VT_IToastNotifier_Show As Long = 6
 Private Const VT_IToastNotifier_AddToSchedule As Long = 9
+Private Const VT_IScheduledToastNotificationFactory_Create As Long = 6
+Private Const VT_IScheduledToastNotification_SetId As Long = 10
 Private Const VT_IToastNotification2_SetTag As Long = 6
 Private Const VT_IToastNotification2_SetGroup As Long = 8
 Private Const VT_IToastNotification2_SetSuppressPopup As Long = 10
@@ -48,11 +81,19 @@ Private Const VT_IAsyncOperation_GetResults As Long = 7
 Private Const VT_IToastNotifier2_UpdateWithTagAndGroup As Long = 6
 Private Const VT_IToastNotifier2_UpdateWithTag As Long = 7
 Private Const VT_INotificationData_SetSequenceNumber As Long = 8
+Private Const VT_IPropertyValueStatics_CreateDateTime As Long = 21
+
+Private Const WRT_FileTimeTicksPerMinute As LongLong = 600000000
+Private Const WinRT_vtCy As Integer = 6
+Private Const WinRT_MaxScheduleIdLen As Long = 16
+Private Const WinRT_RO_INIT_SINGLETHREADED As Long = 0
+Private Const WinRT_RPC_E_CHANGED_MODE As Long = &H80010106
 
 ' Excel セッション中は WinRT を維持し、Show→Update 間で RoUninitialize しない
 Private WinRT_RoInitialized As Boolean
 Private WinRT_ToastDataSequenceNumber As Long
 
+' WinRT Interfaces x64.tlb 参照時は WinRT_* 型名が TLB の WinRT 名前空間と衝突するため ANB 接頭辞を使う。
 Public Type WinRT_ToastConfig
     AppUserModelID As String
     XmlTemplate As String
@@ -63,6 +104,7 @@ Public Type WinRT_ToastConfig
     ExpiresOnReboot As Boolean
     SuppressPopup As Boolean
     Schedule_DeliveryTime As Date
+    Schedule_DeliveryTimeLocal As Date
     ExpirationTime As Date
 End Type
 
@@ -73,7 +115,7 @@ Public Type WinRT_DataBinding
     ProgressTitle As String
     ProgressValueStringOverride As String
     ProgressStatus As String
-    ProgressValue As Double
+    progressValue As Double
     SequenceNumber As Long
 End Type
 
@@ -87,7 +129,7 @@ Public Sub WinRT_ShowToastNotification(ByRef Config As WinRT_ToastConfig, ByRef 
         Binding.SequenceNumber = WinRT_NextToastDataSequence()
     End If
 
-    If Config.Schedule_DeliveryTime > 0 Then
+    If Config.Schedule_DeliveryTime > 0 Or Config.Schedule_DeliveryTimeLocal > 0 Then
         WinRT_ShowScheduledToast Config
     Else
         WinRT_ShowImmediateToast Config, Binding
@@ -309,7 +351,7 @@ Private Sub WinRT_ShowScheduledToast(ByRef Config As WinRT_ToastConfig)
     Dim hStrScheduleId As LongPtr
     Dim hStrTag As LongPtr
     Dim hStrGroup As LongPtr
-    Dim deliveryTime As WinRT_DateTime
+    Dim deliveryTime As WRT_DateTime
     Dim iidScheduledFactory As WinRT_GUID
     Dim iidScheduled2 As WinRT_GUID
     Dim iidScheduled4 As WinRT_GUID
@@ -321,8 +363,9 @@ Private Sub WinRT_ShowScheduledToast(ByRef Config As WinRT_ToastConfig)
     WinRT_GetActivationFactory "Windows.UI.Notifications.ScheduledToastNotification", iidScheduledFactory, pScheduledFactory
     If pScheduledFactory = 0 Then Err.Raise 513, , "ScheduledToastNotification factory failed."
 
-    deliveryTime.UniversalTime = WinRT_VbaDateToUniversalTime(Config.Schedule_DeliveryTime)
-    WinRT_CallComMethod pScheduledFactory, 6, vbLong, WinRT_vbPtr, pXmlDoc, WinRT_vbPtr, VarPtr(deliveryTime), WinRT_vbPtr, VarPtr(pScheduled)
+    WinRT_ScheduleDateToWinRTDateTimeFillFromConfig Config, deliveryTime
+    pScheduled = 0
+    WinRT_FactoryCreateScheduledToast pScheduledFactory, pXmlDoc, deliveryTime, pScheduled
     WinRT_CallComMethod pScheduledFactory, VT_RELEASE, vbLong
     WinRT_CallComMethod pXmlDoc, VT_RELEASE, vbLong
     pScheduledFactory = 0
@@ -332,10 +375,12 @@ Private Sub WinRT_ShowScheduledToast(ByRef Config As WinRT_ToastConfig)
     IIDFromString StrPtr("{A66EA09C-31B4-43B0-B5DD-7A40E85363B1}"), iidScheduled2
     WinRT_CallComMethod pScheduled, VT_QI, vbLong, WinRT_vbPtr, VarPtr(iidScheduled2), WinRT_vbPtr, VarPtr(pScheduled2)
     If pScheduled2 <> 0 Then
-        hStrScheduleId = WinRT_CreateHString(Config.Schedule_ID)
+        If Len(Config.Schedule_ID) > 0 Then
+            hStrScheduleId = WinRT_CreateHString(WinRT_NormalizeScheduleId(Config.Schedule_ID))
+        End If
         hStrTag = WinRT_CreateHString(Config.Tag)
         hStrGroup = WinRT_CreateHString(Config.Group)
-        If hStrScheduleId <> 0 Then WinRT_CallComMethod pScheduled, 8, vbLong, WinRT_vbPtr, hStrScheduleId
+        If hStrScheduleId <> 0 Then WinRT_CallComMethod pScheduled, VT_IScheduledToastNotification_SetId, vbLong, WinRT_vbPtr, hStrScheduleId
         If hStrTag <> 0 Then WinRT_CallComMethod pScheduled2, VT_IToastNotification2_SetTag, vbLong, WinRT_vbPtr, hStrTag
         If hStrGroup <> 0 Then WinRT_CallComMethod pScheduled2, VT_IToastNotification2_SetGroup, vbLong, WinRT_vbPtr, hStrGroup
         If Config.SuppressPopup Then WinRT_CallComMethod pScheduled2, VT_IToastNotification2_SetSuppressPopup, vbLong, vbByte, CByte(1)
@@ -586,15 +631,15 @@ Private Function WinRT_CreateNotificationData(ByRef Binding As WinRT_DataBinding
     If hasProgress Then
         If Len(Binding.ProgressTitle) > 0 Then WinRT_InsertMapValue pMap, "ProgressTitle", Binding.ProgressTitle
         WinRT_InsertMapValue pMap, "ProgressStatus", Binding.ProgressStatus
-        If Binding.ProgressValue < 0 Then
+        If Binding.progressValue < 0 Then
             WinRT_InsertMapValue pMap, "ProgressValue", "Indeterminate"
         Else
-            WinRT_InsertMapValue pMap, "ProgressValue", WinRT_FormatProgressValue(Binding.ProgressValue)
+            WinRT_InsertMapValue pMap, "ProgressValue", WinRT_FormatProgressValue(Binding.progressValue)
         End If
         If Len(Binding.ProgressValueStringOverride) > 0 Then
             WinRT_InsertMapValue pMap, "ProgressValueString", Binding.ProgressValueStringOverride
         Else
-            WinRT_InsertMapValue pMap, "ProgressValueString", WinRT_FormatProgressValueString(Binding.ProgressValue)
+            WinRT_InsertMapValue pMap, "ProgressValueString", WinRT_FormatProgressValueString(Binding.progressValue)
         End If
     End If
     WinRT_CallComMethod pMap, VT_RELEASE, vbLong
@@ -636,7 +681,7 @@ Private Function WinRT_CreateDateTimeReference(ByVal dt As Date) As LongPtr
     Dim hStrClass As LongPtr
     Dim pPropertyValueStatics As LongPtr
     Dim pPropertyValue As LongPtr
-    Dim dateTimeValue As WinRT_DateTime
+    Dim dateTimeValue As WRT_DateTime
     Dim iidPropertyValueStatics As WinRT_GUID
 
     IIDFromString StrPtr("{629DBDCF-4466-40FF-9A1A-484AFD159F5A}"), iidPropertyValueStatics
@@ -646,8 +691,8 @@ Private Function WinRT_CreateDateTimeReference(ByVal dt As Date) As LongPtr
     If hStrClass <> 0 Then WindowsDeleteString hStrClass
     If pPropertyValueStatics = 0 Then Exit Function
 
-    dateTimeValue.UniversalTime = WinRT_VbaDateToUniversalTime(dt)
-    WinRT_CallComMethod pPropertyValueStatics, 13, vbLong, WinRT_vbPtr, VarPtr(dateTimeValue), WinRT_vbPtr, VarPtr(pPropertyValue)
+    WinRT_DateSerialToWinRTDateTimeFill dt, dateTimeValue
+    WinRT_PropertyValueCreateDateTime pPropertyValueStatics, dateTimeValue, pPropertyValue
     WinRT_CallComMethod pPropertyValueStatics, VT_RELEASE, vbLong
     WinRT_CreateDateTimeReference = pPropertyValue
 End Function
@@ -685,20 +730,281 @@ Private Function WinRT_CreateHString(ByVal s As String) As LongPtr
     WinRT_CreateHString = hStr
 End Function
 
-Private Function WinRT_VbaDateToUniversalTime(ByVal dt As Date) As Currency
-    WinRT_VbaDateToUniversalTime = CCur((dt - CDate("1601-01-01")) * 86400# * 10000000#)
+
+Private Function WRT_DateTimeIsZero(ByRef dt As WRT_DateTime) As Boolean
+    WRT_DateTimeIsZero = (dt.dwLowDateTime = 0 And dt.dwHighDateTime = 0)
 End Function
 
-Private Sub WinRT_EnsureRoInitialized(ByRef initialized As Boolean)
-    If Not WinRT_RoInitialized Then
-        RoInitialize 1
-        WinRT_RoInitialized = True
-    End If
-    initialized = True
+Private Sub WRT_CopyFileTimeToDateTime(ByRef ft As WinRT_FILETIME, ByRef outDt As WRT_DateTime)
+    outDt.dwLowDateTime = ft.dwLowDateTime
+    outDt.dwHighDateTime = ft.dwHighDateTime
 End Sub
+
+Private Function WRT_DateTimeToLongLong(ByRef dt As WRT_DateTime) As LongLong
+    Dim v As LongLong
+    RtlMoveMemory v, dt.dwLowDateTime, 8
+    WRT_DateTimeToLongLong = v
+End Function
+
+Private Function WRT_DateTimeToCurrency(ByRef dt As WRT_DateTime) As Currency
+    Dim v As Currency
+    RtlMoveMemory v, dt.dwLowDateTime, 8
+    WRT_DateTimeToCurrency = v
+End Function
+
+Private Function WinRT_ResolveScheduleDeliveryLocal(ByRef Config As WinRT_ToastConfig) As Date
+    If Config.Schedule_DeliveryTimeLocal > 0 Then
+        WinRT_ResolveScheduleDeliveryLocal = Config.Schedule_DeliveryTimeLocal
+    ElseIf Config.Schedule_DeliveryTime > 0 Then
+        WinRT_ResolveScheduleDeliveryLocal = Config.Schedule_DeliveryTime
+    End If
+End Function
+
+Private Sub WinRT_ScheduleDateToWinRTDateTimeFillFromConfig(ByRef Config As WinRT_ToastConfig, ByRef outDt As WRT_DateTime)
+    Dim deliveryLocal As Date
+    Dim minutes As Long
+
+    outDt.dwLowDateTime = 0
+    outDt.dwHighDateTime = 0
+    deliveryLocal = WinRT_ResolveScheduleDeliveryLocal(Config)
+
+    If deliveryLocal <= 0 Then
+        Err.Raise 5, "WinRT_ScheduleDateToWinRTDateTimeFillFromConfig", _
+            "Schedule delivery time is empty. Re-import AppNotificationBuilder.cls and modWinRTToast.bas."
+    End If
+
+#If WRT_USE_TLB_SCHEDULE Then
+    WinRT_ScheduleDateToWinRTDateTimeFillViaTlb deliveryLocal, outDt
+#Else
+    minutes = DateDiff("n", Now, deliveryLocal)
+    If minutes < 1 Then
+        Err.Raise 5, "WinRT_ScheduleDateToWinRTDateTimeFillFromConfig", "Schedule delivery time must be in the future."
+    End If
+    WinRT_DateTimeFromMinutesFromNow minutes, outDt
+    If WRT_DateTimeIsZero(outDt) Then
+        WinRT_LocalSerialToWinRTDateTimeFill deliveryLocal, outDt
+    End If
+#End If
+
+    If WRT_DateTimeIsZero(outDt) Then
+        Err.Raise 5, "WinRT_ScheduleDateToWinRTDateTimeFillFromConfig", _
+            "DeliveryTime is zero. local=" & Format$(deliveryLocal, "yyyy/mm/dd hh:nn:ss") & _
+            " UTC serial=" & CStr(CDbl(Config.Schedule_DeliveryTime)) & _
+            " local serial=" & CStr(CDbl(Config.Schedule_DeliveryTimeLocal)) & _
+            " ft=0x" & Hex$(outDt.dwHighDateTime) & Right$("00000000" & Hex$(outDt.dwLowDateTime), 8)
+    End If
+End Sub
+
+' TLB の SetToNow + AddMinutes と同じ考え方（UTC FILETIME + 分差）
+Private Sub WinRT_DateTimeFromMinutesFromNow(ByVal minutesFromNow As Long, ByRef outDt As WRT_DateTime)
+    Dim stUtc As WinRT_SYSTEMTIME
+    Dim ftUtc As WinRT_FILETIME
+    Dim ftAdd As WinRT_FILETIME
+    Dim ticks As LongLong
+    Dim addTicks As LongLong
+
+    If minutesFromNow < 1 Then Exit Sub
+
+    GetSystemTime stUtc
+    If SystemTimeToFileTime(stUtc, ftUtc) = 0 Then Exit Sub
+
+    RtlMoveMemory ticks, ftUtc.dwLowDateTime, 8
+    addTicks = CLngLng(minutesFromNow) * WRT_FileTimeTicksPerMinute
+    ticks = ticks + addTicks
+    RtlMoveMemory ftAdd.dwLowDateTime, ticks, 8
+    WRT_CopyFileTimeToDateTime ftAdd, outDt
+End Sub
+
+Private Sub WinRT_ScheduleDateToWinRTDateTimeFill(ByVal deliverySerial As Date, ByRef outDt As WRT_DateTime)
+    outDt.dwLowDateTime = 0
+    outDt.dwHighDateTime = 0
+
+    If deliverySerial <= 0 Then Err.Raise 5, "WinRT_ScheduleDateToWinRTDateTimeFill", "deliverySerial is empty."
+
+#If WRT_USE_TLB_SCHEDULE Then
+    WinRT_ScheduleDateToWinRTDateTimeFillViaTlb deliverySerial, outDt
+#Else
+    WinRT_DateTimeFromMinutesFromNow DateDiff("n", Now, deliverySerial), outDt
+    If WRT_DateTimeIsZero(outDt) Then WinRT_DateSerialToWinRTDateTimeFill deliverySerial, outDt
+#End If
+
+    If WRT_DateTimeIsZero(outDt) Then
+        Err.Raise 5, "WinRT_ScheduleDateToWinRTDateTimeFill", _
+            "DeliveryTime is zero. deliverySerial=" & CStr(CDbl(deliverySerial))
+    End If
+End Sub
+
+#If WRT_USE_TLB_SCHEDULE Then
+Private Sub WinRT_ScheduleDateToWinRTDateTimeFillViaTlb(ByVal deliverySerial As Date, ByRef outDt As WRT_DateTime)
+    Dim cal As WinRT.ICalendar
+    Dim dt As WinRT.DateTime
+    Dim hClass As LongPtr
+    Dim hr As Long
+    Dim minutes As Long
+
+    minutes = DateDiff("n", Now, deliverySerial)
+    If minutes < 1 Then Err.Raise 5, "WinRT_ScheduleDateToWinRTDateTimeFillViaTlb", "Schedule delivery time must be in the future."
+
+    hClass = WinRT_CreateHString("Windows.Globalization.Calendar")
+    hr = RoActivateInstanceObj(hClass, cal)
+    If hClass <> 0 Then WindowsDeleteString hClass
+    If hr < 0 Then Err.Raise hr, "WinRT_ScheduleDateToWinRTDateTimeFillViaTlb", "RoActivateInstance Calendar failed: 0x" & Hex$(hr)
+
+    hr = cal.SetToNow()
+    If hr < 0 Then Err.Raise hr, "WinRT_ScheduleDateToWinRTDateTimeFillViaTlb", "ICalendar.SetToNow failed: 0x" & Hex$(hr)
+
+    hr = cal.AddMinutes(minutes)
+    If hr < 0 Then Err.Raise hr, "WinRT_ScheduleDateToWinRTDateTimeFillViaTlb", "ICalendar.AddMinutes failed: 0x" & Hex$(hr)
+
+    dt = cal.GetDateTime()
+    RtlMoveMemory outDt.dwLowDateTime, dt, 8
+    Set cal = Nothing
+End Sub
+#End If
+
+' GeneralNotice.cpp SystemTimeToDateTime と同じ（VariantTimeToSystemTime → SystemTimeToFileTime）
+' ExpirationTime など UTC 補正済み serial 向け。スケジュール配信時刻は使わない。
+Private Sub WinRT_DateSerialToWinRTDateTimeFill(ByVal deliverySerial As Date, ByRef outDt As WRT_DateTime)
+    Dim st As WinRT_SYSTEMTIME
+    Dim ft As WinRT_FILETIME
+
+    If deliverySerial <= 0 Then Exit Sub
+
+    VariantTimeToSystemTime CDbl(deliverySerial), st
+    If SystemTimeToFileTime(st, ft) = 0 Then Exit Sub
+    WRT_CopyFileTimeToDateTime ft, outDt
+End Sub
+
+' ローカル wall clock → UTC FILETIME（Calendar.Set 系の絶対日時向け）
+Private Sub WinRT_LocalSerialToWinRTDateTimeFill(ByVal deliveryLocal As Date, ByRef outDt As WRT_DateTime)
+    Dim stLocal As WinRT_SYSTEMTIME
+    Dim stUtc As WinRT_SYSTEMTIME
+    Dim ft As WinRT_FILETIME
+
+    If deliveryLocal <= 0 Then Exit Sub
+
+    VariantTimeToSystemTime CDbl(deliveryLocal), stLocal
+    If TzSpecificLocalTimeToSystemTime(0&, stLocal, stUtc) = 0 Then Exit Sub
+    If SystemTimeToFileTime(stUtc, ft) = 0 Then Exit Sub
+    WRT_CopyFileTimeToDateTime ft, outDt
+End Sub
+
+' CreateToastNotification と同じ WinRT_CallComMethod 経路（DispCallFunc 直呼びは使わない）
+Private Sub WinRT_FactoryCreateScheduledToast( _
+    ByVal pFactory As LongPtr, _
+    ByVal pXmlDoc As LongPtr, _
+    ByRef deliveryTime As WRT_DateTime, _
+    ByRef pScheduled As LongPtr)
+
+    Dim deliveryCy As Currency
+    Dim deliveryTicks As LongLong
+    Dim errNum As Long
+    Dim errDesc As String
+    Dim rawHex As String
+
+    If pFactory = 0 Or pXmlDoc = 0 Then Err.Raise 513, "WinRT_FactoryCreateScheduledToast", "Factory or XmlDocument is null."
+    If WRT_DateTimeIsZero(deliveryTime) Then Err.Raise 5, "WinRT_FactoryCreateScheduledToast", "DeliveryTime is zero."
+
+    ' ヘルパーに依存せず、この場で UDT の 8 バイトを LongLong / Currency へ直接コピーする
+    RtlMoveMemory deliveryTicks, deliveryTime.dwLowDateTime, 8
+    RtlMoveMemory deliveryCy, deliveryTime.dwLowDateTime, 8
+    rawHex = "raw=0x" & Right$("00000000" & Hex$(deliveryTime.dwHighDateTime), 8) & _
+             Right$("00000000" & Hex$(deliveryTime.dwLowDateTime), 8) & _
+             " ticks=0x" & Hex$(deliveryTicks)
+    pScheduled = 0
+
+    On Error Resume Next
+    Err.Clear
+    WinRT_CallComMethod pFactory, VT_IScheduledToastNotificationFactory_Create, vbLong, _
+        WinRT_vbPtr, pXmlDoc, WinRT_vtCy, deliveryCy, WinRT_vbPtr, VarPtr(pScheduled)
+    If Err.Number = 0 And pScheduled <> 0 Then
+        On Error GoTo 0
+        Exit Sub
+    End If
+
+    errNum = Err.Number
+    errDesc = Err.Description
+    Err.Clear
+    pScheduled = 0
+    WinRT_CallComMethod pFactory, VT_IScheduledToastNotificationFactory_Create, vbLong, _
+        WinRT_vbPtr, pXmlDoc, WinRT_vbPtr, deliveryTicks, WinRT_vbPtr, VarPtr(pScheduled)
+    If Err.Number = 0 And pScheduled <> 0 Then
+        On Error GoTo 0
+        Exit Sub
+    End If
+
+    If errNum = 0 Then errNum = Err.Number
+    If Len(errDesc) = 0 Then errDesc = Err.Description
+    On Error GoTo 0
+
+    If errNum = 0 Then errNum = &H80070057
+    If Len(errDesc) = 0 Then errDesc = "CreateScheduledToastNotification failed: 0x" & Hex$(errNum)
+    Err.Raise errNum, "WinRT_FactoryCreateScheduledToast", errDesc & " " & rawHex
+End Sub
+
+Private Sub WinRT_PropertyValueCreateDateTime( _
+    ByVal pPropertyValueStatics As LongPtr, _
+    ByRef deliveryTime As WRT_DateTime, _
+    ByRef pPropertyValue As LongPtr)
+
+    Dim argTypes(0 To 1) As Integer
+    Dim argValues(0 To 1) As Variant
+    Dim argPtrs(0 To 1) As LongPtr
+    Dim vResult As Variant
+    Dim hRes As Long
+    Dim vTableOffset As LongPtr
+    Dim deliveryTicks As LongLong
+
+    If pPropertyValueStatics = 0 Then Err.Raise 513, "WinRT_PropertyValueCreateDateTime", "PropertyValue statics is null."
+
+    deliveryTicks = WRT_DateTimeToLongLong(deliveryTime)
+
+#If Win64 Then
+    vTableOffset = VT_IPropertyValueStatics_CreateDateTime * 8
+#Else
+    vTableOffset = VT_IPropertyValueStatics_CreateDateTime * 4
+#End If
+
+    argTypes(0) = WinRT_vbPtr
+    argValues(0) = deliveryTicks
+    argPtrs(0) = VarPtr(argValues(0))
+    If VarType(argValues(0)) <> vbLongLong Then Err.Raise 513, "WinRT_PropertyValueCreateDateTime", "DateTime tick must be LongLong."
+    argTypes(1) = WinRT_vbPtr
+    argValues(1) = VarPtr(pPropertyValue)
+    argPtrs(1) = VarPtr(argValues(1))
+
+    hRes = DispCallFunc(pPropertyValueStatics, vTableOffset, 4, vbLong, 2, argTypes(0), argPtrs(0), vResult)
+    If hRes <> 0 Then Err.Raise hRes, "WinRT_PropertyValueCreateDateTime", "DispCallFunc failed: 0x" & Hex$(hRes)
+
+    If CLng(vResult) < 0 Then Err.Raise CLng(vResult), "WinRT_PropertyValueCreateDateTime", "CreateDateTime failed: 0x" & Hex$(CLng(vResult))
+End Sub
+
+Private Function WinRT_NormalizeScheduleId(ByVal scheduleId As String) As String
+    If Len(scheduleId) = 0 Then
+        WinRT_NormalizeScheduleId = "ExcelSchedule"
+    ElseIf Len(scheduleId) > WinRT_MaxScheduleIdLen Then
+        Err.Raise 5, "WinRT_NormalizeScheduleId", _
+            "Schedule_ID must be <= " & WinRT_MaxScheduleIdLen & " chars (WPN_E_DEV_ID_SIZE). Got " & Len(scheduleId) & ": """ & scheduleId & """"
+    Else
+        WinRT_NormalizeScheduleId = scheduleId
+    End If
+End Function
 
 Private Sub WinRT_FinalizeRo(ByVal initialized As Boolean)
     ' 通知表示→更新の連続呼び出しで WinRT ランタイムを破棄しない
+End Sub
+
+Private Sub WinRT_EnsureRoInitialized(ByRef initialized As Boolean)
+    Dim hr As Long
+
+    If Not WinRT_RoInitialized Then
+        hr = RoInitialize(WinRT_RO_INIT_SINGLETHREADED)
+        If hr <> 0 And hr <> 1 And hr <> WinRT_RPC_E_CHANGED_MODE Then
+            Err.Raise hr, "RoInitialize", "RoInitialize failed: 0x" & Hex$(hr)
+        End If
+        WinRT_RoInitialized = True
+    End If
+    initialized = True
 End Sub
 
 Private Function WinRT_CallComMethod(ByVal pUnk As LongPtr, ByVal vTableIndex As Long, ByVal retType As Integer, ParamArray args() As Variant) As Variant
