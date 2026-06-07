@@ -43,6 +43,8 @@ Private Const VT_IToastNotification6_SetExpiresOnReboot As Long = 7
 Private Const VT_IToastNotificationHistory_RemoveGroupedTagWithId As Long = 8
 Private Const VT_IToastNotificationHistory_RemoveGroupWithId As Long = 7
 Private Const VT_IToastNotificationHistory_ClearWithId As Long = 12
+Private Const VT_IToastNotificationManagerStatics2_GetHistory As Long = 6
+Private Const VT_IAsyncOperation_GetResults As Long = 7
 Private Const VT_IToastNotifier2_UpdateWithTagAndGroup As Long = 6
 Private Const VT_IToastNotifier2_UpdateWithTag As Long = 7
 Private Const VT_INotificationData_SetSequenceNumber As Long = 8
@@ -172,6 +174,9 @@ Public Sub WinRT_RemoveToastNotification(ByRef Config As WinRT_ToastConfig)
 
     On Error GoTo Cleanup
     WinRT_EnsureRoInitialized initialized
+
+    If Len(Config.AppUserModelID) = 0 Then Err.Raise 513, "WinRT_RemoveToastNotification", "AppUserModelID is required."
+    If Len(Config.Tag) > 0 And Len(Config.Group) = 0 Then Err.Raise 513, "WinRT_RemoveToastNotification", "Group is required when Tag is specified."
 
     pHistory = WinRT_GetToastHistory(Config.CollectionID)
     If pHistory = 0 Then Err.Raise 513, , "GetToastHistory failed."
@@ -422,7 +427,8 @@ Private Function WinRT_CreateToastNotifierForCollection(ByVal CollectionID As St
     WinRT_CallComMethod pManagerForUser2, VT_RELEASE, vbLong
 
     If pAsync <> 0 Then
-        pNotifier = CLngPtr(WinRT_CallComMethod(pAsync, 7, vbLong))
+        pNotifier = 0
+        WinRT_CallComMethod pAsync, VT_IAsyncOperation_GetResults, vbLong, WinRT_vbPtr, VarPtr(pNotifier)
         WinRT_CallComMethod pAsync, VT_RELEASE, vbLong
     End If
     WinRT_CreateToastNotifierForCollection = pNotifier
@@ -453,7 +459,8 @@ Private Function WinRT_GetDefaultHistory() As LongPtr
     WinRT_CallComMethod pManagerStatics, VT_RELEASE, vbLong
     If pManagerStatics2 = 0 Then Exit Function
 
-    pHistory = CLngPtr(WinRT_CallComMethod(pManagerStatics2, 6, vbLong))
+    pHistory = 0
+    WinRT_CallComMethod pManagerStatics2, VT_IToastNotificationManagerStatics2_GetHistory, vbLong, WinRT_vbPtr, VarPtr(pHistory)
     WinRT_CallComMethod pManagerStatics2, VT_RELEASE, vbLong
     WinRT_GetDefaultHistory = pHistory
 End Function
@@ -488,7 +495,8 @@ Private Function WinRT_GetHistoryForCollection(ByVal CollectionID As String) As 
     WinRT_CallComMethod pManagerForUser2, VT_RELEASE, vbLong
 
     If pAsync <> 0 Then
-        pHistory = CLngPtr(WinRT_CallComMethod(pAsync, 7, vbLong))
+        pHistory = 0
+        WinRT_CallComMethod pAsync, VT_IAsyncOperation_GetResults, vbLong, WinRT_vbPtr, VarPtr(pHistory)
         WinRT_CallComMethod pAsync, VT_RELEASE, vbLong
     End If
     WinRT_GetHistoryForCollection = pHistory
