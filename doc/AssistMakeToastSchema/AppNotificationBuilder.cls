@@ -576,7 +576,8 @@ End Type
 'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-action
 '----------------------------------------------------------------------------------------------------
 '入れれる最大要素数を定数定義
-Private Const MaxElementActionNum As Integer = 5    'ボタンは最大5つ、入れれます
+Private Const MaxElementActionNum   As Integer = 5    'ボタンは最大5つ、入れれます
+Private ElementActionCount          As Integer
 
 Private ElementAction(1 To MaxElementActionNum) As IToastActions
 
@@ -613,6 +614,7 @@ End Type
 '----------------------------------------------------------------------------------------------------
 '入れれる最大要素数を定数定義
 Private Const MaxElementInputNum As Integer = 5    '入力要素は最大5つ、入れれます
+Private ElementInputCount          As Integer
 
 Private ElementInput(1 To MaxElementInputNum) As IToastInput
 
@@ -1389,6 +1391,17 @@ End Property
 '***************************************************************************************************
 Public Property Let SetIToastActions(ByVal Content As String, ByVal Arguments As String, Optional ByVal ActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, Optional PendingUpdate As Boolean, Optional ByVal ContextMenu As Boolean, Optional ByVal IconPath As String, Optional ByVal HintInputId As String, Optional HintButtonStyle As EnumToastButtonStyle, Optional ByVal HintToolTip As String, ByVal Index As Integer)
     With ElementAction(Index)
+        '1. 有効な入力値かつ、Index先が`null`
+        If StrPtr(Content) > 0 And StrPtr(.Content) = 0 Then
+            'カウントアップ
+            ElementActionCount = ElementActionCount + 1
+            
+        '`null`入力かつ、Index先が有効な入力値
+        ElseIf StrPtr(Content) = 0 And StrPtr(.Content) > 0 Then
+            'カウントダウン
+            ElementActionCount = ElementActionCount - 1
+        End If
+
         .Content = Content
         .Arguments = Arguments
         .ActivationType = SetToastActivationType(ActivationType)
@@ -1432,6 +1445,17 @@ End Property
 '***************************************************************************************************
 Public Property Let SetIToastInput(ByVal ArgID As String, Optional ByVal ChoseFlag As Boolean, Optional ByVal ArgPlaceHolderContent As String, Optional ByVal ArgTitle As String, Optional ByVal ArgDefaultInput As String, ByVal Index As Integer)
     With ElementInput(Index)
+        '1. 有効な入力値かつ、Index先が`null`
+        If StrPtr(ArgID) > 0 And StrPtr(.id) = 0 Then
+            'カウントアップ
+            ElementInputCount = ElementInputCount + 1
+            
+        '`null`入力かつ、Index先が有効な入力値
+        ElseIf StrPtr(ArgID) = 0 And StrPtr(.id) > 0 Then
+            'カウントダウン
+            ElementInputCount = ElementInputCount - 1
+        End If
+
         .id = ArgID
 
         'Typeが、"selection"の場合、予め作成されたSelection要素を入れるようにします。
@@ -1810,8 +1834,8 @@ Private Function MakeXmlToastContentBuilder(DataBindingMode As Boolean) As Strin
 
 
     '-------------------------------------------------------actions要素を設定-------------------------------------------------------
-    'action要素に、1番目のContent属性または、input要素に、1番目のID属性が設定されてあったら、ノード：actions  を作成してルートノードの子ノードとして追加します。
-    If StrPtr(ElementAction(1).Content) Or StrPtr(ElementInput(1).id) Then
+    'action要素、input要素、いずれかが設定されてあったら、ノード：actions  を作成してルートノードの子ノードとして追加します。
+    If ElementActionCount > 0 Or ElementInputCount > 0 Then
         Set Node03__actions = RootNode_toast.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode03__actions, ""))
 
 
