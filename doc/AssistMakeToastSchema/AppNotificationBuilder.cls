@@ -415,17 +415,16 @@ End Enum
 
 
 '***************************************************************************************************
-'                   ■■■ トースト スキーマに基づくメンバユーザー定義型宣言 ■■■
+'                   ■■■ トーストの見た目を決めるユーザー定義型宣言 ■■■
 '***************************************************************************************************
 '下記に基づいて順番に、宣言します
 '→https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/root-elements
-
-'===================================================================================================
-'位置        ：Toast要素に付けれる属性値
-'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-toast
+'***************************************************************************************************
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] Toast要素に付けれる属性値
+' [ document] https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-toast
 '---------------------------------------------------------------------------------------------------
 Private ElementToast As ToastVisual
-
 Private Type ToastVisual
     Duration         As String    '通知の表示時間延長フラグ
     Launch           As String    'トースト自体をクリックする際のスキーマ値
@@ -435,27 +434,26 @@ Private Type ToastVisual
     UseButtonStyle   As Boolean   'スタイル付きボタン使用フラグ
 End Type
 
-'===================================================================================================
-'位置        ：binding要素に付けれる属性値
-'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-binding
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] binding要素に付けれる属性値
+' [ document] https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-binding
 '---------------------------------------------------------------------------------------------------
 Private ElementBinding As ToastBindingGeneric
-
 Private Type ToastBindingGeneric
-    Baseuri     As String   'イメージ ソース属性の相対 URI と組み合わせた既定のベース URI。
+    baseUri     As String   'イメージ ソース属性の相対 URI と組み合わせた既定のベース URI。
     template    As String   'この値は "ToastGeneric" に設定する必要があります
 End Type
 
-'===================================================================================================
-'位置        ：binding親要素のimage子要素で使える属性値
-'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-image
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] binding親要素のimage子要素で使える属性値
+' [ document] https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-image
 '---------------------------------------------------------------------------------------------------
 Private ElementsImage As TopAdaptiveImage
 
 'image要素で使える属性
 Private Type AttributeImage
     AddImageQuery As Boolean    'イメージ URI にクエリ文字列を追加できるようにするかの設定値です
-    alt           As String     '支援技術のユーザー向けの画像の説明
+    Alt           As String     '支援技術のユーザー向けの画像の説明
     src           As String     'イメージ ソースの URI。ローカル画像や、httpsソースも使える
     Placement     As String     'イメージ配置
     HintCrop      As String     '円にトリミングする印
@@ -468,10 +466,10 @@ Private Type TopAdaptiveImage
     Hero    As AttributeImage  'トースト内で目立つように表示される注目のヒーロー画像を表示。常に通知上部に配置されます
 End Type
 
-'====================================================================================================
-'位置        ：binding親要素のtext子要素で使える値と、属性値
-'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-text
-'----------------------------------------------------------------------------------------------------
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] binding親要素のtext子要素で使える値と、属性値
+' [ document] https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-text
+'---------------------------------------------------------------------------------------------------
 Private ElementsText As TopAdaptiveText
 
 'text要素で使える属性
@@ -492,20 +490,20 @@ End Type
 'text要素の立ち位置
 Private Type TopAdaptiveText
     Title       As ParameterText    'タイトル
-    Body        As ParameterText    'コンテンツ
+    Body        As ParameterText    '本文
     Attribution As ParameterText    '常に下部に表示するもの
 End Type
 
-'====================================================================================================
-'位置        ：subgroup要素に付けれる属性値と値
-'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-subgroup
-'----------------------------------------------------------------------------------------------------
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] subgroup要素に付けれる属性値と値
+' [ document] https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-subgroup
+'---------------------------------------------------------------------------------------------------
 Private ElementsSubgroup()      As AdaptiveSubgroup, SubgroupTotal As Long
 Private SubgroupInnerTexts()    As SubAdaptiveText, SubgroupInnerTextsTotal As Long
 Private SubgroupInnerImages()   As SubAdaptiveImage, SubgroupInnerImagesTotal As Long
 Private SubgroupInnerOrder()    As SubgroupInnerOrder, SubgroupInnerTotal As Long
 
-'グループ/サブグループの子として配置されるテキスト要素
+' --- グループ/サブグループの子として配置されるテキスト要素 ---
 'https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptivetext
 Private Type SubAdaptiveText
     '各属性
@@ -520,7 +518,7 @@ Private Type SubAdaptiveText
     Value          As String   '表示するテキスト。
 End Type
 
-'グループ/サブグループの子として配置されるインライン画像
+' --- グループ/サブグループの子として配置されるインライン画像 ---
 'https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema#adaptiveimage
 Private Type SubAdaptiveImage
     '各属性
@@ -532,13 +530,13 @@ Private Type SubAdaptiveImage
     AddImageQuery       As Boolean  'クエリ文字列を追加できるようになります
 End Type
 
-'配置順の管理
+' --- 配置順の管理 ---
 Private Type SubgroupInnerOrder
     UseText           As Boolean  'テキストか画像かのフラグ値
     TargetElementNo   As Long     '対象の要素No
 End Type
 
-'subgroupに付けれる属性と値、順序データ
+' --- subgroupに付けれる属性と値、順序データ ---
 Private Type AdaptiveSubgroup
     '各属性
     HintWeight As Integer       '別のサブグループを基準として太さを指定することで、このサブグループの列の幅を制御します。
@@ -552,41 +550,34 @@ Private Type AdaptiveSubgroup
     QueueImage() As SubAdaptiveImage
 End Type
 
-
-
-'====================================================================================================
-'位置        ：binding親要素のprogress子要素で使える属性値
-'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-progress
-'----------------------------------------------------------------------------------------------------
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] binding親要素のprogress子要素で使える属性値
+' [ document] https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-progress
+'---------------------------------------------------------------------------------------------------
 Private ElementProgress As AdaptiveProgressBar
-
 Private Type AdaptiveProgressBar
     Title               As String   '省略可能なタイトル文字列。
-    Status              As String   '左側の進行状況バーの下に表示されるステータス文字列。 この文字列は、"ダウンロード中..." や "インストール中..." などのように、操作の状態を反映する必要があります。
+    status              As String   '左側の進行状況バーの下に表示されるステータス文字列。 この文字列は、"ダウンロード中..." や "インストール中..." などのように、操作の状態を反映する必要があります。
     Value               As Double   'プログレスバーの値。 この値には、0.0 ~ 1.0 の浮動小数点数、または読み込みアニメーションを生成する値 "Indeterminate" を指定します。なおVBAの場合、負の場合で"Indeterminate"扱いとします。
     ValueStringOverride As String   '既定のパーセンテージ文字列の代わりに表示される省略可能な文字列。 これを指定しない場合は、"70%" などの文字が表示されます。
 End Type
 
-'====================================================================================================
-'位置        ：Audio要素に付けれる属性値
-'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-audio
-'----------------------------------------------------------------------------------------------------
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] Audio要素に付けれる属性値
+' [ document] https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-audio
+'---------------------------------------------------------------------------------------------------
 Private ElementAudio As ToastAudio
-
 Private Type ToastAudio
     loop   As Boolean   'ループフラグ
     silent As Boolean   '無音フラグ
     src    As String    '通知音名称
 End Type
 
-'====================================================================================================
-'位置        ：actions親要素のaction子要素で使える属性値
-'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-action
-'----------------------------------------------------------------------------------------------------
-Private ElementActionCount          As Integer
-
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] actions親要素のaction子要素で使える属性値
+' [ document] https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-action
+'---------------------------------------------------------------------------------------------------
 Private ElementAction(1 To MaxElementActionNum) As IToastActions
-
 Private Type IToastActions
     Content                 As String   'ボタンに表示されるコンテンツ。
     Arguments               As String   'ユーザーがこのボタンをクリックした場合にアプリが後から受け取る、アプリで定義された引数の文字列です。
@@ -600,29 +591,27 @@ Private Type IToastActions
     HintToolTip             As String   'ボタンに空のコンテンツ文字列がある場合のボタンのヒント。
 End Type
 
-'====================================================================================================
-'位置        ：input親要素のselection子要素で使える属性値。
-'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-selection
-'----------------------------------------------------------------------------------------------------
+'挿入カウンター
+Private ElementActionCount  As Integer
 
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] input親要素のselection子要素で使える属性値。
+' [ document] https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-selection
+'---------------------------------------------------------------------------------------------------
 Private ElementSelection(1 To MaxElementSelectionNum) As ToastSelectionBox
-
 Private Type ToastSelectionBox
     SelectionID As String   '識別子名
     ChoseName   As String   '選択肢に出す名称
 End Type
 
-'====================================================================================================
-'位置        ：actions親要素のinput子要素で使える属性値
-'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-input
-'----------------------------------------------------------------------------------------------------
-Private ElementInputCount          As Integer
-
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] actions親要素のinput子要素で使える属性値
+' [ document] https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-input
+'---------------------------------------------------------------------------------------------------
 Private ElementInput(1 To MaxElementInputNum) As IToastInput
-
 Private Type IToastInput
     '属性一覧
-    id                 As String    '入力に関連付けられている ID
+    ID                 As String    '入力に関連付けられている ID
     Type               As String    'この属性には、"text"、"selection" のいずれかの値を指定できます。
     PlaceHolderContent As String    'テキスト入力用に表示されるプレースホルダー
     Title              As String    '入力のラベルとして表示されるテキスト。
@@ -632,14 +621,16 @@ Private Type IToastInput
     Value() As ToastSelectionBox
 End Type
 
-'====================================================================================================
-'位置        ：header要素に付けれる属性値
-'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-header
-'----------------------------------------------------------------------------------------------------
-Private ElementHeader As ToastHeader
+'挿入カウンター
+Private ElementInputCount As Integer
 
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] header要素に付けれる属性値
+' [ document] https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-header
+'---------------------------------------------------------------------------------------------------
+Private ElementHeader As ToastHeader
 Private Type ToastHeader
-    id             As String    'このヘッダーを一意に識別します。 2 つの通知が同じヘッダー ID を持つ場合、アクション センターで同じヘッダーの下に表示されます。
+    ID             As String    'このヘッダーを一意に識別します。 2 つの通知が同じヘッダー ID を持つ場合、アクション センターで同じヘッダーの下に表示されます。
     Title          As String    'ヘッダーのタイトルです。
     Arguments      As String    'ユーザーがこのヘッダーをクリックするとアプリに返されます。 null にすることはできません。
     ActivationType As String    'このヘッダーがクリックされた場合に使用するアクティブ化の種類。
