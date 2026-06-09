@@ -31,6 +31,10 @@ Private Declare PtrSafe Function WindowsGetStringRawBuffer Lib "combase.dll" (By
 Private Declare PtrSafe Function GlobalAlloc Lib "kernel32" (ByVal uFlags As Long, ByVal dwBytes As LongPtr) As LongPtr
 Private Declare PtrSafe Function GlobalFree Lib "kernel32" (ByVal hMem As LongPtr) As LongPtr
 Private Declare PtrSafe Function WinRT_GetCurrentProcessId Lib "kernel32" Alias "GetCurrentProcessId" () As Long
+Private Declare PtrSafe Function FormatMessageW Lib "kernel32" Alias "FormatMessageW" ( _
+    ByVal dwFlags As Long, ByVal lpSource As LongPtr, ByVal dwMessageId As Long, _
+    ByVal dwLanguageId As Long, ByVal lpBuffer As LongPtr, ByVal nSize As Long, _
+    ByVal Arguments As LongPtr) As Long
 
 Private Type WinRT_SYSTEMTIME
     wYear As Integer
@@ -150,6 +154,8 @@ Private Const WRT_GroupDelimiter As String = "|"
 Private Const WRT_GPTR As Long = &H40
 Private Const WRT_S_OK As Long = 0
 Private Const WRT_E_NOINTERFACE As Long = &H80004002
+Private Const WRT_FORMAT_MESSAGE_FROM_SYSTEM As Long = &H1000
+Private Const WRT_FORMAT_MESSAGE_IGNORE_INSERTS As Long = &H200
 ' Dismissed / Failed 受信時に呼ぶ既定マクロ名（DLL 版 EventNotice.cpp と同名）
 Private Const WRT_MacroName_Dismissed As String = "ExcelToast_Dismissed"
 Private Const WRT_MacroName_Failed As String = "ExcelToast_Failed"
@@ -1494,6 +1500,7 @@ Private Function WinRT_Act_InvokeFailed(ByVal this As LongPtr, ByVal pSender As 
     Set dict = CreateObject("Scripting.Dictionary")
     dict("ToastNotification.Tag") = WinRT_Act_GetToastTag(pSender)
     dict("ErrorCode") = "0x" & Right$("00000000" & Hex$(errorCode), 8)
+    dict("ErrorDetail") = WinRT_HResultToMessage(errorCode)
 
     WinRT_Act_RunExcelMacro groupInfo, WRT_MacroName_Failed, dict
     WinRT_Act_InvokeFailed = WRT_S_OK
@@ -1716,6 +1723,32 @@ Private Function WinRT_HStringToString(ByVal hStr As LongPtr) As String
     If pWchar = 0 Or bufLen <= 0 Then Exit Function
     WinRT_HStringToString = String$(bufLen, vbNullChar)
     RtlMoveMemory ByVal StrPtr(WinRT_HStringToString), ByVal pWchar, CLngPtr(bufLen) * 2
+End Function
+
+' HRESULT をシステムメッセージに変換（C++ _com_error::ErrorMessage と同等）
+Private Function WinRT_HResultToMessage(ByVal hr As Long) As String
+    Dim buf As String
+    Dim cch As Long
+
+    If hr = 0 Then Exit Function
+    buf = String$(1024, vbNullChar)
+    cch = FormatMessageW(WRT_FORMAT_MESSAGE_FROM_SYSTEM Or WRT_FORMAT_MESSAGE_IGNORE_INSERTS, _
+        0, hr, 0, StrPtr(buf), 1024, 0)
+    If cch > 0 Then
+        WinRT_HResultToMessage = WinRT_TrimTrailingCrLf(Left$(buf, cch))
+    End If
+End Function
+
+Private Function WinRT_TrimTrailingCrLf(ByVal s As String) As String
+    Do While Len(s) > 0
+        Select Case Right$(s, 1)
+            Case vbCr, vbLf, " ", vbTab
+                s = Left$(s, Len(s) - 1)
+            Case Else
+                Exit Do
+        End Select
+    Loop
+    WinRT_TrimTrailingCrLf = s
 End Function
 
 ' IAsyncOperation / IAsyncAction の完了を待ち、完了後の HRESULT(ErrorCode) を返す。0=成功。
