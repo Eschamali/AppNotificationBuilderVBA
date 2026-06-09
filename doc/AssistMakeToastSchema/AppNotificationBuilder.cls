@@ -784,94 +784,56 @@ Private Function EnumToStringAdaptiveTextAlign(param As EnumAdaptiveTextStyle) A
 End Function
 
 
-'***************************************************************************************************
-' ■■■ VBA上で使うのに相応しいAppUserModelIDをプリセット ■■■
-'***************************************************************************************************
-Private Const AppUserModelID_Excel  As String = "Microsoft.Office.EXCEL.EXE.15" 'DeskTopアプリ：Excel
-Private AppUserModelID_Any          As String                                   '任意のAppID設定用変数
-Private ThisExcelPID                As Long                                     'このClassファイル構築時のプロセスID
-
-
 
 '***************************************************************************************************
-' ■■■ PowerShell経由で実行する際の定数一式 ■■■
+'                                  ■■■ Toast全般の設定 ■■■
 '***************************************************************************************************
-'PowerShell起動コマンド
-Private Const ActionPS As String = "powershell -Command """
-
-'xmlコンテンツを制御するオブジェクトを定義し、xml内容を読み込むコマンド文字列
-Private Const ReadXml As String = "$XmlDocument = [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime]::New();$XmlDocument.loadXml($xml)"
-
-
-
-'***************************************************************************************************
-' ■■■ Toast全般の設定プロパティ ■■■
-'***************************************************************************************************
-'* 機能    ：インターネット上の画像ソースを使うか決める変数をセットします
-'---------------------------------------------------------------------------------------------------
-Public Property Let AllowUse_InternetImage(ByVal ArgFlag As Boolean)
-    ToastConfig.AllowUse_InternetImageFlag = ArgFlag
-End Property
-
-'===================================================================================================
 '* 機能    ：この通知をどのアプリで出すかを設定します
 '---------------------------------------------------------------------------------------------------
 '* 機能説明：設定すると、ExcelのAppUserModelIDよりも優先して設定されます。batファイル等、VBAと直接関係なくなり、アイコンが噛み合わない時に使います。
 '* 注意事項：存在しない(未インストール)AppID、無効な文字列を指定すると、Toastが発行されないのでご注意ください。
 '---------------------------------------------------------------------------------------------------
-Public Property Let SetAppUserModelID(ByVal ArgAppID As String)
-    AppUserModelID_Any = ArgAppID
+Public Property Let SetAppUserModelID(appId As String)
+    ToastConfig.AppUserModelID = appId
 End Property
 
-'===================================================================================================
+'***************************************************************************************************
 '* 機能    ：タイムゾーンを変更します。デフォルトは、日本基準のため日本在宅者は基本、使用する必要はありません
 '---------------------------------------------------------------------------------------------------
 '* 注意事項：Class_Initialize　で、日本時間にセットされます
 '---------------------------------------------------------------------------------------------------
-Public Sub SetTimeZone(ByVal ArgUTC_Hour As Integer, ByVal ArgUTC_Minute As Integer)
+Public Sub SetTimeZone(ArgUTC_Hour As Integer, ArgUTC_Minute As Integer)
     With TargetTimeZone
         .Hour = ArgUTC_Hour
         .Minute = ArgUTC_Minute
     End With
 End Sub
 
-'===================================================================================================
-'* 機能    ：設定値を纏めたユーザー定義型：ToastNotification　を基に、DLLで扱えるユーザー定義型：ToastNotificationParams　に変換します
+'***************************************************************************************************
+'* 機能　　：トーストからマクロ実行するためのブック情報を提供します
 '---------------------------------------------------------------------------------------------------
-'* 注意事項：Windows API の文字列関係は、ポインターで取得するパターンが多いので、StrPtrで経由する必要があります
+'* 返り値　：ブック名|プロセスID　という形式
 '---------------------------------------------------------------------------------------------------
-Private Function ParamsConvertForDLL(ToastSetting As ToastNotification) As ToastNotificationParams
-    With ParamsConvertForDLL
-        '文字列から、文字列ポインターに変換
-        .AppUserModelID = StrPtr(ToastSetting.AppUserModelID)
-        .XmlTemplate = StrPtr(ToastSetting.XmlSchema)
-        .Tag = StrPtr(ToastSetting.Tag)
-        .Group = StrPtr(ToastSetting.Group)
-        .Schedule_ID = StrPtr(ToastSetting.Schedule_ID)
-        .CollectionID = StrPtr(ToastSetting.CollectionID)
-        
-        'スイッチングをセット。Boolean→BOOL の変換が上手く行かないため、longで代用します。
-        .ExpiresOnReboot = ToastSetting.ExpiresOnReboot * -1
-        .SuppressPopup = ToastSetting.SuppressPopup * -1
-    
-        '日付をセット。DLL(C++)での処理の場合、UTC基準になるため、設定済みのタイムゾーンを基に、補正します。
-        'スケジュール通知
-        .Schedule_DeliveryTime = DateAdd("h", TargetTimeZone.Hour * -1, ToastSetting.Schedule_DeliveryTime)
-        .Schedule_DeliveryTime = DateAdd("n", TargetTimeZone.Minute * -1, .Schedule_DeliveryTime)
-        
-        '有効期限(上限は3日後)
-        .ExpirationTime = DateAdd("h", TargetTimeZone.Hour * -1, ToastSetting.ExpirationTime)
-        .ExpirationTime = DateAdd("n", TargetTimeZone.Minute * -1, .ExpirationTime)
-    End With
+'* 機能説明：ToastNotification.Group プロパティの設定に使い、使用中のブックをユニークに特定します
+'            これは、コールバックでの特定に使います
+'***************************************************************************************************
+Private Function GetUniqueBookInfo() As String
+    GetUniqueBookInfo = ThisWorkbook.Name & パラメーター区切り文字 & ThisExcelPID
 End Function
 
-'===================================================================================================
+
+
+'***************************************************************************************************
+'                                    ■■■ 変換用 ■■■
+'***************************************************************************************************
 '* 機能    ：WinRT 直呼び出し用の設定構造体へ変換します
 '---------------------------------------------------------------------------------------------------
+'* 機能説明：基本は、As Is ですが日時系は、UTC基準になるため、一部変換が入ります
+'***************************************************************************************************
 Private Function ParamsConvertForWinRT(ToastSetting As ToastNotification) As WinRT_ToastConfig
     With ParamsConvertForWinRT
         .AppUserModelID = ToastSetting.AppUserModelID
-        .XmlTemplate = ToastSetting.XmlSchema
+        .XmlTemplate = ToastSetting.Content
         .Tag = ToastSetting.Tag
         .Group = ToastSetting.Group
         .Schedule_ID = ToastSetting.Schedule_ID
@@ -888,19 +850,22 @@ Private Function ParamsConvertForWinRT(ToastSetting As ToastNotification) As Win
     End With
 End Function
 
-'===================================================================================================
+'***************************************************************************************************
 '* 機能    ：WinRT 直呼び出し用のデータバインディング構造体へ変換します
-'---------------------------------------------------------------------------------------------------
+'***************************************************************************************************
 Private Function DataBindingConvertForWinRT() As WinRT_DataBinding
     With DataBindingConvertForWinRT
+        '最上位のテキスト要素部分
         .TitleText = ElementsText.Title.Value
         .ContentsText = ElementsText.Body.Value
         .AttributionText = ElementsText.Attribution.Value
-        
-        If Len(ElementProgress.Status) > 0 Then
+
+        'プログレスバー
+        '※必須項目が入ってたら、他の項目も適用させます
+        If StrPtr(ElementProgress.status) Then
             .ProgressTitle = ElementProgress.Title
-            .ProgressStatus = ElementProgress.Status
-            .ProgressValue = ElementProgress.Value
+            .ProgressStatus = ElementProgress.status
+            .progressValue = ElementProgress.Value
             .ProgressValueStringOverride = ElementProgress.ValueStringOverride
         End If
     End With
