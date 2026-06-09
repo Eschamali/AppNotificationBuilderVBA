@@ -909,31 +909,20 @@ End Function
 
 
 '***************************************************************************************************
-' ■■■ Toastを構成するスキーマ情報を決める基となるメンバ変数へ設定するプロパティ ■■■
+'       ■■■ Toastを構成するスキーマ情報を決める基となるメンバ変数へ設定するプロパティ ■■■
 '***************************************************************************************************
-'記述順番と名称はは、下記のリンクに準拠します。
-'→https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema
-'値、固定値の設定は、ここで行う
 '---------------------------------------------------------------------------------------------------
-'* 機能　　：toast要素のduration属性へ値をセット
+' [ SECTION ] XMLを構成するプロパティのうち、toast要素を指します
+' [ document] https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-toast
 '---------------------------------------------------------------------------------------------------
-'* 引数　　：ArgExtensionDuration
-'               True ：long  として扱います。25秒間、表示されます。
-'               False：short として扱います。省略も同等です。
+'* 機能　　：launch、activationType属性へ値をセット
 '---------------------------------------------------------------------------------------------------
-'* 注意事項：アクセシビリティ→視覚効果→この時間が経過したら通知を破棄する  で表示時間をオーバーライド可能です。(longの場合は、上回る場合にオーバーライド)
+'* 引数　　：Schema          起動スキーマ。URLやファイルパスなど
+'            ActivationType     このヘッダーがクリックされた場合に使用するアクティブ化の種類
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：公式サイトでは、`activationType`の項目がありませんが、設定値としては存在してます
 '***************************************************************************************************
-Public Property Let SetToastContent_Duration(ByVal ArgExtensionDuration As Boolean)
-    If ArgExtensionDuration Then ElementToast.Duration = "long" Else ElementToast.Duration = vbNullString
-End Property
-
-'***************************************************************************************************
-'* 機能　　：toast要素のlaunch、activationType属性へ値をセット
-'---------------------------------------------------------------------------------------------------
-'* 引数　　：ArgSchema          起動スキーマ。URLやファイルパスなど
-'            ActivationType     このヘッダーがクリックされた場合に使用するアクティブ化の種類(DLLを使用しない場合、"protocol"以外は機能しません)
-'***************************************************************************************************
-Public Property Let SetToastContent_Launch(Optional ByVal ActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, ByVal ArgSchema As String)
+Public Property Let XmlToast_Launch(Optional ActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, Schema As String)
     With ElementToast
         .Launch = Schema
         .ActivationType = EnumToStringToastActivationType(ActivationType)
@@ -941,48 +930,43 @@ Public Property Let SetToastContent_Launch(Optional ByVal ActivationType As Enum
 End Property
 
 '***************************************************************************************************
+'* 機能　　：duration属性へ値をセット
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：UseLong
+'               True ：long  として扱います。25秒間、表示されます。
+'               False：short として扱います。省略も同等なので、ここでは、省略として扱います
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：アクセシビリティ→視覚効果→この時間が経過したら通知を破棄する  で表示時間をオーバーライド可能です。(longの場合は、上回る場合にオーバーライド)
+'***************************************************************************************************
+Public Property Let XmlToast_Duration(UseLong As Boolean)
+    If UseLong Then ElementToast.Duration = "long" Else ElementToast.Duration = vbNullString
+End Property
+
+'***************************************************************************************************
 '* 機能　　：toast要素のdisplayTimestamp属性へ値をセット
 '---------------------------------------------------------------------------------------------------
-'* 引数　　：ArgDisplayTimestamp    カスタム タイムスタンプで既定のタイムスタンプをオーバーライドします
+'* 引数　　：DisplayTimestamp    カスタム タイムスタンプで既定のタイムスタンプをオーバーライドします
 '---------------------------------------------------------------------------------------------------
 '* 注意事項：※ISO 8601で指定する都合上、UTCを設定する引数を設けますが、JSTの場合は気にする必要はありません。
 '* URL     ：https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/custom-timestamps-on-toasts
 '***************************************************************************************************
-Public Property Let SetToastContent_DisplayTimestamp(Optional ArgUTC_Hour As Integer = 9, Optional ArgUTC_Minute As Integer = 0, ByVal ArgDisplayTimestamp As Date)
+Public Property Let XmlToast_DisplayTimestamp(Optional UTC_Hour As Integer = 9, Optional UTC_Minute As Integer = 0, DisplayTimestamp As Date)
     With WorksheetFunction
-        If ArgDisplayTimestamp Then ElementToast.DisplayTimestamp = .Text(ArgDisplayTimestamp, "yyyy-mm-ddThh:mm:ss") & .Text(TargetTimeZone.Hour, "+00:;-00:") & .Text(TargetTimeZone.Minute, "00") Else ElementToast.DisplayTimestamp = vbNullString
+        If DisplayTimestamp Then ElementToast.DisplayTimestamp = .Text(DisplayTimestamp, "yyyy-mm-ddThh:mm:ss") & .Text(TargetTimeZone.Hour, "+00:;-00:") & .Text(TargetTimeZone.Minute, "00") Else ElementToast.DisplayTimestamp = vbNullString
     End With
 End Property
 
 '***************************************************************************************************
-'* 機能　　：toast要素のsynalio属性へ値をセット
+'* 機能　　：synalio属性へ値をセット
 '---------------------------------------------------------------------------------------------------
 '* 引数　　：ArgID    シナリオID。便宜上、数値に応じてシナリオ名を設定します
 '***************************************************************************************************
-Public Property Let SetToastContent_Scenario(ToastScenarioMode As EnumToastScenario)
+Public Property Let XmlToast_Scenario(ToastScenarioMode As EnumToastScenario)
     ElementToast.Synalio = EnumToStringToastScenario(ToastScenarioMode)
 End Property
 
 '***************************************************************************************************
-'* 機能    ：引数に応じて、アクティブ化の種類を文字列で返します
-'***************************************************************************************************
-Private Function SetToastActivationType(ByVal activationID As EnumToastActivationType) As String
-    Select Case activationID
-        Case EnumToastActivationType.taForeground
-            SetToastActivationType = "foreground"
-        Case EnumToastActivationType.taBackground
-            SetToastActivationType = "background"
-        Case EnumToastActivationType.taProtocol
-            SetToastActivationType = "protocol"
-        Case EnumToastActivationType.taSystem
-            SetToastActivationType = "system"
-        Case Else
-            SetToastActivationType = vbNullString
-    End Select
-End Function
-
-'***************************************************************************************************
-'* 機能　　：toast要素のuseButtonStyle属性へ値をセット
+'* 機能　　：useButtonStyle属性へ値をセット
 '---------------------------------------------------------------------------------------------------
 '* 引数　　：ArguseButtonStyle
 '               True ：スタイル付きボタンを使用します
@@ -990,277 +974,155 @@ End Function
 '---------------------------------------------------------------------------------------------------
 '* 注意事項：この機能は、Windows 11 以降のみ機能します。
 '***************************************************************************************************
-Public Property Let SetToastContent_UseButtonStyle(ByVal ArgUseButtonStyle As Boolean)
-    ElementToast.UseButtonStyle = ArgUseButtonStyle
+Public Property Let XmlToast_UseButtonStyle(UseButtonStyle As Boolean)
+    ElementToast.UseButtonStyle = UseButtonStyle
 End Property
 
-'***************************************************************************************************
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] XMLを構成するプロパティのうち、binding要素を指します
+' [ document] https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-binding
+'---------------------------------------------------------------------------------------------------
 '* 機能　　binding要素の各属性へ値をセット
 '---------------------------------------------------------------------------------------------------
-'* 引数　　：ArgTemp            イメージ ソース属性の相対 URI と組み合わせた既定のベース URI。
-'            ArgBaseImageURI    この値は "ToastGeneric" に設定する必要があります
+'* 引数　　：ArgBaseImageURI    イメージ ソース属性の相対 URI と組み合わせた既定のベース URI。
 '***************************************************************************************************
-Public Property Let SetToastBindingGeneric(Optional ByVal ArgTemp As String = "ToastGeneric", ByVal ArgBaseImageURI As String)
-    With ElementBinding
-        .Baseuri = ArgBaseImageURI
-        .template = ArgTemp     '※この値は "ToastGeneric" に設定する必要があります
-    End With
+Public Property Let XmlBinding_baseUri(baseUri As String)
+    ElementBinding.baseUri = baseUri
 End Property
 
-'***************************************************************************************************
-'* 機能　　：binding親要素のimage子要素のうち、インラインに設定する画像のパスと、丸いロゴフラグの設定を行う
 '---------------------------------------------------------------------------------------------------
-'* 引数　　：Arg_InlineImageSrc    イメージ ソースの URI。ファイルパスや、http(s)画像など
-'            Arg_InlineCircle
+' [ SECTION ] XMLを構成するプロパティのうち、image要素を指します
+' [ document] https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-image
+'---------------------------------------------------------------------------------------------------
+'* 機能　　：インラインに設定する画像のパスと、丸いロゴフラグの設定を行う
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：InlineImageSrc    イメージ ソースの URI。ファイルパスや、http(s)画像など
+'            InlineCircle
 '               True ：画像は円にトリミングされます。
 '               False：画像はトリミングされず、そのまんまのサイズとして表示されます。
 
 '            Flag_addImageQuery     srcのURIに、クエリ文字列を追加できるようにするには、"true"を指定します。
-'            Arg_Alt                画像の説明を記載します。
+'            Alt                画像の説明を記載します。
 '***************************************************************************************************
-Public Property Let SetToastGenericInlineImage(Optional ByVal Arg_InlineCircle As Integer, Optional ByVal Flag_addImageQuery As Boolean, Optional ByVal Arg_Alt As String, ByVal Arg_InlineImageSrc As String)
+Public Property Let XmlImage_Inline(Optional InlineCircle As Boolean, Optional Flag_addImageQuery As Boolean, Optional Alt As String, InlineImageSrc As String)
     With ElementsImage.Inline
-        .src = UseHttpImageCheck(Arg_InlineImageSrc)
+        .src = InlineImageSrc
         .AddImageQuery = Flag_addImageQuery
-        .alt = Arg_Alt
+        .Alt = Alt
 
-        If Arg_InlineCircle Then .HintCrop = "circle" Else .HintCrop = vbNullString
+        If InlineCircle Then .HintCrop = "circle" Else .HintCrop = vbNullString
     End With
 End Property
 
 '***************************************************************************************************
-'* 機能　　：binding親要素のimage子要素のうち、ヒーロー画像のパスの設定を行う
+'* 機能　　：ヒーロー画像のパスの設定を行う
 '---------------------------------------------------------------------------------------------------
-'* 引数　　：Arg_HeroImageSrc       イメージ ソースの URI。ファイルパスや、http(s)画像など
+'* 引数　　：HeroImageSrc       イメージ ソースの URI。ファイルパスや、http(s)画像など
 '            Flag_addImageQuery     srcのURIに、クエリ文字列を追加できるようにするには、"true"を指定します。
-'            Arg_Alt                画像の説明を記載します。
+'            Alt                画像の説明を記載します。
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：ヒーロー画像の丸み加工はできません
 '***************************************************************************************************
-Public Property Let SetToastGenericHeroImage(Optional ByVal Flag_addImageQuery As Boolean, Optional ByVal Arg_Alt As String, ByVal Arg_HeroImageSrc As String)
+Public Property Let XmlImage_Hero(Optional Flag_addImageQuery As Boolean, Optional Alt As String, HeroImageSrc As String)
     With ElementsImage.Hero
-        .src = UseHttpImageCheck(Arg_HeroImageSrc)
+        .src = HeroImageSrc
         .AddImageQuery = Flag_addImageQuery
-        .alt = Arg_Alt
+        .Alt = Alt
 
         .Placement = "hero"
     End With
 End Property
 
 '***************************************************************************************************
-'* 機能　　：binding親要素のimage子要素のうち、AppLogo(appLogoOverride)に設定する画像のパスと、丸いロゴフラグの設定を行う
+'* 機能　　：、AppLogo(appLogoOverride)に設定する画像のパスと、丸いロゴフラグの設定を行う
 '---------------------------------------------------------------------------------------------------
-'* 引数　　：Arg_AppLogoSrc    イメージ ソースの URI。ファイルパスや、http(s)画像など
-'            Arg_LogoCircle
+'* 引数　　：AppLogoSrc    イメージ ソースの URI。ファイルパスや、http(s)画像など
+'            LogoCircle
 '               True ：画像は円にトリミングされます。
 '               False：画像はトリミングされず、正方形として表示されます。
 
 '            Flag_addImageQuery     srcのURIに、クエリ文字列を追加できるようにするには、"true"を指定します。
-'            Arg_Alt                画像の説明を記載します。
+'            Alt                画像の説明を記載します。
 '***************************************************************************************************
-Public Property Let SetToastGenericAppLogo(Optional ByVal Arg_LogoCircle As Boolean, Optional ByVal Flag_addImageQuery As Boolean, Optional ByVal Arg_Alt As String, ByVal Arg_AppLogoSrc As String)
+Public Property Let XmlImage_AppLogo(Optional LogoCircle As Boolean, Optional Flag_addImageQuery As Boolean, Optional Alt As String, AppLogoSrc As String)
     With ElementsImage.AppLogo
-        .src = UseHttpImageCheck(Arg_AppLogoSrc)
+        .src = AppLogoSrc
         .AddImageQuery = Flag_addImageQuery
-        .alt = Arg_Alt
+        .Alt = Alt
 
         .Placement = "appLogoOverride"
 
-        If Arg_LogoCircle Then .HintCrop = "circle" Else .HintCrop = vbNullString
+        If LogoCircle Then .HintCrop = "circle" Else .HintCrop = vbNullString
     End With
 End Property
 
-'***************************************************************************************************
-'* 機能　　：binding親要素のtext子要素に値と属性をそれぞれ設定します
 '---------------------------------------------------------------------------------------------------
-'* 引数　　：TextContents                   通知内容
-'            HintCallScenarioCenterAlign    テキストを中央に配置するフラグ(Synalio属性値が"incomingCall"のToast要素のみ効果発動。それ以外の場合は無視されます。
+' [ SECTION ] XMLを構成するプロパティのうち、text 要素を指します
+' [ document] https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-text
 '---------------------------------------------------------------------------------------------------
-'* 機能説明：1行目のタイトルにあたります
-'* 注意事項：Synalio属性値が"incomingCall"のToast要素のみ効果発動。それ以外の場合は無視されます。
+'* 機能　　：タイトル部分を指定します
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：Title                          タイトル部分の通知内容
+'            HintCallScenarioCenterAlign    テキストを中央に配置するフラグ ※Synalio属性値が"incomingCall"のToast要素のみ効果発動。それ以外の場合は無視されます
+'---------------------------------------------------------------------------------------------------
+'* 機能説明：通知上部のタイトルに設定する内容です
+'* 注意事項：・最大、2行まで表示できます
+'            ・クリアは、`vbnullstring`で可能です
 '***************************************************************************************************
-Public Property Let SetToastGenericTitleText(Optional ByVal HintCallScenarioCenterAlign As Boolean, ByVal TextContents As String)
+Public Property Let XmlText_Title(Optional HintCallScenarioCenterAlign As Boolean, Title As String)
     With ElementsText.Title
-        .Value = TextContents
+        .Value = Title
         .Attribute.HintCallScenarioCenterAlign = HintCallScenarioCenterAlign
     End With
 End Property
 
 '***************************************************************************************************
-'* 機能　　：binding親要素のtext子要素に値と属性をそれぞれ設定します
+'* 機能　　：Body部分を指定します
 '---------------------------------------------------------------------------------------------------
-'* 引数　　：TextContents                   通知内容
-'            HintCallScenarioCenterAlign    テキストを中央に配置するフラグ(Synalio属性値が"incomingCall"のToast要素のみ効果発動。それ以外の場合は無視されます。
+'* 引数　　：Body                           通知内容
+'            HintCallScenarioCenterAlign    テキストを中央に配置するフラグ ※Synalio属性値が"incomingCall"のToast要素のみ効果発動。それ以外の場合は無視されます
 '---------------------------------------------------------------------------------------------------
-'* 機能説明：2行目以降の通知内容にあたります
-'* 注意事項：Synalio属性値が"incomingCall"のToast要素のみ効果発動。それ以外の場合は無視されます。
-'            また、タイトルが未設定の場合、これがタイトル扱いになるため注意
+'* 機能説明：通知の中ほどに設定する内容です
+'* 注意事項：・最大、4行まで表示できます
+'            ・クリアは、`vbnullstring`で可能です
 '***************************************************************************************************
-Public Property Let SetToastGenericContentsText(Optional ByVal HintCallScenarioCenterAlign As Boolean, ByVal TextContents As String)
+Public Property Let XmlText_Body(Optional HintCallScenarioCenterAlign As Boolean, Body As String)
+    'タイトルが空欄の場合は、そこに半角スペースを入れて、このBodyがタイトル化しないようにします
+    If ElementsText.Title.Value = "" Then ElementsText.Title.Value = " "
+
+    'Body部分を指定
     With ElementsText.Body
-        .Value = TextContents
+        .Value = Body
         .Attribute.HintCallScenarioCenterAlign = HintCallScenarioCenterAlign
     End With
 End Property
 
 '***************************************************************************************************
-'* 機能　　：binding親要素のtext子要素に値と属性をそれぞれ設定します
+'* 機能　　`attribution`にあたる内容を指定します
 '---------------------------------------------------------------------------------------------------
-'* 引数　　：TextContents                   通知内容
+'* 引数　　：Attribution                    通知内容
 '            HintCallScenarioCenterAlign    テキストを中央に配置するフラグ(Synalio属性値が"incomingCall"のToast要素のみ効果発動。それ以外の場合は無視されます。
 '---------------------------------------------------------------------------------------------------
 '* 機能説明：通知の下部に設定するテキストを設定します。
-'* 注意事項：Synalio属性値が"incomingCall"のToast要素のみ効果発動。それ以外の場合は無視されます。
-'            placement属性に、"attribution"を常に付与しています
+'* 注意事項：・最大、2行まで表示できます
+'            ・クリアは、`vbnullstring`で可能です
 '***************************************************************************************************
-Public Property Let SetToastGenericAttributionText(Optional ByVal HintCallScenarioCenterAlign As Boolean, ByVal TextContents As String)
+Public Property Let XmlText_Attribution(Optional HintCallScenarioCenterAlign As Boolean, Attribution As String)
     With ElementsText.Attribution
-        .Value = TextContents
+        .Value = Attribution
         .Attribute.HintCallScenarioCenterAlign = HintCallScenarioCenterAlign
 
         .Attribute.Placement = "attribution"
     End With
 End Property
 
-'***************************************************************************************************
-'* 機能　　：subgroup要素に属性と、事前に定義したtext,image要素をそれぞれ追加します
 '---------------------------------------------------------------------------------------------------
-'* 引数　　：Weight         別のサブグループを基準として太さを指定することで、このサブグループの列の幅を制御します。
-'            TextStacking   このサブグループのコンテンツの垂直方向の配置を制御します。
+' [ SECTION ] XMLを構成するプロパティのうち、Audio 要素を指します
+' [ document] https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-audio
 '---------------------------------------------------------------------------------------------------
-'* 注意事項：このプロパティを使用すると以前、「AddAdaptiveSubgroupImage」、「AddAdaptiveSubgroupText」で呼び出して設定した配列、
-'             SubgroupInnerImages,SubgroupInnerTexts の中身をリセットします。
-'***************************************************************************************************
-Public Sub AddAdaptiveSubgroup(Optional ByVal Weight As Integer, Optional ByVal TextStacking As AdaptiveSubgroupTextStacking)
-    '1. 加算処理(0基準)
-    SubgroupTotal = SubgroupTotal + 1
-
-    '2. 配列を増やします
-    ReDim Preserve ElementsSubgroup(SubgroupTotal)
-
-    '3. パラメーターを設定します
-    With ElementsSubgroup(SubgroupTotal)
-        '各属性
-        .HintWeight = Weight
-        .HintTextStacking = EnumToStringAdaptiveSubgroupTextStacking(TextStacking)
-
-        '順序データ
-        .QueueOrder = SubgroupInnerOrder
-
-        '各値
-        .QueueText = SubgroupInnerTexts
-        .QueueImage = SubgroupInnerImages
-    End With
-
-    '4. 以前定義したsubgroup要素内のtext,image要素をリセットする
-    '  カウントリセット
-    SubgroupInnerTextsTotal = -1
-    SubgroupInnerImagesTotal = -1
-    SubgroupInnerTotal = -1
-    '  配列リセット
-    ReDim SubgroupInnerTexts(SubgroupInnerTextsTotal + 1)
-    ReDim SubgroupInnerImages(SubgroupInnerImagesTotal + 1)
-    ReDim SubgroupInnerOrder(SubgroupInnerTotal + 1)
-End Sub
-
-'***************************************************************************************************
-'* 機能　　：subgroup親要素のimage子要素に値と属性をそれぞれ追加します
-'---------------------------------------------------------------------------------------------------
-'* 引数　　：       src                 As String   '画像パス
-'                   HintCrop            As String   'イメージの目的のトリミングを制御
-'                   HintRemoveMargin    As Boolean  'このプロパティを true に設定することで余白を削除できます。
-'                   HintAlign           As String   '画像の水平方向の配置です。
-'                   AlternateText       As String   'アクセシビリティ対応目的で使用される、画像を説明する代替テキストです。
-'                   AddImageQuery       As Boolean  'クエリ文字列を追加できるようになります
-'---------------------------------------------------------------------------------------------------
-'* 機能説明：アダプティブを使用した画像をレンダリング出来ます。
-'***************************************************************************************************
-Public Property Let AddAdaptiveSubgroupImage(Optional ByVal Crop As EnumAdaptiveImageCrop, Optional ByVal RemoveMargin As Boolean, Optional ByVal Align As EnumAdaptiveImageAlign, Optional ByVal AltText As String, Optional ByVal AddImageQuery As Boolean, ImageSrc As String)
-    '加算処理(0基準)
-    SubgroupInnerImagesTotal = SubgroupInnerImagesTotal + 1     '画像挿入数
-    SubgroupInnerTotal = SubgroupInnerTotal + 1                 'Subgroup要素内の挿入要素数
-
-    '配列を増やします
-    ReDim Preserve SubgroupInnerImages(SubgroupInnerImagesTotal)
-
-    '順序データを設定します
-    ReDim Preserve SubgroupInnerOrder(SubgroupInnerTotal)
-    SubgroupInnerOrder(SubgroupInnerTotal).TargetElementNo = SubgroupInnerImagesTotal
-    SubgroupInnerOrder(SubgroupInnerTotal).UseText = False
-
-    'パラメーターを設定します
-    With SubgroupInnerImages(SubgroupInnerImagesTotal)
-        '各属性
-        .src = ImageSrc
-        .HintCrop = EnumToStringAdaptiveImageCrop(Crop)
-        .HintAlign = EnumToStringAdaptiveImageAlign(Align)
-        .AlternateText = AltText
-        .AddImageQuery = AddImageQuery
-    End With
-End Property
-
-'***************************************************************************************************
-'* 機能　　：subgroup親要素のtext子要素に値と属性をそれぞれ追加します
-'---------------------------------------------------------------------------------------------------
-'* 引数　　：   Style        テキストのフォント サイズ、太さ、および不透明度を制御します。
-'               Wrap         true に設定すると、テキストの折り返しが有効になります。
-'               MaxLines     表示が許可される、テキスト要素の最大行数です。
-'               MinLines     表示する必要のある、テキスト要素の最小行数です。
-'               Align        テキストの水平方向の配置。
-'               Arg_Language XML ペイロードの対象ロケールです。
-'               TextContents 表示テキスト
-'---------------------------------------------------------------------------------------------------
-'* 機能説明：アダプティブを使用したテキストをレンダリング出来ます。
-'***************************************************************************************************
-Public Property Let AddAdaptiveSubgroupText(Optional ByVal Style As EnumAdaptiveTextStyle, Optional ByVal Wrap As Boolean, Optional ByVal MaxLines As Integer, Optional ByVal MinLines As Integer, Optional ByVal Align As EnumAdaptiveTextAlign, Optional ByVal Arg_Language As String, ByVal TextContents As String)
-    '加算処理(0基準)
-    SubgroupInnerTextsTotal = SubgroupInnerTextsTotal + 1   'テキスト挿入数
-    SubgroupInnerTotal = SubgroupInnerTotal + 1             'Subgroup要素内の挿入要素数
-    
-    '配列を増やします
-    ReDim Preserve SubgroupInnerTexts(SubgroupInnerTextsTotal)
-    
-    '順序データを設定します
-    ReDim Preserve SubgroupInnerOrder(SubgroupInnerTotal)
-    SubgroupInnerOrder(SubgroupInnerTotal).TargetElementNo = SubgroupInnerTextsTotal
-    SubgroupInnerOrder(SubgroupInnerTotal).UseText = True
-
-    'パラメーターを設定します
-    With SubgroupInnerTexts(SubgroupInnerTextsTotal)
-        '各属性
-        .HintStyle = EnumToStringAdaptiveTextStyle(Style)
-        .HintWrap = Wrap
-        .HintMaxLines = MaxLines
-        .HintMinLines = MinLines
-        .HintAlign = EnumToStringAdaptiveTextAlign(Align)
-        .Language = Language
-
-        'テキスト値
-        .Value = TextContents
-    End With
-End Property
-
-'***************************************************************************************************
-'* 機能　　：binding親要素のProgress子要素に必要な属性を一括設定します
-'---------------------------------------------------------------------------------------------------
-'* 引数　　：Arg_Title                  タイトルの文字列 (オプション) を取得または設定します。 データ バインディングをサポートしています。
-'            Arg_Value                  進行状況バーの値を取得または設定します。 データ バインディングをサポートしています。 既定値は 0 です。 0.0 ～ 1.0 の double 型で、ゲージ式。負の値にすると、ドットアニメーションの不確定式になります。
-'            Arg_ValueStringOverride    割合を示す既定の文字列に代わって表示される文字列 (オプション) を取得または設定します。 これを指定しない場合は、"70%" などの文字が表示されます。
-'            Arg_Status                 進行状況バーの下の左側に表示されるステータス文字列 (必須) を取得または設定します。 この文字列は、"ダウンロード中..." や "インストール中..." などのように、操作の状態を反映する必要があります。
-'---------------------------------------------------------------------------------------------------
-'URL       ：https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-progress-bar
-'***************************************************************************************************
-Public Property Let SetAdaptiveProgressBar(Optional Arg_Value As Double, Optional Arg_Title As String, Optional Arg_ValueStringOverride As String, Arg_Status As String)
-    With ElementProgress
-        .Title = Arg_Title & ""
-        .Status = Arg_Status
-        .Value = Arg_Value
-        .ValueStringOverride = Arg_ValueStringOverride
-    End With
-End Property
-
-'***************************************************************************************************
 '* 機能　　：Audio要素の属性をセット
 '---------------------------------------------------------------------------------------------------
-'* 引数　　：ArgSrcID       通知音ID。便宜上、数値に応じて通知音名を設定します
+'* 引数　　：SrcID          通知音ID。便宜上、数値に応じて通知音名を設定します
 '               1-25        Windows側で定められた通知音名を番号で指定
 '               上記以外    ミュートにします
 
@@ -1268,7 +1130,7 @@ End Property
 '               True  ：トーストが表示されている限りサウンドが繰り返される場合に設定
 '               False ：1回だけ再生する場合に設定
 '***************************************************************************************************
-Public Property Let SetToastAudio(Optional ByVal ArgLoop As Boolean, SrcID As EnumMsWinSoundEvent)
+Public Property Let XmlAudio(Optional ArgLoop As Boolean, SrcID As EnumMsWinSoundEvent)
     With ElementAudio
         'audio要素のLoop属性を設定
         .loop = ArgLoop
@@ -1288,7 +1150,10 @@ Public Property Let SetToastAudio(Optional ByVal ArgLoop As Boolean, SrcID As En
     End With
 End Property
 
-'***************************************************************************************************
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] XMLを構成するプロパティのうち、actions  要素を指します
+' [ document] https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-action
+'---------------------------------------------------------------------------------------------------
 '* 機能　　：action要素の各属性にセットしたものをactions要素に挿入します
 '---------------------------------------------------------------------------------------------------
 '* 引数　　：Content            ボタンに表示されるコンテンツ
@@ -1303,9 +1168,11 @@ End Property
 '            HintToolTip        ボタンに空のコンテンツ文字列がある場合のボタンのヒント。
 '            Index              追加位置
 '---------------------------------------------------------------------------------------------------
-'* 注意事項：公式Document上には、type属性があるようですがここでは一旦無視します。
+'* 注意事項：・公式Document上には、type属性があるようですがここでは一旦無視します
+'            ・`Content`に`vbnullstring`を適用すると、そのIndexでは未使用にできます
+'            ・文字列のパラメータークリアにも`vbnullstring`で対応可能です
 '***************************************************************************************************
-Public Property Let SetIToastActions(ByVal Content As String, ByVal Arguments As String, Optional ByVal ActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, Optional PendingUpdate As Boolean, Optional ByVal ContextMenu As Boolean, Optional ByVal IconPath As String, Optional ByVal HintInputId As String, Optional HintButtonStyle As EnumToastButtonStyle, Optional ByVal HintToolTip As String, ByVal Index As Integer)
+Public Property Let XmlAction(Content As String, Arguments As String, Optional ActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, Optional PendingUpdate As Boolean, Optional ContextMenu As Boolean, Optional IconPath As String, Optional HintInputId As String, Optional HintButtonStyle As EnumHintButtonStyle, Optional HintToolTip As String, Index As Integer)
     With ElementAction(Index)
         '1. 挿入カウントを行う
         '有効な入力値かつ、Index先が`null`
@@ -1338,36 +1205,39 @@ End Property
 '***************************************************************************************************
 '* 機能　　：input要素の各属性にセットしたものをaction要素に挿入します
 '---------------------------------------------------------------------------------------------------
-'* 引数　　：ArgID                  入力に関連付けられている ID
+'* 引数　　：ID                     入力に関連付けられている ID
 '            ChoseFlag              Trueで"SelectionBox"、Falseで、"TextBox"扱いとします
-'            ArgPlaceHolderContent  テキスト入力用に表示されるプレースホルダー。
-'            Argtitle               入力のラベルとして表示されるテキスト
-'            ArgDefaultInput        デフォルトの入力値
+'            PlaceHolderContent  テキスト入力用に表示されるプレースホルダー。
+'            title               入力のラベルとして表示されるテキスト
+'            DefaultInput        デフォルトの入力値
 '            Index                  追加位置
 '---------------------------------------------------------------------------------------------------
-'* 注意事項：「ChoseFlag = True」でこのプロパティを使用すると以前、「SetToastSelectionBox」で呼び出して設定した配列、
-'            ElementSelection の中身をリセットします。
+'* 注意事項：・「ChoseFlag = True」でこのプロパティを使用すると「XmlSelection」で設定したプロパティをリセットします
+'            ・`ID`に`vbnullstring`を適用すると、そのIndexでは未使用にできます
+'            ・文字列のパラメータークリアにも`vbnullstring`で対応可能です
 '***************************************************************************************************
-Public Property Let SetIToastInput(ByVal ArgID As String, Optional ByVal ChoseFlag As Boolean, Optional ByVal ArgPlaceHolderContent As String, Optional ByVal ArgTitle As String, Optional ByVal ArgDefaultInput As String, ByVal Index As Integer)
+Public Property Let XmlInput(ByVal ID As String, Optional ByVal ChoseFlag As Boolean, Optional ByVal PlaceHolderContent As String, Optional ByVal Title As String, Optional ByVal DefaultInput As String, ByVal Index As Integer)
     With ElementInput(Index)
-        '1. 有効な入力値かつ、Index先が`null`
-        If StrPtr(ArgID) > 0 And StrPtr(.id) = 0 Then
+        '1. 挿入カウントを行う
+        '有効な入力値かつ、Index先が`null`
+        If StrPtr(ID) > 0 And StrPtr(.ID) = 0 Then
             'カウントアップ
             ElementInputCount = ElementInputCount + 1
-            
+
         '`null`入力かつ、Index先が有効な入力値
-        ElseIf StrPtr(ArgID) = 0 And StrPtr(.id) > 0 Then
+        ElseIf StrPtr(ID) = 0 And StrPtr(.ID) > 0 Then
             'カウントダウン
             ElementInputCount = ElementInputCount - 1
         End If
 
-        .id = ArgID
+        '2. 各種パラメーター適用
+        .ID = ID
 
         'Typeが、"selection"の場合、予め作成されたSelection要素を入れるようにします。
         If ChoseFlag Then
             .Type = "selection"
             .Value = ElementSelection
-            
+
             '挿入後、同じ変数で使い回すため、初期化する
             Dim i As Long
             For i = 1 To MaxElementSelectionNum
@@ -1378,31 +1248,189 @@ Public Property Let SetIToastInput(ByVal ArgID As String, Optional ByVal ChoseFl
             .Type = "text"
         End If
 
-        .PlaceHolderContent = ArgPlaceHolderContent
-        .Title = ArgTitle
-        .DefaultInput = ArgDefaultInput
+        .PlaceHolderContent = PlaceHolderContent
+        .Title = Title
+        .DefaultInput = DefaultInput
     End With
 End Property
 
 '***************************************************************************************************
 '* 機能　　：input要素のtype属性が"selection" の時に挿入する"selection"要素を定義します
 '---------------------------------------------------------------------------------------------------
-'* 引数　　：ArgSelectionID    識別子。「ToastNotification.Activated」を利用する場合、これが"UserInput"の値として返されます。
+'* 引数　　：ArgSelectionID    識別子。※`ToastNotification.Activated`を利用する場合、これが`UserInput`の値として返されます。
 '                              なお、数値のみの指定にすると、リマインダー用途としても使用可能です(単位：分)
 '
 '            ArgChoseName      選択肢名称
 '            Index             挿入位置
 '---------------------------------------------------------------------------------------------------
-'* 注意事項：DLLを使用しない場合、リマインダー用途しか使い所がありません
+'* 注意事項：前述の`XmlInput`にて、`ChoseFlag:= True`を使用する前に、このプロパティで設定してください
 '***************************************************************************************************
-Public Property Let SetToastSelectionBox(ByVal ArgSelectionID As String, ByVal ArgChoseName As String, ByVal Index As Integer)
+Public Property Let XmlSelection(SelectionID As String, ChoseName As String, Index As Integer)
     With ElementSelection(Index)
-        .SelectionID = ArgSelectionID
-        .ChoseName = ArgChoseName
+        .SelectionID = SelectionID
+        .ChoseName = ChoseName
+    End With
+End Property
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] XMLを構成するプロパティのうち、group 要素を指します
+' [ document] https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-group
+'---------------------------------------------------------------------------------------------------
+'* 機能　　：subgroup要素に属性と、事前に定義したtext,image要素をそれぞれ追加します
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：Weight         別のサブグループを基準として太さを指定することで、このサブグループの列の幅を制御します。
+'            TextStacking   このサブグループのコンテンツの垂直方向の配置を制御します。
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：このプロパティを使用すると以前、「AddAdaptiveSubgroupImage」、「AddAdaptiveSubgroupText」で呼び出して設定した配列、
+'             SubgroupInnerImages,SubgroupInnerTexts の中身をリセットします。
+'***************************************************************************************************
+Public Sub AddAdaptiveSubgroup(Optional Weight As Integer, Optional TextStacking As AdaptiveSubgroupTextStacking)
+    '1. 加算処理(0基準)
+    SubgroupTotal = SubgroupTotal + 1
+
+    '2. 配列を増やします
+    ReDim Preserve ElementsSubgroup(SubgroupTotal)
+
+    '3. パラメーターを設定します
+    With ElementsSubgroup(SubgroupTotal)
+        '各属性
+        .HintWeight = Weight
+        .HintTextStacking = EnumToStringAdaptiveSubgroupTextStacking(TextStacking)
+
+        '順序データ
+        .QueueOrder = SubgroupInnerOrder
+
+        '各値
+        .QueueText = SubgroupInnerTexts
+        .QueueImage = SubgroupInnerImages
+    End With
+
+    '4. 以前定義したsubgroup要素内のtext,image要素をリセットする
+    '  カウントリセット
+    SubgroupInnerTextsTotal = -1
+    SubgroupInnerImagesTotal = -1
+    SubgroupInnerTotal = -1
+    '  配列リセット
+    ReDim SubgroupInnerTexts(SubgroupInnerTextsTotal + 1)
+    ReDim SubgroupInnerImages(SubgroupInnerImagesTotal + 1)
+    ReDim SubgroupInnerOrder(SubgroupInnerTotal + 1)
+End Sub
+
+'***************************************************************************************************
+'* 機能　　：subgroup要素に設定した中身の要素を全てクリーンします
+'***************************************************************************************************
+Public Sub CleanAdaptiveSubgroup()
+    'カウントリセット
+    SubgroupTotal = -1
+
+    '配列リセット
+    ReDim ElementsSubgroup(SubgroupTotal + 1)
+End Sub
+
+'***************************************************************************************************
+'* 機能　　：subgroup親要素のimage子要素に値と属性をそれぞれ追加します
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：       src                 As String   '画像パス
+'                   HintCrop            As String   'イメージの目的のトリミングを制御
+'                   HintRemoveMargin    As Boolean  'このプロパティを true に設定することで余白を削除できます。
+'                   HintAlign           As String   '画像の水平方向の配置です。
+'                   AlternateText       As String   'アクセシビリティ対応目的で使用される、画像を説明する代替テキストです。
+'                   AddImageQuery       As Boolean  'クエリ文字列を追加できるようになります
+'---------------------------------------------------------------------------------------------------
+'* 機能説明：アダプティブを使用した画像をレンダリング出来ます。
+'***************************************************************************************************
+Public Property Let AddAdaptiveSubgroupImage(Optional Crop As EnumAdaptiveImageCrop, Optional RemoveMargin As Boolean, Optional Align As EnumAdaptiveImageAlign, Optional AltText As String, Optional AddImageQuery As Boolean, ImageSrc As String)
+    '加算処理(0基準)
+    SubgroupInnerImagesTotal = SubgroupInnerImagesTotal + 1     '画像挿入数
+    SubgroupInnerTotal = SubgroupInnerTotal + 1                 'Subgroup要素内の挿入要素数
+
+    '配列を増やします
+    ReDim Preserve SubgroupInnerImages(SubgroupInnerImagesTotal)
+
+    '順序データを設定します
+    ReDim Preserve SubgroupInnerOrder(SubgroupInnerTotal)
+    SubgroupInnerOrder(SubgroupInnerTotal).TargetElementNo = SubgroupInnerImagesTotal
+    SubgroupInnerOrder(SubgroupInnerTotal).UseText = False
+
+    'パラメーターを設定します
+    With SubgroupInnerImages(SubgroupInnerImagesTotal)
+        '各属性
+        .src = ImageSrc
+        .HintCrop = EnumToStringAdaptiveImageCrop(Crop)
+        .HintAlign = EnumToStringAdaptiveImageAlign(Align)
+        .AlternateText = AltText
+        .AddImageQuery = AddImageQuery
     End With
 End Property
 
 '***************************************************************************************************
+'* 機能　　：subgroup親要素のtext子要素に値と属性をそれぞれ追加します
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：   Style        テキストのフォント サイズ、太さ、および不透明度を制御します。
+'               Wrap         true に設定すると、テキストの折り返しが有効になります。
+'               MaxLines     表示が許可される、テキスト要素の最大行数です。
+'               MinLines     表示する必要のある、テキスト要素の最小行数です。
+'               Align        テキストの水平方向の配置。
+'               Language XML ペイロードの対象ロケールです。
+'               TextContents 表示テキスト
+'---------------------------------------------------------------------------------------------------
+'* 機能説明：アダプティブを使用したテキストをレンダリング出来ます。
+'***************************************************************************************************
+Public Property Let AddAdaptiveSubgroupText(Optional Style As EnumAdaptiveTextStyle, Optional Wrap As Boolean, Optional MaxLines As Integer, Optional MinLines As Integer, Optional Align As EnumAdaptiveTextAlign, Optional Language As String, TextContents As String)
+    '加算処理(0基準)
+    SubgroupInnerTextsTotal = SubgroupInnerTextsTotal + 1   'テキスト挿入数
+    SubgroupInnerTotal = SubgroupInnerTotal + 1             'Subgroup要素内の挿入要素数
+    
+    '配列を増やします
+    ReDim Preserve SubgroupInnerTexts(SubgroupInnerTextsTotal)
+    
+    '順序データを設定します
+    ReDim Preserve SubgroupInnerOrder(SubgroupInnerTotal)
+    SubgroupInnerOrder(SubgroupInnerTotal).TargetElementNo = SubgroupInnerTextsTotal
+    SubgroupInnerOrder(SubgroupInnerTotal).UseText = True
+
+    'パラメーターを設定します
+    With SubgroupInnerTexts(SubgroupInnerTextsTotal)
+        '各属性
+        .HintStyle = EnumToStringAdaptiveTextStyle(Style)
+        .HintWrap = Wrap
+        .HintMaxLines = MaxLines
+        .HintMinLines = MinLines
+        .HintAlign = EnumToStringAdaptiveTextAlign(Align)
+        .Language = Language
+
+        'テキスト値
+        .Value = TextContents
+    End With
+End Property
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] XMLを構成するプロパティのうち、progress 要素を指します
+' [ document] https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-progress
+'---------------------------------------------------------------------------------------------------
+'* 機能　　：binding親要素のProgress子要素に必要な属性を一括設定します
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：Title                  タイトルの文字列 (オプション) を取得または設定します。 データ バインディングをサポートしています。
+'            Arg_Value              進行状況バーの値を取得または設定します。 データ バインディングをサポートしています。 既定値は 0 です。 0.0 ～ 1.0 の double 型で、ゲージ式。負の値にすると、ドットアニメーションの不確定式になります。
+'            ValueStringOverride    割合を示す既定の文字列に代わって表示される文字列 (オプション) を取得または設定します。 これを指定しない場合は、"70%" などの文字が表示されます。
+'            Status                 進行状況バーの下の左側に表示されるステータス文字列 (必須) を取得または設定します。 この文字列は、"ダウンロード中..." や "インストール中..." などのように、操作の状態を反映する必要があります。
+'---------------------------------------------------------------------------------------------------
+'* 詳細説明：`Status`に`vbnullstring`をセットすることで、この要素を削除できます
+'* URL     ：https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-progress-bar
+'***************************************************************************************************
+Public Property Let SetAdaptiveProgressBar(Optional Arg_Value As Double, Optional Title As String, Optional ValueStringOverride As String, status As String)
+    With ElementProgress
+        .Title = Title
+        .status = status
+        .Value = Arg_Value
+        .ValueStringOverride = ValueStringOverride
+    End With
+End Property
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] XMLを構成するプロパティのうち、header 要素を指します
+' [ document] https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-header
+'---------------------------------------------------------------------------------------------------
 '* 機能　　：header要素の各属性にセットしたものをtoast要素に挿入します
 '---------------------------------------------------------------------------------------------------
 '* 引数　　：ArgID            ：このヘッダーを一意に識別します。 2 つの通知が同じヘッダー ID を持つ場合、アクション センターで同じヘッダーの下に表示されます。(省略時：このExcelのファイルフルパス)
@@ -1413,36 +1441,34 @@ End Property
 '* 詳細説明：ArgTitle を vbnullstring で渡すとこの header要素自体を除去できます。
 '* 注意事項：Microsoft の思想設計上、ActivationType は、Protocol が推奨されてます。
 '***************************************************************************************************
-Public Property Let SetToastHeader(Optional ByVal ArgID As String, Optional ByVal ArgArguments As String, Optional ByVal ArgActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, ByVal ArgTitle As String)
+Public Property Let XmlHeader(Optional ID As String, Optional Arguments As String, Optional ActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, ByVal Title As String)
     With ElementHeader
         '省略時：このExcelのファイルフルパス
-        If StrPtr(ArgID) Then .id = ArgID Else .id = ThisWorkbook.FullName
-        
+        If StrPtr(ID) Then .ID = ID Else .ID = ThisWorkbook.FullName
+
         '省略時：このExcelの保存フォルダパス
-        If StrPtr(ArgArguments) Then .Arguments = ArgArguments Else .Arguments = ThisWorkbook.Path
+        If StrPtr(Arguments) Then .Arguments = Arguments Else .Arguments = ThisWorkbook.Path
 
         '引数の中身そのまんま
         .ActivationType = EnumToStringToastActivationType(ActivationType)
-        .Title = ArgTitle
+        .Title = Title
     End With
 End Property
-
-
-
-'***************************************************************************************************
-' ■■■ Toastを構成するスキーマ情報を、メンバ変数を基に、動的生成します ■■■
-'***************************************************************************************************
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] トースト スキーマ生成
+' [ document] https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/schema-root
+'---------------------------------------------------------------------------------------------------
+'* 機能　　 ：上記のLETプロパティで設定した「トースト スキーマ」のXMLを取り出す
+'---------------------------------------------------------------------------------------------------
 '* 返り値　 ：トースト スキーマのxmlContentsが返る
 '* 引数　　 ：DataBindingMode   True ：トーストの更新ができるような値の指定を行います(例：{UpdateParameter})
 '*                              False：値を直接記入します。スケジュール通知や、リマインド通知といった更新処理が使えないシチュエーションに指定します
 '---------------------------------------------------------------------------------------------------
 '* 注意事項 ：「Microsoft XML. v6.0」の参照設定が必要です
-'* URL      ：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/schema-root
 '***************************************************************************************************
-Private Function MakeXmlToastContentBuilder(DataBindingMode As Boolean) As String
+Public Property Get ToastNotificationContent(DataBindingMode As Boolean) As String
     'IXMLDOMNodeオブジェクトを宣言
     Dim ToastContents As MSXML2.DOMDocument60
-
 
 
     '--------------------ルート要素(toast)--------------------
@@ -1484,11 +1510,9 @@ Private Function MakeXmlToastContentBuilder(DataBindingMode As Boolean) As Strin
     Const NameNode03_01_01__selection As String = "selection"
 
 
-
     '初期化
     Set ToastContents = New MSXML2.DOMDocument60
     ToastContents.async = False
-
 
 
     '-------------------------------------------------------Root要素を設定-------------------------------------------------------
@@ -1512,7 +1536,6 @@ Private Function MakeXmlToastContentBuilder(DataBindingMode As Boolean) As Strin
     End With
 
 
-
     '-------------------------------------------------------visual要素を設定-------------------------------------------------------
     'ノード：visual  を作成してルートノードの子ノードとして追加します。
     Set Node01__visual = RootNode_toast.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01__visual, ""))
@@ -1521,16 +1544,14 @@ Private Function MakeXmlToastContentBuilder(DataBindingMode As Boolean) As Strin
     Set Node01_01__binding = Node01__visual.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01__binding, ""))
 
 
-
     '-------------------------------------------------------binding要素を設定-------------------------------------------------------
     With Node01_01__binding
         '属性ノード：template  を作成して値を設定し、先程の「binding」ノードの属性に追加します。
         .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "template", "")).NodeValue = ElementBinding.template
 
         '属性ノード：baseUri  を作成して値を設定し、先程の「binding」ノードの属性に追加します。
-        If StrPtr(ElementBinding.Baseuri) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "baseUri", "")).NodeValue = ElementBinding.Baseuri
+        If StrPtr(ElementBinding.baseUri) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "baseUri", "")).NodeValue = ElementBinding.baseUri
     End With
-
 
 
     '-------------------------------------------------------image要素関係の設定-------------------------------------------------------
@@ -1543,7 +1564,7 @@ Private Function MakeXmlToastContentBuilder(DataBindingMode As Boolean) As Strin
                 If ElementsImage.AppLogo.AddImageQuery Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "addImageQuery", "")).NodeValue = LCase(ElementsImage.AppLogo.AddImageQuery)   'フラグ値は、全て小文字でないと正しく機能しないので変換をかまします
 
                 '属性ノード：alt  に値があったら、先ほどのノード：image  の属性に追加します
-                If StrPtr(ElementsImage.AppLogo.alt) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "alt", "")).NodeValue = ElementsImage.AppLogo.alt
+                If StrPtr(ElementsImage.AppLogo.Alt) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "alt", "")).NodeValue = ElementsImage.AppLogo.Alt
 
                 '属性ノード：src  に値を設定したのを、先ほどのノード：image  の属性に追加します
                 .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "src", "")).NodeValue = ElementsImage.AppLogo.src
@@ -1563,7 +1584,7 @@ Private Function MakeXmlToastContentBuilder(DataBindingMode As Boolean) As Strin
                 If ElementsImage.Inline.AddImageQuery Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "addImageQuery", "")).NodeValue = LCase(ElementsImage.Inline.AddImageQuery)   'フラグ値は、全て小文字でないと正しく機能しないので変換をかまします
 
                 '属性ノード：alt  に値があったら、先ほどのノード：image  の属性に追加します
-                If StrPtr(ElementsImage.Inline.alt) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "alt", "")).NodeValue = ElementsImage.Inline.alt
+                If StrPtr(ElementsImage.Inline.Alt) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "alt", "")).NodeValue = ElementsImage.Inline.Alt
 
                 '属性ノード：src  に値を設定したのを、先ほどのノード：image  の属性に追加します
                 .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "src", "")).NodeValue = ElementsImage.Inline.src
@@ -1580,7 +1601,7 @@ Private Function MakeXmlToastContentBuilder(DataBindingMode As Boolean) As Strin
                 If ElementsImage.Hero.AddImageQuery Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "addImageQuery", "")).NodeValue = LCase(ElementsImage.Hero.AddImageQuery)   'フラグ値は、全て小文字でないと正しく機能しないので変換をかまします
 
                 '属性ノード：alt  に値があったら、先ほどのノード：image  の属性に追加します
-                If StrPtr(ElementsImage.Hero.alt) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "alt", "")).NodeValue = ElementsImage.Hero.alt
+                If StrPtr(ElementsImage.Hero.Alt) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "alt", "")).NodeValue = ElementsImage.Hero.Alt
 
                 '属性ノード：src  に値を設定したのを、先ほどのノード：image  の属性に追加します
                 .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "src", "")).NodeValue = ElementsImage.Hero.src
@@ -1591,7 +1612,6 @@ Private Function MakeXmlToastContentBuilder(DataBindingMode As Boolean) As Strin
         End If
 
     End With
-
 
 
     '-------------------------------------------------------text要素関係の設定-------------------------------------------------------
@@ -1614,7 +1634,7 @@ Private Function MakeXmlToastContentBuilder(DataBindingMode As Boolean) As Strin
             With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_02__text, ""))
                 '先ほどのノード：text  にバインディング名を設定します
                 '※スケジュール通知の場合は、バインディング機能が使えないため、そのまま記入します
-                If DataBindingMode Then .Text = DataBindingTopText_Contents Else .Text = ElementsText.Body.Value
+                If DataBindingMode Then .Text = DataBindingTopText_Body Else .Text = ElementsText.Body.Value
 
                  '属性ノード：hint-callScenarioCenterAlign  に値を設定してあったら、先ほどのノード：text  の属性に追加します
                 If ElementsText.Body.Attribute.HintCallScenarioCenterAlign Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-callScenarioCenterAlign", "")).NodeValue = LCase(ElementsText.Body.Attribute.HintCallScenarioCenterAlign)
@@ -1636,7 +1656,6 @@ Private Function MakeXmlToastContentBuilder(DataBindingMode As Boolean) As Strin
             End With
         End If
     End With
-
 
 
     '-------------------------------------------------------group,subgroup要素関係の設定-------------------------------------------------------
@@ -1696,10 +1715,9 @@ Private Function MakeXmlToastContentBuilder(DataBindingMode As Boolean) As Strin
     End If
 
 
-
     '-------------------------------------------------------progress要素関係の設定-------------------------------------------------------
     'スケジュール通知じゃないかつ、属性ノード：status  に値を設定してあったら「progress」ノードを追加します(Microsoft ドキュメント準拠)
-    If StrPtr(ElementProgress.Status) And DataBindingMode Then
+    If StrPtr(ElementProgress.status) And DataBindingMode Then
         With Node01_01__binding.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_03__progress, ""))
             '属性ノード：title  にバインディング設定したのを、先ほどのノード：progress  の属性に追加します
             .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "title", "")).NodeValue = DataBindingProgress_Title
@@ -1714,7 +1732,6 @@ Private Function MakeXmlToastContentBuilder(DataBindingMode As Boolean) As Strin
             If StrPtr(ElementProgress.ValueStringOverride) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "valueStringOverride", "")).NodeValue = DataBindingProgress_ValueString
         End With
     End If
-
 
 
     '-------------------------------------------------------audio要素を設定-------------------------------------------------------
@@ -1737,7 +1754,6 @@ Private Function MakeXmlToastContentBuilder(DataBindingMode As Boolean) As Strin
     End If
 
 
-
     '-------------------------------------------------------actions要素を設定-------------------------------------------------------
     'action要素、input要素、いずれかが設定されてあったら、ノード：actions  を作成してルートノードの子ノードとして追加します。
     If ElementActionCount > 0 Or ElementInputCount > 0 Then
@@ -1749,10 +1765,10 @@ Private Function MakeXmlToastContentBuilder(DataBindingMode As Boolean) As Strin
         '5つまで、繰り返す
         For i = 1 To MaxElementInputNum
             '属性ノード：ID  がない場合は、作成をSKIPします
-            If StrPtr(ElementInput(i).id) Then
+            If StrPtr(ElementInput(i).ID) Then
                 Set Node03_01__input = Node03__actions.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode03_01__input, ""))
                 With Node03_01__input.Attributes
-                    .setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "id", "")).NodeValue = ElementInput(i).id
+                    .setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "id", "")).NodeValue = ElementInput(i).ID
                     .setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "type", "")).NodeValue = ElementInput(i).Type
                     If StrPtr(ElementInput(i).PlaceHolderContent) Then .setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "placeHolderContent", "")).NodeValue = ElementInput(i).PlaceHolderContent
                     If StrPtr(ElementInput(i).Title) Then .setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "title", "")).NodeValue = ElementInput(i).Title
@@ -1773,7 +1789,6 @@ Private Function MakeXmlToastContentBuilder(DataBindingMode As Boolean) As Strin
                 End With
             End If
         Next
-
 
 
         '-------------------------------------------------------action要素を設定-------------------------------------------------------
@@ -1799,12 +1814,11 @@ Private Function MakeXmlToastContentBuilder(DataBindingMode As Boolean) As Strin
     End If
 
 
-
     '-------------------------------------------------------header要素を設定-------------------------------------------------------
     'header要素に、Title属性が設定されてあったら、ノード：header  を作成してルートノードの子ノードとして追加します。
     If StrPtr(ElementHeader.Title) Then
         With RootNode_toast.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode04__header, ""))
-            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "id", "")).NodeValue = ElementHeader.id
+            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "id", "")).NodeValue = ElementHeader.ID
             .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "title", "")).NodeValue = ElementHeader.Title
             .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "arguments", "")).NodeValue = ElementHeader.Arguments
             .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "activationType", "")).NodeValue = ElementHeader.ActivationType
@@ -1812,11 +1826,9 @@ Private Function MakeXmlToastContentBuilder(DataBindingMode As Boolean) As Strin
     End If
 
 
-
     '上記の処理で生成されたxmlコンテンツを返します(末尾に改行が入らないように抽出文字数を調整します)
-    'Debug.Print ToastContents.XML
-    MakeXmlToastContentBuilder = Mid(ToastContents.XML, 1, Len(ToastContents.XML) - Len(vbCrLf))
-End Function
+    ToastNotificationContent = Mid(ToastContents.xml, 1, Len(ToastContents.xml) - Len(vbCrLf))
+End Property
 
 
 
