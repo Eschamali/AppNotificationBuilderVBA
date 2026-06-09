@@ -1857,71 +1857,61 @@ End Sub
 
 
 '***************************************************************************************************
-'             ■■■ 専用DLL C++からWindows.UI.Notificationsを呼び出すメソッド ■■■
+'               ■■■ Toast通知の機能を呼び出すメインディッシュラッパーメソッド ■■■
 '***************************************************************************************************
-'* 処理名　：RunDll_ToastNotifierShow
 '* 機能　　：引数に渡された値で、単純なトースト通知を表示します。指定日時に通知するスケジュール機能も対応します
 '---------------------------------------------------------------------------------------------------
-'* 返り値　：引数に渡された値で、トーストを表示させるコマンド文字列を返します
 '* 引数　　：ToastTag           ToastTagを指定します。複数通知を提供する際に必要です
 '            CollectionID       トーストコレクションIDがあるなら、それを指定
 '            ScheduleDate       指定日時に通知したい場合は、「Date型」として指定することでスケジュール通知として登録されます。省略時、即時通知とします
-'            ExpirationDate     アクションセンターから自動削除される日時を指定。最大30sの遅延バグが発生します。
+'            ExpirationDate     アクションセンターから自動削除される日時を指定。最大30sの遅延バグが発生します。 ※上限は3日後までです
 '            Suppress           True で、ポップアップ メッセージを表示せずに、トースト通知がアクション センターに通知されます。
 '            ExpiresOnReboot    True で、再起動すると同時に、トースト通知が消えます
-'---------------------------------------------------------------------------------------------------
-'* 注意事項：これを実行すると、即座にDll内で処理を行います。また、日時系データを扱う場合は、UTC基準になるので注意
 '**************************************************************************************************
-Public Sub RunDll_ToastNotifierShow(ByVal ToastTag As String, Optional ByVal CollectionID As String, Optional ByVal ScheduleDate As Date, Optional ByVal ExpirationDate As Date, Optional ByVal Suppress As Boolean, Optional ExpiresOnReboot As Boolean)
-    'データバインディングを使用するか判定する
+Public Sub RunToastNotifierShow(ToastTag As String, Optional CollectionID As String, Optional ScheduleDate As Date, Optional ExpirationDate As Date, Optional Suppress As Boolean, Optional ExpiresOnReboot As Boolean)
+    '--- 1. データバインディングを使用するか判定する ---
     Dim UseDataBinding As Boolean, i As Long
-    
-    'スケジュール設定：あり
     If ScheduleDate > 0 Then
+        'スケジュール設定：あり
         'データバインディングを、無効化する
         UseDataBinding = False
-            
+
         '過去になっている場合、VBAエラーを起こして、処理を停止させます
         If Now() >= ScheduleDate Then Err.Raise Number:=vbObjectError + 1, Description:=vbObjectErrorID_0001
-    
-    'スケジュール設定：なし
     Else
+        'スケジュール設定：なし
         'データバインディングを、有効化する
         UseDataBinding = True
-        
+
         'ただし、action要素に特定の組み合わせを検知したら、データバインディングを、無効化する
         For i = 1 To MaxElementActionNum
             If ElementAction(i).ActivationType = EnumToStringToastActivationType(taSystem) And ElementAction(i).Arguments = ActionArguments再通知 Then UseDataBinding = False: Exit For
         Next
     End If
 
-    '設定値をまとめる
+    '--- 2. 設定値をまとめる ---
     With ToastConfig
-        .AppUserModelID = DecisionAppUserModelID(True)
-        '.AllowUse_InternetImageFlag                     '事前に、設定済み
-        .XmlSchema = MakeXmlToastContentBuilder(UseDataBinding)
-        
+        .Content = ToastNotificationContent(UseDataBinding)
+
         .Tag = ToastTag
         .Group = GetUniqueBookInfo
-        .Schedule_ID = "ExcelSchedule"
         .CollectionID = CollectionID
-        
+
         .ExpiresOnReboot = ExpiresOnReboot
         .SuppressPopup = Suppress
-        
+
         .Schedule_DeliveryTime = ScheduleDate
         .ExpirationTime = ExpirationDate
     End With
 
-    'データバインディングを設定しつつ、WinRT 直呼び出しで通知を表示します
+    '--- 3. データバインディングを設定しつつ、WinRT 直呼び出しで通知を表示します ---
     Dim WinRTConfig As WinRT_ToastConfig
     WinRTConfig = ParamsConvertForWinRT(ToastConfig)
     WinRT_ShowToastNotification WinRTConfig, DataBindingConvertForWinRT()
 End Sub
 
 '***************************************************************************************************
-'* 処理名　：RunDll_ToastNotifierUpdate
-'* 機能　　：引数に渡された値で、トーストの進行状況バーを更新します。
+'* 機能　　：事前に「XmlText系」と「SetAdaptiveProgressBar」で変更した値を、表示中のトーストタグに即反映させ、更新させます
 '---------------------------------------------------------------------------------------------------
 '* 返り値　：https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.notificationupdateresult
 '            0(Succeeded)               通知が更新されました。
@@ -1930,35 +1920,23 @@ End Sub
 '            ※上記以外                  予期せぬエラー
 
 '* 引数　　：ToastTag                   ToastTagを指定します。以後の進捗状況を更新する際に必要です
+'            CollectionID               `CollectionID`がある場合は指定します
 '---------------------------------------------------------------------------------------------------
-'* 機能説明：既にトーストの進行状況バーを表示しているとき、その時に指定したタグを指定することで、更新が可能です。Dllの場合、返り値に対応し、これに応じた分岐処理も可能です。
+'* 機能説明：既にトーストの進行状況バーを表示しているとき、その時に指定したタグを指定することで、更新が可能です
 '***************************************************************************************************
-Public Property Get RunDll_ToastNotifierUpdate(ByVal ToastTag As String, Optional ByVal CollectionID As String) As Long
-    '設定値をまとめる
+Public Function RunToastNotifierUpdate(ToastTag As String, Optional CollectionID As String) As Long
+    '--- 1. 必要な設定値をまとめる ---
     With ToastConfig
-        .AppUserModelID = DecisionAppUserModelID(True)
-        '.AllowUse_InternetImageFlag                     '事前に、設定済み
-        .XmlSchema = vbNullString
-
         .Tag = ToastTag
         .Group = GetUniqueBookInfo
-        .Schedule_ID = vbNullString
         .CollectionID = CollectionID
-        
-        .ExpiresOnReboot = False
-        .SuppressPopup = False
-        
-        .Schedule_DeliveryTime = False
-        .ExpirationTime = False
     End With
 
-
-    'WinRT 直呼び出しで通知を更新します
-    RunDll_ToastNotifierUpdate = WinRT_UpdateToastNotification(ParamsConvertForWinRT(ToastConfig), DataBindingConvertForWinRT())
-End Property
+    '--- 2. WinRT 直呼び出しで通知を更新します ---
+    RunToastNotifierUpdate = WinRT_UpdateToastNotification(ParamsConvertForWinRT(ToastConfig), DataBindingConvertForWinRT())
+End Function
 
 '**************************************************************************************************
-'* 処理名　：RunDll_ToastNotificationHistoryRemove
 '* 機能　　：タグから、トースト通知を削除します
 '---------------------------------------------------------------------------------------------------
 '* 引数　　：CollectionID       コレクション通知IDの方を削除したい時に指定
@@ -1967,13 +1945,9 @@ End Property
 '---------------------------------------------------------------------------------------------------
 '* 注意事項：AllDel が True になると、ToastTag を無視します。
 '**************************************************************************************************
-Public Sub RunDll_ToastNotificationHistoryRemove(Optional ByVal ToastTag As String, Optional ByVal CollectionID As String, Optional AllDel As Boolean)
-    '設定値をまとめる
+Public Sub RunToastNotificationHistoryRemove(Optional ToastTag As String, Optional CollectionID As String, Optional AllDel As Boolean)
+    '--- 1. 必要な設定値をまとめる ---
     With ToastConfig
-        .AppUserModelID = DecisionAppUserModelID(True)
-        '.AllowUse_InternetImageFlag                     '事前に、設定済み
-        .XmlSchema = vbNullString
-
         'AllDelモードなら、NULL 指定
         If AllDel Then
             .Tag = vbNullString
@@ -1982,23 +1956,16 @@ Public Sub RunDll_ToastNotificationHistoryRemove(Optional ByVal ToastTag As Stri
             .Tag = ToastTag
             .Group = GetUniqueBookInfo
         End If
-        .Schedule_ID = vbNullString
+
         .CollectionID = CollectionID
-        
-        .ExpiresOnReboot = False
-        .SuppressPopup = False
-        
-        .Schedule_DeliveryTime = False
-        .ExpirationTime = False
     End With
 
 
-    'WinRT 直呼び出しで通知を削除します
+    '--- 2. WinRT 直呼び出しで通知を削除します ---
     WinRT_RemoveToastNotification ParamsConvertForWinRT(ToastConfig)
 End Sub
 
 '***************************************************************************************************
-'* 処理名　：RunDll_ToastCollectionManagerSaveToastCollectionAsync
 '* 機能　　：引数で渡された値で、コレクションを使用したトースト通知のグループ化を作成します。
 '---------------------------------------------------------------------------------------------------
 '* 返り値　：0で、成功扱いです。
@@ -2010,32 +1977,15 @@ End Sub
 '* 注意事項：Desktopアプリだと、「CollectionId」が「displayName」になる問題があるため、Storeアプリでの使用を推奨します。
 '* URL     ：https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-collections
 '***************************************************************************************************
-Public Property Get RunDll_ToastCollectionManagerSaveToastCollectionAsync(ByVal CollectionID As String, ByVal DisplayName As String, ByVal LaunchArgs As String, IconUri As String) As Long
-    '設定値をまとめる
-    With ToastConfig
-        .AppUserModelID = DecisionAppUserModelID(True)
-        '.AllowUse_InternetImageFlag                     '事前に、設定済み
-        .XmlSchema = vbNullString
+Public Function RunToastCollectionManagerSaveToastCollectionAsync(CollectionID As String, displayName As String, launchArgs As String, iconUri As String) As Long
+    '1. 必要な設定値をまとめる
+    ToastConfig.CollectionID = CollectionID
 
-        .Tag = vbNullString
-        .Group = vbNullString
-        .Schedule_ID = vbNullString
-        .CollectionID = CollectionID
-        
-        .ExpiresOnReboot = False
-        .SuppressPopup = False
-        
-        .Schedule_DeliveryTime = False
-        .ExpirationTime = False
-    End With
-    
-    
-    'ToastCollectionを作成（WinRT 直呼び出し）
-    RunDll_ToastCollectionManagerSaveToastCollectionAsync = WinRT_SaveToastCollection(ParamsConvertForWinRT(ToastConfig), DisplayName, LaunchArgs, IconUri)
-End Property
+    '2. ToastCollectionを作成
+    RunToastCollectionManagerSaveToastCollectionAsync = WinRT_SaveToastCollection(ParamsConvertForWinRT(ToastConfig), displayName, launchArgs, iconUri)
+End Function
 
 '***************************************************************************************************
-'* 処理名　：RunDll_ToastCollectionManagerRemoveToastCollectionAsync
 '* 機能　　：引数で渡された値で、コレクションを使用したトースト通知のグループ化を削除します。なお、省略時、全削除となります
 '---------------------------------------------------------------------------------------------------
 '* 返り値　：0で、成功扱いです。
@@ -2043,32 +1993,15 @@ End Property
 '---------------------------------------------------------------------------------------------------
 '* URL     ：https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-collections
 '***************************************************************************************************
-Public Property Get RunDll_ToastCollectionManagerRemoveToastCollectionAsync(Optional ByVal CollectionID As String) As Long
-    '設定値をまとめる
-    With ToastConfig
-        .AppUserModelID = DecisionAppUserModelID(True)
-        '.AllowUse_InternetImageFlag                     '事前に、設定済み
-        .XmlSchema = vbNullString
+Public Function RunToastCollectionManagerRemoveToastCollectionAsync(Optional CollectionID As String) As Long
+    '1. 必要な設定値をまとめる
+    ToastConfig.CollectionID = CollectionID
 
-        .Tag = vbNullString
-        .Group = vbNullString
-        .Schedule_ID = vbNullString
-        .CollectionID = CollectionID
-        
-        .ExpiresOnReboot = False
-        .SuppressPopup = False
-        
-        .Schedule_DeliveryTime = False
-        .ExpirationTime = False
-    End With
-    
-    
-    'ToastCollectionを削除（WinRT 直呼び出し）
-    RunDll_ToastCollectionManagerRemoveToastCollectionAsync = WinRT_RemoveToastCollection(ParamsConvertForWinRT(ToastConfig))
-End Property
+    '2. ToastCollectionを削除
+    RunToastCollectionManagerRemoveToastCollectionAsync = WinRT_RemoveToastCollection(ParamsConvertForWinRT(ToastConfig))
+End Function
 
 '***************************************************************************************************
-'* 処理名　：RunDll_CheckNotificationSetting
 '* 機能　　：トースト通知の表示に関する制限を確認します
 '---------------------------------------------------------------------------------------------------
 '* 返り値　：0~4 の値。意味は公式サイトを御覧ください。
@@ -2076,27 +2009,12 @@ End Property
 '---------------------------------------------------------------------------------------------------
 '* URL     ：https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.notificationsetting
 '***************************************************************************************************
-Public Property Get RunDll_CheckNotificationSetting(Optional ByVal CollectionID As String) As Long
-    '設定値をまとめる
-    With ToastConfig
-        .AppUserModelID = DecisionAppUserModelID(True)
-        '.AllowUse_InternetImageFlag                     '事前に、設定済み
-        .XmlSchema = vbNullString
+Public Property Get CheckNotificationSetting(Optional CollectionID As String) As Long
+    '1. 必要な設定値をまとめる
+    ToastConfig.CollectionID = CollectionID
 
-        .Tag = vbNullString
-        .Group = vbNullString
-        .Schedule_ID = vbNullString
-        .CollectionID = CollectionID
-        
-        .ExpiresOnReboot = False
-        .SuppressPopup = False
-        
-        .Schedule_DeliveryTime = False
-        .ExpirationTime = False
-    End With
-    
-    'チェック
-    RunDll_CheckNotificationSetting = WinRT_CheckNotificationSetting(ParamsConvertForWinRT(ToastConfig))
+    '2. チェック
+    CheckNotificationSetting = WinRT_CheckNotificationSetting(ParamsConvertForWinRT(ToastConfig))
 End Property
 
 
