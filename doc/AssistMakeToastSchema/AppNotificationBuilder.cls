@@ -639,6 +639,152 @@ End Type
 
 
 '***************************************************************************************************
+'                       ■■■ Enum → 文字列 変換プロシージャ ■■■
+'***************************************************************************************************
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] アクティブ化の種類を文字列で返します
+'---------------------------------------------------------------------------------------------------
+Private Function EnumToStringToastActivationType(param As EnumToastActivationType) As String
+    Select Case param
+        Case EnumToastActivationType.taForeground:  EnumToStringToastActivationType = "foreground"
+        Case EnumToastActivationType.taBackground:  EnumToStringToastActivationType = "background"
+        Case EnumToastActivationType.taProtocol:    EnumToStringToastActivationType = "protocol"
+        Case EnumToastActivationType.taSystem:      EnumToStringToastActivationType = "system"
+    End Select
+End Function
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] トーストが表すシナリオを文字列で返します
+'---------------------------------------------------------------------------------------------------
+Private Function EnumToStringToastScenario(param As EnumToastScenario) As String
+    Select Case param
+        Case EnumToastScenario.tsAlarm:         EnumToStringToastScenario = "alarm"        '通知を永遠に表示する。action要素がないと効果は発動しないが、応答不可になっても設定問わず、必ず表示される。通知音はアラーム系(Alarm)か、ミュートのみ設定可能
+        Case EnumToastScenario.tsReminder:      EnumToStringToastScenario = "reminder"     '通知を永遠に表示する。action要素がないと効果は発動しないが、任意の通知音に設定可能
+        Case EnumToastScenario.tsIncomingCall:  EnumToStringToastScenario = "incomingCall" '通知を永遠に表示する。action要素がなくても効果発動。最後のボタン位置のみ、Windowsのテーマ色に基づく着色が施され、位置が必ず下側になる。通知音は呼び出し系(Call)か、ミュートのみ設定可能
+        Case EnumToastScenario.tsUrgent:        EnumToStringToastScenario = "urgent"       '重要な通知として表示。応答不可にしても表示されますが、設定で表示させないようにすることが可能です。とりあえず常に表示させたい場合は、シナリオ：「アラーム」にしましょう
+        Case Else   '通常の通知として表示。属性：duration  あるいは、アクセシビリティ→視覚効果→この時間が経過したら通知を破棄する  に基づく表示時間となります    End Select
+End Function
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] メディア ファイルを文字列で返します
+'---------------------------------------------------------------------------------------------------
+Private Function EnumToStringMsWinSoundEvent(param As EnumMsWinSoundEvent) As String
+    Select Case param
+        Case EnumMsWinSoundEvent.NotificationDefault:           EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.Default"
+        Case EnumMsWinSoundEvent.NotificationIM:                EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.IM":
+        Case EnumMsWinSoundEvent.NotificationMail:              EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.Mail"
+        Case EnumMsWinSoundEvent.NotificationReminder:          EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.Reminder"
+        Case EnumMsWinSoundEvent.NotificationSMS:               EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.SMS"
+        Case EnumMsWinSoundEvent.NotificationLoopingAlarm01:    EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.Looping.Alarm"
+        Case EnumMsWinSoundEvent.NotificationLoopingAlarm02:    EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.Looping.Alarm2"
+        Case EnumMsWinSoundEvent.NotificationLoopingAlarm03:    EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.Looping.Alarm3"
+        Case EnumMsWinSoundEvent.NotificationLoopingAlarm04:    EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.Looping.Alarm4"
+        Case EnumMsWinSoundEvent.NotificationLoopingAlarm05:    EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.Looping.Alarm5"
+        Case EnumMsWinSoundEvent.NotificationLoopingAlarm06:    EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.Looping.Alarm6"
+        Case EnumMsWinSoundEvent.NotificationLoopingAlarm07:    EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.Looping.Alarm7"
+        Case EnumMsWinSoundEvent.NotificationLoopingAlarm08:    EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.Looping.Alarm8"
+        Case EnumMsWinSoundEvent.NotificationLoopingAlarm09:    EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.Looping.Alarm9"
+        Case EnumMsWinSoundEvent.NotificationLoopingAlarm10:    EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.Looping.Alarm10"
+        Case EnumMsWinSoundEvent.NotificationLoopingCall01:     EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.Looping.Call"
+        Case EnumMsWinSoundEvent.NotificationLoopingCall02:     EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.Looping.Call2"
+        Case EnumMsWinSoundEvent.NotificationLoopingCall03:     EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.Looping.Call3"
+        Case EnumMsWinSoundEvent.NotificationLoopingCall04:     EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.Looping.Call4"
+        Case EnumMsWinSoundEvent.NotificationLoopingCall05:     EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.Looping.Call5"
+        Case EnumMsWinSoundEvent.NotificationLoopingCall06:     EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.Looping.Call6"
+        Case EnumMsWinSoundEvent.NotificationLoopingCall07:     EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.Looping.Call7"
+        Case EnumMsWinSoundEvent.NotificationLoopingCall08:     EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.Looping.Call8"
+        Case EnumMsWinSoundEvent.NotificationLoopingCall09:     EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.Looping.Call9"
+        Case EnumMsWinSoundEvent.NotificationLoopingCall10:     EnumToStringMsWinSoundEvent = "ms-winsoundevent:Notification.Looping.Call10"
+    End Select
+End Function
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] ボタンのスタイルを文字列で返します
+'---------------------------------------------------------------------------------------------------
+Private Function EnumToStringHintButtonStyle(param As EnumHintButtonStyle) As String
+    Select Case param
+        Case EnumHintButtonStyle.hbsSuccess:    EnumToStringHintButtonStyle = "Success"     'ボタンが緑色です
+        Case EnumHintButtonStyle.hbsCritical:   EnumToStringHintButtonStyle = "Critical"    'ボタンが赤です
+    End Select
+End Function
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] コンテンツの垂直方向の配置を文字列で返します
+'---------------------------------------------------------------------------------------------------
+Private Function EnumToStringAdaptiveSubgroupTextStacking(param As AdaptiveSubgroupTextStacking) As String
+    Select Case param
+        Case AdaptiveSubgroupTextStacking.TextStacking_Top:     EnumToStringAdaptiveSubgroupTextStacking = "top"
+        Case AdaptiveSubgroupTextStacking.TextStacking_Center:  EnumToStringAdaptiveSubgroupTextStacking = "center"
+        Case AdaptiveSubgroupTextStacking.TextStacking_Bottom:  EnumToStringAdaptiveSubgroupTextStacking = "bottom"
+        Case Else   '既定値
+    End Select
+End Function
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] イメージの目的のトリミングを文字列で返します
+'---------------------------------------------------------------------------------------------------
+Private Function EnumToStringAdaptiveImageCrop(param As EnumAdaptiveImageCrop) As String
+    Select Case param
+        Case EnumAdaptiveImageCrop.ImageCrop_Circle:    EnumToStringAdaptiveImageCrop = "circle"
+        Case EnumAdaptiveImageCrop.ImageCrop_None:      EnumToStringAdaptiveImageCrop = "none"
+        Case Else   '既定値
+    End Select
+End Function
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] イメージの水平方向の配置を文字列で返します
+'---------------------------------------------------------------------------------------------------
+Private Function EnumToStringAdaptiveImageAlign(param As EnumAdaptiveImageAlign) As String
+    Select Case param
+        Case EnumAdaptiveImageAlign.ImageAlign_Stretch:  EnumToStringAdaptiveImageAlign = "stretch"
+        Case EnumAdaptiveImageAlign.ImageAlign_Left:     EnumToStringAdaptiveImageAlign = "left"
+        Case EnumAdaptiveImageAlign.ImageAlign_Center:   EnumToStringAdaptiveImageAlign = "center"
+        Case EnumAdaptiveImageAlign.ImageAlign_Right:    EnumToStringAdaptiveImageAlign = "right"
+        Case Else   '既定値
+    End Select
+End Function
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] テキスト スタイルは、フォント サイズ、太さ、不透明度を制御する文字列で返します
+'---------------------------------------------------------------------------------------------------
+Private Function EnumToStringAdaptiveTextStyle(param As EnumAdaptiveTextStyle) As String
+    Select Case param
+        Case EnumAdaptiveTextStyle.TextStyle_Caption:           EnumToStringAdaptiveTextStyle = "caption"
+        Case EnumAdaptiveTextStyle.TextStyle_CaptionSubtle:     EnumToStringAdaptiveTextStyle = "captionsubtle"
+        Case EnumAdaptiveTextStyle.TextStyle_Body:              EnumToStringAdaptiveTextStyle = "body"
+        Case EnumAdaptiveTextStyle.TextStyle_BodySubtle:        EnumToStringAdaptiveTextStyle = "bodysubtle"
+        Case EnumAdaptiveTextStyle.TextStyle_Base:              EnumToStringAdaptiveTextStyle = "base"
+        Case EnumAdaptiveTextStyle.TextStyle_BaseSubtle:        EnumToStringAdaptiveTextStyle = "basesubtle"
+        Case EnumAdaptiveTextStyle.TextStyle_Subtitle:          EnumToStringAdaptiveTextStyle = "subtitle"
+        Case EnumAdaptiveTextStyle.TextStyle_SubtitleSubtle:    EnumToStringAdaptiveTextStyle = "subtitlesubtle"
+        Case EnumAdaptiveTextStyle.TextStyle_Title:             EnumToStringAdaptiveTextStyle = "title"
+        Case EnumAdaptiveTextStyle.TextStyle_TitleSubtle:       EnumToStringAdaptiveTextStyle = "titlesubtle"
+        Case EnumAdaptiveTextStyle.TextStyle_TitleNumeral:      EnumToStringAdaptiveTextStyle = "titlenumeral"
+        Case EnumAdaptiveTextStyle.TextStyle_Subheader:         EnumToStringAdaptiveTextStyle = "subheader"
+        Case EnumAdaptiveTextStyle.TextStyle_SubheaderSubtle:   EnumToStringAdaptiveTextStyle = "subheadersubtle"
+        Case EnumAdaptiveTextStyle.TextStyle_SubheaderNumeral:  EnumToStringAdaptiveTextStyle = "subheadernumeral"
+        Case EnumAdaptiveTextStyle.TextStyle_Header:            EnumToStringAdaptiveTextStyle = "header"
+        Case EnumAdaptiveTextStyle.TextStyle_HeaderSubtle:      EnumToStringAdaptiveTextStyle = "headersubtle"
+        Case EnumAdaptiveTextStyle.TextStyle_HeaderNumeral:     EnumToStringAdaptiveTextStyle = "headernumeral"
+        Case Else   '既定値
+    End Select
+End Function
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] テキストの水平方向の配置を制御するを文字列で返します
+'---------------------------------------------------------------------------------------------------
+Private Function EnumToStringAdaptiveTextAlign(param As EnumAdaptiveTextStyle) As String
+    Select Case param
+        Case EnumAdaptiveTextAlign.TextAlign_Auto:      EnumToStringAdaptiveTextAlign = "auto"
+        Case EnumAdaptiveTextAlign.TextAlign_Left:      EnumToStringAdaptiveTextAlign = "left"
+        Case EnumAdaptiveTextAlign.TextAlign_Center:    EnumToStringAdaptiveTextAlign = "center"
+        Case EnumAdaptiveTextAlign.TextAlign_Right:     EnumToStringAdaptiveTextAlign = "right"
+        Case Else   '既定値
+    End Select
+End Function
+
+
+'***************************************************************************************************
 ' ■■■ VBA上で使うのに相応しいAppUserModelIDをプリセット ■■■
 '***************************************************************************************************
 Private Const AppUserModelID_Excel  As String = "Microsoft.Office.EXCEL.EXE.15" 'DeskTopアプリ：Excel
@@ -789,8 +935,8 @@ End Property
 '***************************************************************************************************
 Public Property Let SetToastContent_Launch(Optional ByVal ActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, ByVal ArgSchema As String)
     With ElementToast
-        .Launch = ArgSchema
-        .ActivationType = SetToastActivationType(ActivationType)
+        .Launch = Schema
+        .ActivationType = EnumToStringToastActivationType(ActivationType)
     End With
 End Property
 
@@ -814,30 +960,7 @@ End Property
 '* 引数　　：ArgID    シナリオID。便宜上、数値に応じてシナリオ名を設定します
 '***************************************************************************************************
 Public Property Let SetToastContent_Scenario(ToastScenarioMode As EnumToastScenario)
-    'ArgIDから、シナリオ名を決めます。
-    With ElementToast
-        Select Case ToastScenarioMode
-            Case EnumToastScenario.tsReminder
-                '通知を永遠に表示する。action要素がないと効果は発動しないが、任意の通知音に設定可能
-                .Synalio = "reminder"
-
-            Case EnumToastScenario.tsAlarm
-                '通知を永遠に表示する。action要素がないと効果は発動しないが、応答不可になっても設定問わず、必ず表示される。通知音はアラーム系(Alarm)か、ミュートのみ設定可能
-                .Synalio = "alarm"
-
-            Case EnumToastScenario.tsIncomingCall
-                '通知を永遠に表示する。action要素がなくても効果発動。最後のボタン位置のみ、Windowsのテーマ色に基づく着色が施され、位置が必ず下側になる。通知音は呼び出し系(Call)か、ミュートのみ設定可能
-                .Synalio = "incomingCall"
-
-            Case EnumToastScenario.tsUrgent
-                '重要な通知として表示。応答不可にしても表示されますが、設定で表示させないようにすることが可能です。とりあえず常に表示させたい場合は、シナリオ：「アラーム」にしましょう。
-                .Synalio = "urgent"
-
-            Case Else
-                '通常の通知として表示。属性：duration  あるいは、アクセシビリティ→視覚効果→この時間が経過したら通知を破棄する  に基づく表示時間となります
-                .Synalio = vbNullString
-        End Select
-    End With
+    ElementToast.Synalio = EnumToStringToastScenario(ToastScenarioMode)
 End Property
 
 '***************************************************************************************************
@@ -1007,42 +1130,27 @@ End Property
 '             SubgroupInnerImages,SubgroupInnerTexts の中身をリセットします。
 '***************************************************************************************************
 Public Sub AddAdaptiveSubgroup(Optional ByVal Weight As Integer, Optional ByVal TextStacking As AdaptiveSubgroupTextStacking)
-    '加算処理(0基準)
+    '1. 加算処理(0基準)
     SubgroupTotal = SubgroupTotal + 1
 
-    '配列を増やします
+    '2. 配列を増やします
     ReDim Preserve ElementsSubgroup(SubgroupTotal)
-    
-    'パラメーターを設定します
+
+    '3. パラメーターを設定します
     With ElementsSubgroup(SubgroupTotal)
         '各属性
         .HintWeight = Weight
-        
-        Select Case TextStacking
+        .HintTextStacking = EnumToStringAdaptiveSubgroupTextStacking(TextStacking)
 
-            Case AdaptiveSubgroupTextStacking.TextStacking_Top
-                .HintTextStacking = "top"
-            
-            Case AdaptiveSubgroupTextStacking.TextStacking_Center
-                .HintTextStacking = "center"
-            
-            Case AdaptiveSubgroupTextStacking.TextStacking_Bottom
-                .HintTextStacking = "bottom"
-            
-            Case Else
-                .HintTextStacking = vbNullString
-        End Select
-        
-        
         '順序データ
         .QueueOrder = SubgroupInnerOrder
-        
+
         '各値
         .QueueText = SubgroupInnerTexts
         .QueueImage = SubgroupInnerImages
     End With
 
-    '以前定義したsubgroup要素内のtext,image要素をリセットする
+    '4. 以前定義したsubgroup要素内のtext,image要素をリセットする
     '  カウントリセット
     SubgroupInnerTextsTotal = -1
     SubgroupInnerImagesTotal = -1
@@ -1069,10 +1177,10 @@ Public Property Let AddAdaptiveSubgroupImage(Optional ByVal Crop As EnumAdaptive
     '加算処理(0基準)
     SubgroupInnerImagesTotal = SubgroupInnerImagesTotal + 1     '画像挿入数
     SubgroupInnerTotal = SubgroupInnerTotal + 1                 'Subgroup要素内の挿入要素数
-    
+
     '配列を増やします
     ReDim Preserve SubgroupInnerImages(SubgroupInnerImagesTotal)
-    
+
     '順序データを設定します
     ReDim Preserve SubgroupInnerOrder(SubgroupInnerTotal)
     SubgroupInnerOrder(SubgroupInnerTotal).TargetElementNo = SubgroupInnerImagesTotal
@@ -1081,38 +1189,9 @@ Public Property Let AddAdaptiveSubgroupImage(Optional ByVal Crop As EnumAdaptive
     'パラメーターを設定します
     With SubgroupInnerImages(SubgroupInnerImagesTotal)
         '各属性
-        .src = UseHttpImageCheck(ImageSrc)
-        
-        Select Case Crop
-            Case EnumAdaptiveImageCrop.ImageCrop_Circle
-                .HintCrop = "circle"
-            
-            Case EnumAdaptiveImageCrop.ImageCrop_None
-                .HintCrop = "none"
-            
-            Case Else
-                .HintCrop = vbNullString
-        End Select
-        
-        .HintRemoveMargin = RemoveMargin
-        
-        Select Case Align
-            Case EnumAdaptiveImageAlign.ImageAlign_Stretch
-                .HintAlign = "stretch"
-            
-            Case EnumAdaptiveImageAlign.ImageAlign_Left
-                .HintAlign = "left"
-            
-            Case EnumAdaptiveImageAlign.ImageAlign_Center
-                .HintAlign = "center"
-            
-            Case EnumAdaptiveImageAlign.ImageAlign_Right
-                .HintAlign = "right"
-            
-            Case Else
-                .HintAlign = vbNullString
-        End Select
-        
+        .src = ImageSrc
+        .HintCrop = EnumToStringAdaptiveImageCrop(Crop)
+        .HintAlign = EnumToStringAdaptiveImageAlign(Align)
         .AlternateText = AltText
         .AddImageQuery = AddImageQuery
     End With
@@ -1147,87 +1226,14 @@ Public Property Let AddAdaptiveSubgroupText(Optional ByVal Style As EnumAdaptive
     'パラメーターを設定します
     With SubgroupInnerTexts(SubgroupInnerTextsTotal)
         '各属性
-        Select Case Style
-            Case EnumAdaptiveTextStyle.TextStyle_Caption
-                .HintStyle = "caption"
-
-            Case EnumAdaptiveTextStyle.TextStyle_CaptionSubtle
-                .HintStyle = "captionsubtle"
-
-            Case EnumAdaptiveTextStyle.TextStyle_Body
-                .HintStyle = "body"
-
-            Case EnumAdaptiveTextStyle.TextStyle_BodySubtle
-                .HintStyle = "bodysubtle"
-
-            Case EnumAdaptiveTextStyle.TextStyle_Base
-                .HintStyle = "base"
-
-            Case EnumAdaptiveTextStyle.TextStyle_BaseSubtle
-                .HintStyle = "basesubtle"
-
-            Case EnumAdaptiveTextStyle.TextStyle_Subtitle
-                .HintStyle = "subtitle"
-
-            Case EnumAdaptiveTextStyle.TextStyle_SubtitleSubtle
-                .HintStyle = "subtitlesubtle"
-
-            Case EnumAdaptiveTextStyle.TextStyle_Title
-                .HintStyle = "title"
-
-            Case EnumAdaptiveTextStyle.TextStyle_TitleSubtle
-                .HintStyle = "titlesubtle"
-
-            Case EnumAdaptiveTextStyle.TextStyle_TitleNumeral
-                .HintStyle = "titlenumeral"
-
-            Case EnumAdaptiveTextStyle.TextStyle_Subheader
-                .HintStyle = "subheader"
-
-            Case EnumAdaptiveTextStyle.TextStyle_SubheaderSubtle
-                .HintStyle = "subheadersubtle"
-
-            Case EnumAdaptiveTextStyle.TextStyle_SubheaderNumeral
-                .HintStyle = "subheadernumeral"
-
-            Case EnumAdaptiveTextStyle.TextStyle_Header
-                .HintStyle = "header"
-
-            Case EnumAdaptiveTextStyle.TextStyle_HeaderSubtle
-                .HintStyle = "headersubtle"
-
-            Case EnumAdaptiveTextStyle.TextStyle_HeaderNumeral
-                .HintStyle = "headernumeral"
-            
-            Case Else
-                .HintStyle = vbNullString
-        
-        End Select
-
+        .HintStyle = EnumToStringAdaptiveTextStyle(Style)
         .HintWrap = Wrap
         .HintMaxLines = MaxLines
         .HintMinLines = MinLines
-        
-        Select Case Align
-            Case EnumAdaptiveTextAlign.TextAlign_Auto
-                .HintAlign = "auto"
-            
-            Case EnumAdaptiveTextAlign.TextAlign_Left
-                .HintAlign = "left"
-            
-            Case EnumAdaptiveTextAlign.TextAlign_Center
-                .HintAlign = "center"
-            
-            Case EnumAdaptiveTextAlign.TextAlign_Right
-                .HintAlign = "right"
-            
-            Case Else
-                .HintAlign = vbNullString
-        End Select
-        
-        .Language = Arg_Language
-        
-        '値
+        .HintAlign = EnumToStringAdaptiveTextAlign(Align)
+        .Language = Language
+
+        'テキスト値
         .Value = TextContents
     End With
 End Property
@@ -1262,106 +1268,23 @@ End Property
 '               True  ：トーストが表示されている限りサウンドが繰り返される場合に設定
 '               False ：1回だけ再生する場合に設定
 '***************************************************************************************************
-Public Property Let SetToastAudio(Optional ByVal ArgLoop As Boolean, ArgSrcID As EnumMsWinSoundEvent)
+Public Property Let SetToastAudio(Optional ByVal ArgLoop As Boolean, SrcID As EnumMsWinSoundEvent)
     With ElementAudio
         'audio要素のLoop属性を設定
         .loop = ArgLoop
 
         'ArgSrcID に応じて、ミュート判定を決める
-        If 0 < ArgSrcID And ArgSrcID <= DefNoticeSoundNum Then
+        If 0 < SrcID And SrcID <= DefNoticeSoundNum Then
             '存在する番号ならミュートしない
             .silent = False
+
+            '音源を設定
+            '※toast要素のsynalio属性値によっては、この設定が効かないことがあります
+            .src = EnumToStringMsWinSoundEvent(SrcID)
         Else
             '存在しない番号ならミュート
             .silent = True
         End If
-
-        'audio要素のsrc属性を設定
-        'ArgSrcIDから、通知音ファイル名を決めます。Windows側で決められた範囲でしか使えないので注意
-        '→https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-audio#attributes
-            
-        'ただし、toast要素のsynalio属性値によっては、この設定が効かないことがあります
-        Select Case ArgSrcID
-            Case EnumMsWinSoundEvent.NotificationDefault
-                .src = "ms-winsoundevent:Notification.Default"
-
-            Case EnumMsWinSoundEvent.NotificationIM
-                .src = "ms-winsoundevent:Notification.IM"
-                
-            Case EnumMsWinSoundEvent.NotificationMail
-                .src = "ms-winsoundevent:Notification.Mail"
-
-            Case EnumMsWinSoundEvent.NotificationReminder
-                .src = "ms-winsoundevent:Notification.Reminder"
-
-            Case EnumMsWinSoundEvent.NotificationSMS
-                .src = "ms-winsoundevent:Notification.SMS"
-
-            Case EnumMsWinSoundEvent.NotificationLoopingAlarm01
-                .src = "ms-winsoundevent:Notification.Looping.Alarm"
-
-            Case EnumMsWinSoundEvent.NotificationLoopingAlarm02
-                .src = "ms-winsoundevent:Notification.Looping.Alarm2"
-
-            Case EnumMsWinSoundEvent.NotificationLoopingAlarm03
-                .src = "ms-winsoundevent:Notification.Looping.Alarm3"
-
-            Case EnumMsWinSoundEvent.NotificationLoopingAlarm04
-                .src = "ms-winsoundevent:Notification.Looping.Alarm4"
-
-            Case EnumMsWinSoundEvent.NotificationLoopingAlarm05
-                .src = "ms-winsoundevent:Notification.Looping.Alarm5"
-
-            Case EnumMsWinSoundEvent.NotificationLoopingAlarm06
-                .src = "ms-winsoundevent:Notification.Looping.Alarm6"
-
-            Case EnumMsWinSoundEvent.NotificationLoopingAlarm07
-                .src = "ms-winsoundevent:Notification.Looping.Alarm7"
-
-            Case EnumMsWinSoundEvent.NotificationLoopingAlarm08
-                .src = "ms-winsoundevent:Notification.Looping.Alarm8"
-
-            Case EnumMsWinSoundEvent.NotificationLoopingAlarm09
-                .src = "ms-winsoundevent:Notification.Looping.Alarm9"
-
-            Case EnumMsWinSoundEvent.NotificationLoopingAlarm10
-                .src = "ms-winsoundevent:Notification.Looping.Alarm10"
-
-            Case EnumMsWinSoundEvent.NotificationLoopingCall01
-                .src = "ms-winsoundevent:Notification.Looping.Call"
-
-            Case EnumMsWinSoundEvent.NotificationLoopingCall02
-                .src = "ms-winsoundevent:Notification.Looping.Call2"
-
-            Case EnumMsWinSoundEvent.NotificationLoopingCall03
-                .src = "ms-winsoundevent:Notification.Looping.Call3"
-
-            Case EnumMsWinSoundEvent.NotificationLoopingCall04
-                .src = "ms-winsoundevent:Notification.Looping.Call4"
-
-            Case EnumMsWinSoundEvent.NotificationLoopingCall05
-                .src = "ms-winsoundevent:Notification.Looping.Call5"
-
-            Case EnumMsWinSoundEvent.NotificationLoopingCall06
-                .src = "ms-winsoundevent:Notification.Looping.Call6"
-
-            Case EnumMsWinSoundEvent.NotificationLoopingCall07
-                .src = "ms-winsoundevent:Notification.Looping.Call7"
-
-            Case EnumMsWinSoundEvent.NotificationLoopingCall08
-                .src = "ms-winsoundevent:Notification.Looping.Call8"
-
-            Case EnumMsWinSoundEvent.NotificationLoopingCall09
-                .src = "ms-winsoundevent:Notification.Looping.Call9"
-
-            Case EnumMsWinSoundEvent.NotificationLoopingCall10
-                .src = "ms-winsoundevent:Notification.Looping.Call10"
-
-            Case Else
-                .src = vbNullString
-
-        End Select
-
     End With
 End Property
 
@@ -1384,41 +1307,30 @@ End Property
 '***************************************************************************************************
 Public Property Let SetIToastActions(ByVal Content As String, ByVal Arguments As String, Optional ByVal ActivationType As EnumToastActivationType = EnumToastActivationType.taProtocol, Optional PendingUpdate As Boolean, Optional ByVal ContextMenu As Boolean, Optional ByVal IconPath As String, Optional ByVal HintInputId As String, Optional HintButtonStyle As EnumToastButtonStyle, Optional ByVal HintToolTip As String, ByVal Index As Integer)
     With ElementAction(Index)
-        '1. 有効な入力値かつ、Index先が`null`
+        '1. 挿入カウントを行う
+        '有効な入力値かつ、Index先が`null`
         If StrPtr(Content) > 0 And StrPtr(.Content) = 0 Then
             'カウントアップ
             ElementActionCount = ElementActionCount + 1
-            
+
         '`null`入力かつ、Index先が有効な入力値
         ElseIf StrPtr(Content) = 0 And StrPtr(.Content) > 0 Then
             'カウントダウン
             ElementActionCount = ElementActionCount - 1
         End If
 
+        '2. 各種パラメーター適用
         .Content = Content
         .Arguments = Arguments
-        .ActivationType = SetToastActivationType(ActivationType)
+        .ActivationType = EnumToStringToastActivationType(ActivationType)
         '.Type = ArgType
 
         If PendingUpdate Then .afterActivationBehavior = "pendingUpdate" Else .afterActivationBehavior = vbNullString
         If ContextMenu Then .Placement = "contextMenu" Else .Placement = vbNullString
 
-        .ImageUri = UseHttpImageCheck(IconPath)
+        .ImageUri = IconPath
         .HintInputId = HintInputId
-
-        '属性：hint-buttonStyle  は、引数の値に応じて命名します
-        Select Case HintButtonStyle
-            Case 1
-                'ボタンを緑色にします。
-                .HintButtonStyle = "Success"
-            Case 2
-                'ボタンを赤色にします。
-                .HintButtonStyle = "Critical"
-            Case Else
-                '装飾は、施しません。
-                .HintButtonStyle = vbNullString
-        End Select
-
+        .HintButtonStyle = EnumToStringHintButtonStyle(HintButtonStyle)
         .HintToolTip = HintToolTip
     End With
 End Property
@@ -1510,7 +1422,7 @@ Public Property Let SetToastHeader(Optional ByVal ArgID As String, Optional ByVa
         If StrPtr(ArgArguments) Then .Arguments = ArgArguments Else .Arguments = ThisWorkbook.Path
 
         '引数の中身そのまんま
-        .ActivationType = SetToastActivationType(ArgActivationType)
+        .ActivationType = EnumToStringToastActivationType(ActivationType)
         .Title = ArgTitle
     End With
 End Property
@@ -2102,7 +2014,7 @@ Public Sub RunDll_ToastNotifierShow(ByVal ToastTag As String, Optional ByVal Col
         
         'ただし、action要素に特定の組み合わせを検知したら、データバインディングを、無効化する
         For i = 1 To MaxElementActionNum
-            If ElementAction(i).ActivationType = SetToastActivationType(taSystem) And ElementAction(i).Arguments = ActionArguments再通知 Then UseDataBinding = False: Exit For
+            If ElementAction(i).ActivationType = EnumToStringToastActivationType(taSystem) And ElementAction(i).Arguments = ActionArguments再通知 Then UseDataBinding = False: Exit For
         Next
     End If
 
