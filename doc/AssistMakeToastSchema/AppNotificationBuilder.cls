@@ -8,13 +8,11 @@ Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
 '***************************************************************************************************
-'   VBAから、Windows PowerShell を経由して、デスクトップ通知【トースト通知】を表示させます
-'   また、DLLファイルを経由した通知手段も提供します。Ver1.5.1.2
-'   (WinRT 直呼び出し: Show / Update / Remove / CheckNotificationSetting)
-
+'   VBAから、`DispCallFunc × Vtable`を駆使したトースト通知機能を提供します
+'
 ' MIT License
 '
-' Copyright (c) 2025 eschamali
+' Copyright (c) 2025 -2026 eschamali
 ' https://github.com/Eschamali/AppNotificationBuilderVBA
 '
 ' Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -45,15 +43,38 @@ Option Explicit
 
 
 '***************************************************************************************************
-'               ■■■ VBA用 WinRT 直呼び出し / 残存DLL 内部関数宣言セクション ■■■
+'                               ■■■ 各種WindowsAPI宣言 ■■■
 '***************************************************************************************************
-' 機能     ：Show / Update / Remove / CheckNotificationSetting は modWinRTToast 経由で WinRT を直接呼び出します。
-'            Collection 操作と SQLite 操作のみ、従来どおり C++ DLL を使用します。
 '---------------------------------------------------------------------------------------------------
-Private Declare PtrSafe Function CreateToastCollection Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams, ByVal DisplayName As LongPtr, ByVal LaunchArgs As LongPtr, ByVal IconUri As LongPtr) As Long 'ToastCollectionの作成
-Private Declare PtrSafe Function DeleteToastCollection Lib "AppNotificationBuilderVBA" (ByRef Params_String As ToastNotificationParams) As Long 'ToastCollectionの削除
-Private Declare PtrSafe Function ExecuteSQLite Lib "AppNotificationBuilderVBA" (ByVal DB_Path As LongPtr, ByVal sql As LongPtr) As String    'SQLite操作用
+' [ SECTION ] 基本機能
+'---------------------------------------------------------------------------------------------------
 Private Declare PtrSafe Function GetCurrentProcessId Lib "kernel32" () As Long      'アクティブExcelのプロセスID取得用
+Private Declare PtrSafe Function mciSendString Lib "winmm.dll" Alias "mciSendStringA" (ByVal lpstrCommand As String, ByVal lpstrReturnString As String, ByVal uReturnLength As Long, ByVal hwndCallback As Long) As Long    'カスタム音声
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] WinRT-API へ直接アクセスするための必要なAPI群
+'---------------------------------------------------------------------------------------------------
+
+
+
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] レジストリ操作
+'---------------------------------------------------------------------------------------------------
+
+
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] SQLite操作
+'---------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
 
 
 
@@ -86,18 +107,6 @@ Private Const DataBindingProgress_Title         As String = "{ProgressTitle}"
 Private Const DataBindingProgress_Status        As String = "{ProgressStatus}"
 Private Const DataBindingProgress_Value         As String = "{ProgressValue}"
 Private Const DataBindingProgress_ValueString   As String = "{ProgressValueString}"
-
-
-
-'***************************************************************************************************
-'                               ■■■ 通知に関連した拡張機能 ■■■
-'***************************************************************************************************
-'  機能     ：Windows API 定義です。
-'            ・mciSendString            任意のパスやURLの音源ファイルを通知音として再生させる機能に使います。
-'            ・URLDownloadToFile        インターネット上の画像を通知に載せる機能に使います。
-'---------------------------------------------------------------------------------------------------
-Private Declare PtrSafe Function mciSendString Lib "winmm.dll" Alias "mciSendStringA" (ByVal lpstrCommand As String, ByVal lpstrReturnString As String, ByVal uReturnLength As Long, ByVal hwndCallback As Long) As Long
-Private Declare PtrSafe Function URLDownloadToFile Lib "urlmon" Alias "URLDownloadToFileA" (ByVal pCaller As Long, ByVal szURL As String, ByVal szFileName As String, ByVal dwReserved As Long, ByVal lpfnCB As Long) As Long
 
 
 
