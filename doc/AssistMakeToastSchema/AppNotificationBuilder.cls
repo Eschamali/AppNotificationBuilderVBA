@@ -2,7 +2,7 @@ VERSION 1.0 CLASS
 BEGIN
   MultiUse = -1  'True
 END
-Attribute VB_Name = "clsAppNotificationBuilder"
+Attribute VB_Name = "AppNotificationBuilder"
 Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = False
@@ -2248,8 +2248,8 @@ Public Property Get RunDll_ToastCollectionManagerSaveToastCollectionAsync(ByVal 
     End With
     
     
-    'ToastCollectionを作成
-    RunDll_ToastCollectionManagerSaveToastCollectionAsync = CreateToastCollection(ParamsConvertForDLL(ToastConfig), StrPtr(DisplayName), StrPtr(LaunchArgs), StrPtr(IconUri))
+    'ToastCollectionを作成（WinRT 直呼び出し）
+    RunDll_ToastCollectionManagerSaveToastCollectionAsync = WinRT_SaveToastCollection(ParamsConvertForWinRT(ToastConfig), DisplayName, LaunchArgs, IconUri)
 End Property
 
 '***************************************************************************************************
@@ -2281,8 +2281,8 @@ Public Property Get RunDll_ToastCollectionManagerRemoveToastCollectionAsync(Opti
     End With
     
     
-    'ToastCollectionを削除
-    RunDll_ToastCollectionManagerRemoveToastCollectionAsync = DeleteToastCollection(ParamsConvertForDLL(ToastConfig))
+    'ToastCollectionを削除（WinRT 直呼び出し）
+    RunDll_ToastCollectionManagerRemoveToastCollectionAsync = WinRT_RemoveToastCollection(ParamsConvertForWinRT(ToastConfig))
 End Property
 
 '***************************************************************************************************

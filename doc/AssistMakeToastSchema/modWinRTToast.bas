@@ -80,7 +80,21 @@ Private Const VT_IToastNotificationHistory_RemoveGroupedTagWithId As Long = 8
 Private Const VT_IToastNotificationHistory_RemoveGroupWithId As Long = 7
 Private Const VT_IToastNotificationHistory_ClearWithId As Long = 12
 Private Const VT_IToastNotificationManagerStatics2_GetHistory As Long = 6
-Private Const VT_IAsyncOperation_GetResults As Long = 7
+Private Const VT_IToastNotificationManagerStatics5_GetDefault As Long = 6
+Private Const VT_IToastNotificationManagerForUser2_GetToastCollectionManagerWithAppId As Long = 9
+Private Const VT_IUriFactory_CreateUri As Long = 6
+Private Const VT_IToastCollectionFactory_CreateInstance As Long = 6
+Private Const VT_IToastCollectionManager_SaveToastCollectionAsync As Long = 6
+Private Const VT_IToastCollectionManager_RemoveToastCollectionAsync As Long = 9
+Private Const VT_IToastCollectionManager_RemoveAllToastCollectionsAsync As Long = 10
+Private Const VT_IAsyncOperation_GetResults As Long = 8
+Private Const VT_IAsyncInfo_GetStatus As Long = 7
+Private Const VT_IAsyncInfo_GetErrorCode As Long = 8
+Private Const WinRT_AsyncStatus_Started As Long = 0
+Private Const WinRT_AsyncStatus_Completed As Long = 1
+Private Const WinRT_AsyncStatus_Canceled As Long = 2
+Private Const WinRT_AsyncStatus_Error As Long = 3
+Private Const WinRT_IID_IAsyncInfo As String = "{00000036-0000-0000-C000-000000000046}"
 Private Const VT_IToastNotifier2_UpdateWithTagAndGroup As Long = 6
 Private Const VT_IToastNotifier2_UpdateWithTag As Long = 7
 Private Const VT_INotificationData_SetSequenceNumber As Long = 8
@@ -274,6 +288,156 @@ Cleanup:
     On Error GoTo 0
 End Function
 
+' CollectionNotice.cpp CreateToastCollection と同等（WinRT 直呼び）。0=成功
+Public Function WinRT_SaveToastCollection(ByRef Config As WinRT_ToastConfig, ByVal DisplayName As String, ByVal LaunchArgs As String, ByVal IconUri As String) As Long
+    Dim initialized As Boolean
+    Dim pManager As LongPtr
+    Dim pCollection As LongPtr
+    Dim pAsync As LongPtr
+
+    On Error GoTo Cleanup
+    WinRT_EnsureRoInitialized initialized
+
+    If Len(Config.AppUserModelID) = 0 Then Err.Raise 513, "WinRT_SaveToastCollection", "AppUserModelID is required."
+    If Len(Config.CollectionID) = 0 Then Err.Raise 513, "WinRT_SaveToastCollection", "CollectionID is required."
+
+    pManager = WinRT_GetToastCollectionManager(Config.AppUserModelID)
+    If pManager = 0 Then Err.Raise 513, , "GetToastCollectionManager failed."
+
+    pCollection = WinRT_CreateToastCollection(Config.CollectionID, DisplayName, LaunchArgs, IconUri)
+    If pCollection = 0 Then Err.Raise 513, , "CreateToastCollection failed."
+
+    pAsync = 0
+    WinRT_CallComMethod pManager, VT_IToastCollectionManager_SaveToastCollectionAsync, vbLong, WinRT_vbPtr, pCollection, WinRT_vbPtr, VarPtr(pAsync)
+    WinRT_SaveToastCollection = 0
+
+Cleanup:
+    If Err.Number <> 0 Then WinRT_SaveToastCollection = Err.Number
+    On Error Resume Next
+    If pAsync <> 0 Then WinRT_CallComMethod pAsync, VT_RELEASE, vbLong
+    If pCollection <> 0 Then WinRT_CallComMethod pCollection, VT_RELEASE, vbLong
+    If pManager <> 0 Then WinRT_CallComMethod pManager, VT_RELEASE, vbLong
+    WinRT_FinalizeRo initialized
+    On Error GoTo 0
+End Function
+
+' CollectionNotice.cpp DeleteToastCollection と同等。CollectionID 省略時は全削除。0=成功
+Public Function WinRT_RemoveToastCollection(ByRef Config As WinRT_ToastConfig) As Long
+    Dim initialized As Boolean
+    Dim pManager As LongPtr
+    Dim pAsync As LongPtr
+    Dim hStrCollectionId As LongPtr
+
+    On Error GoTo Cleanup
+    WinRT_EnsureRoInitialized initialized
+
+    If Len(Config.AppUserModelID) = 0 Then Err.Raise 513, "WinRT_RemoveToastCollection", "AppUserModelID is required."
+
+    pManager = WinRT_GetToastCollectionManager(Config.AppUserModelID)
+    If pManager = 0 Then Err.Raise 513, , "GetToastCollectionManager failed."
+
+    pAsync = 0
+    If Len(Config.CollectionID) > 0 Then
+        hStrCollectionId = WinRT_CreateHString(Config.CollectionID)
+        WinRT_CallComMethod pManager, VT_IToastCollectionManager_RemoveToastCollectionAsync, vbLong, WinRT_vbPtr, hStrCollectionId, WinRT_vbPtr, VarPtr(pAsync)
+    Else
+        WinRT_CallComMethod pManager, VT_IToastCollectionManager_RemoveAllToastCollectionsAsync, vbLong, WinRT_vbPtr, VarPtr(pAsync)
+    End If
+    WinRT_RemoveToastCollection = 0
+
+Cleanup:
+    If Err.Number <> 0 Then WinRT_RemoveToastCollection = Err.Number
+    On Error Resume Next
+    If hStrCollectionId <> 0 Then WindowsDeleteString hStrCollectionId
+    If pAsync <> 0 Then WinRT_CallComMethod pAsync, VT_RELEASE, vbLong
+    If pManager <> 0 Then WinRT_CallComMethod pManager, VT_RELEASE, vbLong
+    WinRT_FinalizeRo initialized
+    On Error GoTo 0
+End Function
+
+' ToastNotificationManager.GetDefault → IToastNotificationManagerForUser2.GetToastCollectionManager(appId)
+Private Function WinRT_GetToastCollectionManager(ByVal appId As String) As LongPtr
+    Dim pManagerStatics5 As LongPtr
+    Dim pManagerForUser As LongPtr
+    Dim pManagerForUser2 As LongPtr
+    Dim pCollectionManager As LongPtr
+    Dim hStrAppId As LongPtr
+    Dim iidManagerStatics5 As WinRT_GUID
+    Dim iidManagerForUser2 As WinRT_GUID
+
+    IIDFromString StrPtr("{D6F5F569-D40D-407C-8989-88CAB42CFD14}"), iidManagerStatics5
+    IIDFromString StrPtr("{679C64B7-81AB-42C2-8819-C958767753F4}"), iidManagerForUser2
+
+    WinRT_GetActivationFactory "Windows.UI.Notifications.ToastNotificationManager", iidManagerStatics5, pManagerStatics5
+    If pManagerStatics5 = 0 Then Exit Function
+
+    WinRT_CallComMethod pManagerStatics5, VT_IToastNotificationManagerStatics5_GetDefault, vbLong, WinRT_vbPtr, VarPtr(pManagerForUser)
+    WinRT_CallComMethod pManagerStatics5, VT_RELEASE, vbLong
+    If pManagerForUser = 0 Then Exit Function
+
+    WinRT_CallComMethod pManagerForUser, VT_QI, vbLong, WinRT_vbPtr, VarPtr(iidManagerForUser2), WinRT_vbPtr, VarPtr(pManagerForUser2)
+    WinRT_CallComMethod pManagerForUser, VT_RELEASE, vbLong
+    If pManagerForUser2 = 0 Then Exit Function
+
+    hStrAppId = WinRT_CreateHString(appId)
+    WinRT_CallComMethod pManagerForUser2, VT_IToastNotificationManagerForUser2_GetToastCollectionManagerWithAppId, vbLong, WinRT_vbPtr, hStrAppId, WinRT_vbPtr, VarPtr(pCollectionManager)
+    If hStrAppId <> 0 Then WindowsDeleteString hStrAppId
+    WinRT_CallComMethod pManagerForUser2, VT_RELEASE, vbLong
+
+    WinRT_GetToastCollectionManager = pCollectionManager
+End Function
+
+' ToastCollection(collectionId, displayName, launchArgs, iconUri)
+Private Function WinRT_CreateToastCollection(ByVal collectionId As String, ByVal displayName As String, ByVal launchArgs As String, ByVal iconUri As String) As LongPtr
+    Dim pFactory As LongPtr
+    Dim pUri As LongPtr
+    Dim pCollection As LongPtr
+    Dim hStrCollectionId As LongPtr
+    Dim hStrDisplayName As LongPtr
+    Dim hStrLaunchArgs As LongPtr
+    Dim iidFactory As WinRT_GUID
+
+    pUri = WinRT_CreateUri(iconUri)
+
+    IIDFromString StrPtr("{164DD3D7-73C4-44F7-B4FF-FB6D4BF1F4C6}"), iidFactory
+    WinRT_GetActivationFactory "Windows.UI.Notifications.ToastCollection", iidFactory, pFactory
+    If pFactory <> 0 Then
+        hStrCollectionId = WinRT_CreateHString(collectionId)
+        hStrDisplayName = WinRT_CreateHString(displayName)
+        hStrLaunchArgs = WinRT_CreateHString(launchArgs)
+
+        WinRT_CallComMethod pFactory, VT_IToastCollectionFactory_CreateInstance, vbLong, _
+            WinRT_vbPtr, hStrCollectionId, WinRT_vbPtr, hStrDisplayName, WinRT_vbPtr, hStrLaunchArgs, WinRT_vbPtr, pUri, WinRT_vbPtr, VarPtr(pCollection)
+    End If
+
+    If hStrCollectionId <> 0 Then WindowsDeleteString hStrCollectionId
+    If hStrDisplayName <> 0 Then WindowsDeleteString hStrDisplayName
+    If hStrLaunchArgs <> 0 Then WindowsDeleteString hStrLaunchArgs
+    If pUri <> 0 Then WinRT_CallComMethod pUri, VT_RELEASE, vbLong
+    If pFactory <> 0 Then WinRT_CallComMethod pFactory, VT_RELEASE, vbLong
+    WinRT_CreateToastCollection = pCollection
+End Function
+
+' Windows.Foundation.Uri を生成（空文字なら 0）
+Private Function WinRT_CreateUri(ByVal uri As String) As LongPtr
+    Dim pFactory As LongPtr
+    Dim pUri As LongPtr
+    Dim hStrUri As LongPtr
+    Dim iidFactory As WinRT_GUID
+
+    If Len(uri) = 0 Then Exit Function
+
+    IIDFromString StrPtr("{44A9796F-723E-4FDF-A218-033E75B0C084}"), iidFactory
+    WinRT_GetActivationFactory "Windows.Foundation.Uri", iidFactory, pFactory
+    If pFactory = 0 Then Exit Function
+
+    hStrUri = WinRT_CreateHString(uri)
+    WinRT_CallComMethod pFactory, VT_IUriFactory_CreateUri, vbLong, WinRT_vbPtr, hStrUri, WinRT_vbPtr, VarPtr(pUri)
+    If hStrUri <> 0 Then WindowsDeleteString hStrUri
+    WinRT_CallComMethod pFactory, VT_RELEASE, vbLong
+    WinRT_CreateUri = pUri
+End Function
+
 Private Sub WinRT_ShowImmediateToast(ByRef Config As WinRT_ToastConfig, ByRef Binding As WinRT_DataBinding)
     Dim pXmlDoc As LongPtr
     Dim pToast As LongPtr
@@ -453,6 +617,7 @@ Private Function WinRT_CreateToastNotifierForCollection(ByVal CollectionID As St
     Dim pManagerForUser2 As LongPtr
     Dim pAsync As LongPtr
     Dim pNotifier As LongPtr
+    Dim hr As Long
     Dim iidManagerStatics5 As WinRT_GUID
     Dim iidManagerForUser2 As WinRT_GUID
 
@@ -476,8 +641,11 @@ Private Function WinRT_CreateToastNotifierForCollection(ByVal CollectionID As St
     WinRT_CallComMethod pManagerForUser2, VT_RELEASE, vbLong
 
     If pAsync <> 0 Then
-        pNotifier = 0
-        WinRT_CallComMethod pAsync, VT_IAsyncOperation_GetResults, vbLong, WinRT_vbPtr, VarPtr(pNotifier)
+        hr = WinRT_WaitAsync(pAsync)
+        If hr = 0 Then
+            pNotifier = 0
+            WinRT_CallComMethod pAsync, VT_IAsyncOperation_GetResults, vbLong, WinRT_vbPtr, VarPtr(pNotifier)
+        End If
         WinRT_CallComMethod pAsync, VT_RELEASE, vbLong
     End If
     WinRT_CreateToastNotifierForCollection = pNotifier
@@ -521,6 +689,7 @@ Private Function WinRT_GetHistoryForCollection(ByVal CollectionID As String) As 
     Dim pManagerForUser2 As LongPtr
     Dim pAsync As LongPtr
     Dim pHistory As LongPtr
+    Dim hr As Long
     Dim iidManagerStatics5 As WinRT_GUID
     Dim iidManagerForUser2 As WinRT_GUID
 
@@ -544,8 +713,11 @@ Private Function WinRT_GetHistoryForCollection(ByVal CollectionID As String) As 
     WinRT_CallComMethod pManagerForUser2, VT_RELEASE, vbLong
 
     If pAsync <> 0 Then
-        pHistory = 0
-        WinRT_CallComMethod pAsync, VT_IAsyncOperation_GetResults, vbLong, WinRT_vbPtr, VarPtr(pHistory)
+        hr = WinRT_WaitAsync(pAsync)
+        If hr = 0 Then
+            pHistory = 0
+            WinRT_CallComMethod pAsync, VT_IAsyncOperation_GetResults, vbLong, WinRT_vbPtr, VarPtr(pHistory)
+        End If
         WinRT_CallComMethod pAsync, VT_RELEASE, vbLong
     End If
     WinRT_GetHistoryForCollection = pHistory
@@ -1051,6 +1223,50 @@ Private Sub WinRT_EnsureRoInitialized(ByRef initialized As Boolean)
     End If
     initialized = True
 End Sub
+
+' IAsyncOperation / IAsyncAction の完了を待ち、完了後の HRESULT(ErrorCode) を返す。0=成功。
+' WinRT 非同期は QI で IAsyncInfo を取り、Status を Started 以外になるまでポーリングする。
+Private Function WinRT_WaitAsync(ByVal pAsync As LongPtr) As Long
+    Dim iidAsyncInfo As WinRT_GUID
+    Dim pAsyncInfo As LongPtr
+    Dim status As Long
+    Dim errorCode As Long
+    Dim waitCount As Long
+
+    If pAsync = 0 Then
+        WinRT_WaitAsync = &H80004003
+        Exit Function
+    End If
+
+    IIDFromString StrPtr(WinRT_IID_IAsyncInfo), iidAsyncInfo
+    pAsyncInfo = 0
+    WinRT_CallComMethod pAsync, VT_QI, vbLong, WinRT_vbPtr, VarPtr(iidAsyncInfo), WinRT_vbPtr, VarPtr(pAsyncInfo)
+    If pAsyncInfo = 0 Then
+        WinRT_WaitAsync = &H80004002
+        Exit Function
+    End If
+
+    Do
+        status = WinRT_AsyncStatus_Started
+        WinRT_CallComMethod pAsyncInfo, VT_IAsyncInfo_GetStatus, vbLong, WinRT_vbPtr, VarPtr(status)
+        If status <> WinRT_AsyncStatus_Started Then Exit Do
+        DoEvents
+        waitCount = waitCount + 1
+        If waitCount > 50000 Then Exit Do
+    Loop
+
+    If status = WinRT_AsyncStatus_Completed Then
+        errorCode = 0
+    Else
+        errorCode = 0
+        WinRT_CallComMethod pAsyncInfo, VT_IAsyncInfo_GetErrorCode, vbLong, WinRT_vbPtr, VarPtr(errorCode)
+        If status = WinRT_AsyncStatus_Canceled And errorCode = 0 Then errorCode = &H800704C7
+        If status = WinRT_AsyncStatus_Started And errorCode = 0 Then errorCode = &H8001011F
+    End If
+
+    WinRT_CallComMethod pAsyncInfo, VT_RELEASE, vbLong
+    WinRT_WaitAsync = errorCode
+End Function
 
 Private Function WinRT_CallComMethod(ByVal pUnk As LongPtr, ByVal vTableIndex As Long, ByVal retType As Integer, ParamArray args() As Variant) As Variant
     Dim vTableOffset As LongPtr
