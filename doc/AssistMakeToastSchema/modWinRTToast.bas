@@ -31,7 +31,7 @@ Private Declare PtrSafe Function WindowsGetStringRawBuffer Lib "combase.dll" (By
 Private Declare PtrSafe Function GlobalAlloc Lib "kernel32" (ByVal uFlags As Long, ByVal dwBytes As LongPtr) As LongPtr
 Private Declare PtrSafe Function GlobalFree Lib "kernel32" (ByVal hMem As LongPtr) As LongPtr
 Private Declare PtrSafe Function WinRT_GetCurrentProcessId Lib "kernel32" Alias "GetCurrentProcessId" () As Long
-Private Declare PtrSafe Function FormatMessageW Lib "kernel32" Alias "FormatMessageW" ( _
+Private Declare PtrSafe Function FormatMessageW Lib "kernel32" ( _
     ByVal dwFlags As Long, ByVal lpSource As LongPtr, ByVal dwMessageId As Long, _
     ByVal dwLanguageId As Long, ByVal lpBuffer As LongPtr, ByVal nSize As Long, _
     ByVal Arguments As LongPtr) As Long
@@ -363,7 +363,7 @@ Cleanup:
 End Function
 
 ' CollectionNotice.cpp CreateToastCollection と同等（WinRT 直呼び）。0=成功
-Public Function WinRT_SaveToastCollection(ByRef Config As WinRT_ToastConfig, ByVal DisplayName As String, ByVal LaunchArgs As String, ByVal IconUri As String) As Long
+Public Function WinRT_SaveToastCollection(ByRef Config As WinRT_ToastConfig, ByVal displayName As String, ByVal launchArgs As String, ByVal iconUri As String) As Long
     Dim initialized As Boolean
     Dim pManager As LongPtr
     Dim pCollection As LongPtr
@@ -378,7 +378,7 @@ Public Function WinRT_SaveToastCollection(ByRef Config As WinRT_ToastConfig, ByV
     pManager = WinRT_GetToastCollectionManager(Config.AppUserModelID)
     If pManager = 0 Then Err.Raise 513, , "GetToastCollectionManager failed."
 
-    pCollection = WinRT_CreateToastCollection(Config.CollectionID, DisplayName, LaunchArgs, IconUri)
+    pCollection = WinRT_CreateToastCollection(Config.CollectionID, displayName, launchArgs, iconUri)
     If pCollection = 0 Then Err.Raise 513, , "CreateToastCollection failed."
 
     pAsync = 0
@@ -462,7 +462,7 @@ Private Function WinRT_GetToastCollectionManager(ByVal appId As String) As LongP
 End Function
 
 ' ToastCollection(collectionId, displayName, launchArgs, iconUri)
-Private Function WinRT_CreateToastCollection(ByVal collectionId As String, ByVal displayName As String, ByVal launchArgs As String, ByVal iconUri As String) As LongPtr
+Private Function WinRT_CreateToastCollection(ByVal CollectionID As String, ByVal displayName As String, ByVal launchArgs As String, ByVal iconUri As String) As LongPtr
     Dim pFactory As LongPtr
     Dim pUri As LongPtr
     Dim pCollection As LongPtr
@@ -476,7 +476,7 @@ Private Function WinRT_CreateToastCollection(ByVal collectionId As String, ByVal
     IIDFromString StrPtr("{164DD3D7-73C4-44F7-B4FF-FB6D4BF1F4C6}"), iidFactory
     WinRT_GetActivationFactory "Windows.UI.Notifications.ToastCollection", iidFactory, pFactory
     If pFactory <> 0 Then
-        hStrCollectionId = WinRT_CreateHString(collectionId)
+        hStrCollectionId = WinRT_CreateHString(CollectionID)
         hStrDisplayName = WinRT_CreateHString(displayName)
         hStrLaunchArgs = WinRT_CreateHString(launchArgs)
 
@@ -880,7 +880,7 @@ Private Function WinRT_CreateNotificationData(ByRef Binding As WinRT_DataBinding
     End If
 
     If Len(Binding.TitleText) > 0 Then WinRT_InsertMapValue pMap, "TopTextTitle", Binding.TitleText
-    If Len(Binding.ContentsText) > 0 Then WinRT_InsertMapValue pMap, "TopTextContents", Binding.ContentsText
+    If Len(Binding.ContentsText) > 0 Then WinRT_InsertMapValue pMap, "TopTextBody", Binding.ContentsText
     If Len(Binding.AttributionText) > 0 Then WinRT_InsertMapValue pMap, "TopTextAttribution", Binding.AttributionText
     If hasProgress Then
         If Len(Binding.ProgressTitle) > 0 Then WinRT_InsertMapValue pMap, "ProgressTitle", Binding.ProgressTitle
@@ -1303,7 +1303,7 @@ Private Sub WinRT_EnsureRoInitialized(ByRef initialized As Boolean)
 End Sub
 
 '==================================================================================
-' トーストアクティブ化（イベントコールバック）— DLL 不要・純 VBA + DispCallFunc
+' トーストアクティブ化（イベントコールバック）? DLL 不要・純 VBA + DispCallFunc
 '   標準モジュール関数の関数ポインタで IUnknown ベースのネイティブ COM デリゲート
 '   (vtable 4 エントリ: QI / AddRef / Release / Invoke) を自前構築し、
 '   IToastNotification.add_Activated / add_Dismissed / add_Failed に登録する。
