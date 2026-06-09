@@ -87,33 +87,44 @@ Private Const vbObjectErrorID_0002 As String = "設定したパラメーターは、定義され
 
 
 '***************************************************************************************************
-'                       ■■■ システムで使える特別なaction要素引数名 ■■■
+'                           ■■■ 各種トースト通知関連変数/定数 ■■■
 '***************************************************************************************************
-Const ActionArguments再通知 As String = "snooze"
-Const ActionArguments解除   As String = "dismiss"
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] このClassファイル構築時のプロセスID
+'---------------------------------------------------------------------------------------------------
+Private ThisExcelPID    As Long
 
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] 既定値系
+'---------------------------------------------------------------------------------------------------
+Private Const AppUserModelID_Excel      As String = "Microsoft.Office.EXCEL.EXE.15" 'DeskTopアプリ：Excel
+Private Const ToastTemplateName         As String = "ToastGeneric"                  '"ToastGeneric" に設定する必要があります
+Private Const ToastSchedule             As String = "ExcelSchedule"                 'スケジュール通知として発行する際のID
+Private Const パラメーター区切り文字    As String = "|"                             'Group用
 
-
-'***************************************************************************************************
-'                           ■■■ データバインディング名 ■■■
-'***************************************************************************************************
-'最上位テキスト要素
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] データバインディング - 最上位テキスト要素
+'---------------------------------------------------------------------------------------------------
 Private Const DataBindingTopText_Title     As String = "{TopTextTitle}"
-Private Const DataBindingTopText_Contents  As String = "{TopTextContents}"
+Private Const DataBindingTopText_Body      As String = "{TopTextBody}"
 Private Const DataBindingTopText_Attribute As String = "{TopTextAttribution}"
 
-'Progress要素
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] データバインディング - Progress要素
+'---------------------------------------------------------------------------------------------------
 Private Const DataBindingProgress_Title         As String = "{ProgressTitle}"
 Private Const DataBindingProgress_Status        As String = "{ProgressStatus}"
 Private Const DataBindingProgress_Value         As String = "{ProgressValue}"
 Private Const DataBindingProgress_ValueString   As String = "{ProgressValueString}"
 
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] リマインド用の`arguments`属性の予約語
+'---------------------------------------------------------------------------------------------------
+Const ActionArguments再通知 As String = "snooze"
+Const ActionArguments解除   As String = "dismiss"
 
-
-'***************************************************************************************************
-'                          ■■■ 一部の設定プロパティ値を列挙型で宣言 ■■■
-'***************************************************************************************************
-'  機能     ：トーストが表すシナリオを指定します。数字の代わりにこの名称でも機能します。
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] トーストが使用されるシナリオ (アラームやアラームなど)
 '---------------------------------------------------------------------------------------------------
 Public Enum EnumToastScenario
     tsDefault
@@ -123,8 +134,8 @@ Public Enum EnumToastScenario
     tsUrgent
 End Enum
 
-'===================================================================================================
-'  機能     ：トースト通知を表示するときに再生するサウンドを指定します。数字の代わりにこの名称でも機能します。
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] 既定のサウンドの代わりに再生するメディア ファイル
 '---------------------------------------------------------------------------------------------------
 'Windows側で定められた通知音数
 Private Const DefNoticeSoundNum As Integer = 25
@@ -158,16 +169,17 @@ Public Enum EnumMsWinSoundEvent
     NotificationLoopingCall10
 End Enum
 
-'===================================================================================================
-'  機能     ：ボタンのスタイルを指定します。数字の代わりにこの名称でも機能します。
 '---------------------------------------------------------------------------------------------------
-Public Enum EnumToastButtonStyle
-    tbsSuccess = 1
-    tbsCritical
+' [ SECTION ] ボタンのスタイル
+'---------------------------------------------------------------------------------------------------
+Public Enum EnumHintButtonStyle
+    hbsDefault
+    hbsSuccess
+    hbsCritical
 End Enum
 
-'===================================================================================================
-'  機能     ：ユーザーが特定の操作を行った際に使用されるアクティブ化の種類を決定します。
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] ユーザーが特定の操作を行った際に使用されるアクティブ化の種類
 '---------------------------------------------------------------------------------------------------
 Public Enum EnumToastActivationType
     taForeground = 1  'フォアグラウンド アプリが起動します。
@@ -175,21 +187,78 @@ Public Enum EnumToastActivationType
     taProtocol        'プロトコルのアクティブ化を使用して別のアプリを起動します。
     taSystem          'Action要素でのリマインダーモード用です
 End Enum
+
 '---------------------------------------------------------------------------------------------------
+' [ SECTION ] フォント サイズ、太さ、不透明度を制御します
+'---------------------------------------------------------------------------------------------------
+Public Enum EnumAdaptiveTextStyle
+    TextStyle_Default           '既定値です。 スタイルがレンダラーによって決定されます。
+    TextStyle_Caption           '段落のフォント サイズより小さいサイズです。
+    TextStyle_CaptionSubtle     'Caption と同じですが、不透明度が Subtle です。
+    TextStyle_Body              '段落本文のフォント サイズです。
+    TextStyle_BodySubtle        'Body と同じですが、不透明度が Subtle です。
+    TextStyle_Base              '段落本文のフォント サイズで、太字です。 基本的には、Body の太字バージョンと言えます。
+    TextStyle_BaseSubtle        'Base と同じですが、不透明度が Subtle です。
+    TextStyle_Subtitle          'H4 のフォント サイズです。
+    TextStyle_SubtitleSubtle    'Subtitle と同じですが、不透明度が Subtle です。
+    TextStyle_Title             'H3 のフォント サイズです。
+    TextStyle_TitleSubtle       'Title と同じですが、不透明度が Subtle です。
+    TextStyle_TitleNumeral      'Title と同じですが、上/下のパディングが削除されます。
+    TextStyle_Subheader         'H2 のフォント サイズです。
+    TextStyle_SubheaderSubtle   'Subheader と同じですが、不透明度が Subtle です。
+    TextStyle_SubheaderNumeral  'Subheader と同じですが、上/下のパディングが削除されます。
+    TextStyle_Header            'H1 のフォント サイズです。
+    TextStyle_HeaderSubtle      'Header と同じですが、不透明度が Subtle です。
+    TextStyle_HeaderNumeral     'Header と同じですが、上/下のパディングが削除されます。
+End Enum
 
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] テキストの水平方向の配置を制御
+'---------------------------------------------------------------------------------------------------
+Public Enum EnumAdaptiveTextAlign
+    TextAlign_Default '既定値です。 配置がレンダラーによって自動的に決定されます。
+    TextAlign_Auto    '配置が現在の言語とカルチャによって決定されます。
+    TextAlign_Left    'テキストを左側に水平方向に配置します。
+    TextAlign_Center  'テキストを中央に水平方向に配置します。
+    TextAlign_Right   'テキストを右側に水平方向に配置します。
+End Enum
 
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] 画像トリミングを指定
+'---------------------------------------------------------------------------------------------------
+Public Enum EnumAdaptiveImageCrop
+    ImageCrop_Default   '既定値です。トリミングの動作がレンダラーによって決定されます。
+    ImageCrop_None      '画像がトリミングされません。
+    ImageCrop_Circle    '画像が円形にトリミングされます。
+End Enum
 
-'***************************************************************************************************
-'                       ■■■ タイムゾーン　ユーザー定義型宣言 ■■■
-'***************************************************************************************************
-'* 機能　　：日付、時刻データを扱う場合は、UTC基準になる場合があるため、その設定です
-'===================================================================================================
-Private TargetTimeZone As TimeZone
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] 画像の水平方向の配置を指定
+'---------------------------------------------------------------------------------------------------
+Public Enum EnumAdaptiveImageAlign
+    ImageAlign_Default  '既定値です。配置の動作がレンダラーによって決定されます。
+    ImageAlign_Stretch  '利用可能な幅いっぱいに画像が拡大されます (また同時に、画像が配置される位置に応じて、利用可能な高さいっぱいに拡大されることもあります)。
+    ImageAlign_Left     '画像を左側に配置し、ネイディブの解像度で表示します。
+    ImageAlign_Center   '画像を中央に水平方向に配置し、ネイティブの解像度で表示します。
+    ImageAlign_Right    '画像を右側に配置し、ネイディブの解像度で表示します。
+End Enum
 
-Private Type TimeZone
-    Hour    As Integer  '-23~23
-    Minute  As Integer  '0-59
-End Type
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] コンテンツの垂直方向の配置を指定
+'---------------------------------------------------------------------------------------------------
+Public Enum AdaptiveSubgroupTextStacking
+    TextStacking_Default    '既定値です。 レンダラーが既定の垂直方向の配置を自動的に選択します。
+    TextStacking_Top        '上に合わせて垂直に配置されます。
+    TextStacking_Center     '中央に合わせて垂直に配置されます。
+    TextStacking_Bottom     '下に合わせて垂直に配置されます。
+End Enum
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] 各種要素の上限
+'---------------------------------------------------------------------------------------------------
+Private Const MaxElementActionNum       As Integer = 5  'ボタンは最大5つ、入れれます
+Private Const MaxElementInputNum        As Integer = 5  '入力要素は最大5つ、入れれます
+Private Const MaxElementSelectionNum    As Integer = 5  '選択肢は最大5つ、入れれます
 
 
 
@@ -497,62 +566,6 @@ Private Type AdaptiveSubgroup
     QueueImage() As SubAdaptiveImage
 End Type
 
-'<subgroup用の便利な列挙型>
-'画像トリミングを指定します。
-Public Enum EnumAdaptiveImageCrop
-    ImageCrop_Default   '既定値です。トリミングの動作がレンダラーによって決定されます。
-    ImageCrop_None      '画像がトリミングされません。
-    ImageCrop_Circle    '画像が円形にトリミングされます。
-End Enum
-
-'画像の水平方向の配置を指定します。
-Public Enum EnumAdaptiveImageAlign
-    ImageAlign_Default  '既定値です。配置の動作がレンダラーによって決定されます。
-    ImageAlign_Stretch  '利用可能な幅いっぱいに画像が拡大されます (また同時に、画像が配置される位置に応じて、利用可能な高さいっぱいに拡大されることもあります)。
-    ImageAlign_Left     '画像を左側に配置し、ネイディブの解像度で表示します。
-    ImageAlign_Center   '画像を中央に水平方向に配置し、ネイティブの解像度で表示します。
-    ImageAlign_Right    '画像を右側に配置し、ネイディブの解像度で表示します。
-End Enum
-
-'フォント サイズ、太さ、および不透明度を制御します。 "Subtle" の不透明度は 60% の不透明度になります。
-Public Enum EnumAdaptiveTextStyle
-    TextStyle_Default           '既定値です。 スタイルがレンダラーによって決定されます。
-    TextStyle_Caption           '段落のフォント サイズより小さいサイズです。
-    TextStyle_CaptionSubtle     'Caption と同じですが、不透明度が Subtle です。
-    TextStyle_Body              '段落本文のフォント サイズです。
-    TextStyle_BodySubtle        'Body と同じですが、不透明度が Subtle です。
-    TextStyle_Base              '段落本文のフォント サイズで、太字です。 基本的には、Body の太字バージョンと言えます。
-    TextStyle_BaseSubtle        'Base と同じですが、不透明度が Subtle です。
-    TextStyle_Subtitle          'H4 のフォント サイズです。
-    TextStyle_SubtitleSubtle    'Subtitle と同じですが、不透明度が Subtle です。
-    TextStyle_Title             'H3 のフォント サイズです。
-    TextStyle_TitleSubtle       'Title と同じですが、不透明度が Subtle です。
-    TextStyle_TitleNumeral      'Title と同じですが、上/下のパディングが削除されます。
-    TextStyle_Subheader         'H2 のフォント サイズです。
-    TextStyle_SubheaderSubtle   'Subheader と同じですが、不透明度が Subtle です。
-    TextStyle_SubheaderNumeral  'Subheader と同じですが、上/下のパディングが削除されます。
-    TextStyle_Header            'H1 のフォント サイズです。
-    TextStyle_HeaderSubtle      'Header と同じですが、不透明度が Subtle です。
-    TextStyle_HeaderNumeral     'Header と同じですが、上/下のパディングが削除されます。
-End Enum
-
-'テキストの水平方向の配置を制御します。
-Public Enum EnumAdaptiveTextAlign
-    TextAlign_Default '既定値です。 配置がレンダラーによって自動的に決定されます。
-    TextAlign_Auto    '配置が現在の言語とカルチャによって決定されます。
-    TextAlign_Left    'テキストを左側に水平方向に配置します。
-    TextAlign_Center  'テキストを中央に水平方向に配置します。
-    TextAlign_Right   'テキストを右側に水平方向に配置します。
-End Enum
-
-'コンテンツの垂直方向の配置を指定します。
-Public Enum AdaptiveSubgroupTextStacking
-    TextStacking_Default    '既定値です。 レンダラーが既定の垂直方向の配置を自動的に選択します。
-    TextStacking_Top        '上に合わせて垂直に配置されます。
-    TextStacking_Center     '中央に合わせて垂直に配置されます。
-    TextStacking_Bottom     '下に合わせて垂直に配置されます。
-End Enum
-
 
 
 '====================================================================================================
@@ -584,8 +597,6 @@ End Type
 '位置        ：actions親要素のaction子要素で使える属性値
 'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-action
 '----------------------------------------------------------------------------------------------------
-'入れれる最大要素数を定数定義
-Private Const MaxElementActionNum   As Integer = 5    'ボタンは最大5つ、入れれます
 Private ElementActionCount          As Integer
 
 Private ElementAction(1 To MaxElementActionNum) As IToastActions
@@ -607,8 +618,6 @@ End Type
 '位置        ：input親要素のselection子要素で使える属性値。
 'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-selection
 '----------------------------------------------------------------------------------------------------
-'入れれる最大要素数を定数定義
-Private Const MaxElementSelectionNum As Integer = 5    '選択肢は最大5つ、入れれます
 
 Private ElementSelection(1 To MaxElementSelectionNum) As ToastSelectionBox
 
@@ -621,8 +630,6 @@ End Type
 '位置        ：actions親要素のinput子要素で使える属性値
 'ドキュメント：https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/element-input
 '----------------------------------------------------------------------------------------------------
-'入れれる最大要素数を定数定義
-Private Const MaxElementInputNum As Integer = 5    '入力要素は最大5つ、入れれます
 Private ElementInputCount          As Integer
 
 Private ElementInput(1 To MaxElementInputNum) As IToastInput
