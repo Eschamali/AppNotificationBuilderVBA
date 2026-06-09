@@ -1798,56 +1798,9 @@ End Property
 
 
 '***************************************************************************************************
-'                              ■■■ ヘルパー関連の機能 ■■■
+'                                   ■■■ 各種便利機能 ■■■
 '***************************************************************************************************
-'* 機能　　：トーストからマクロ実行するためのブック情報を提供します
-'---------------------------------------------------------------------------------------------------
-'* 返り値　：ブック名|プロセスID　という形式
-'***************************************************************************************************
-Private Function GetUniqueBookInfo() As String
-    GetUniqueBookInfo = ThisWorkbook.Name & パラメーター区切り文字 & ThisExcelPID
-End Function
-
-
-
-'***************************************************************************************************
-'* 機能　　：どのアプリから通知を発行するかを設定するAppIDを設定するコマンド文字列を生成します
-'---------------------------------------------------------------------------------------------------
-'* 返り値　：AppIDを設定するコマンド文字列
-'* 引数　　：UseDll
-'               True ：カスタマイズしたDllで処理する際に指定。AppUserModelIDをそのまま返します
-'               False：PowerShellコマンドで実行する際に指定します。変数格納用の「$AppId」が追加されます(規定)
-'---------------------------------------------------------------------------------------------------
-'* 機能説明：ネット上の画像も使用して通知を表示するかを設定します
-'* 注意事項：厳密には、Settingがc:internetを含むAppIDでないとインターネット上の画像が使えない
-'**************************************************************************************************
-Private Function DecisionAppUserModelID(Optional UseDll As Boolean) As String
-    '任意のAppIDの設定があったら、そちらを優先します。
-    If StrPtr(AppUserModelID_Any) Then
-        ToastConfig.AppUserModelID = AppUserModelID_Any
-
-    '未設定の場合は、ExcelのAppUserModelIDをセットします。
-    Else
-        ToastConfig.AppUserModelID = AppUserModelID_Excel
-    End If
-
-
-
-    'AppIDを決めるコマンド文字列を返す
-    If UseDll Then
-        DecisionAppUserModelID = ToastConfig.AppUserModelID
-    Else
-        DecisionAppUserModelID = "$AppId = '" & ToastConfig.AppUserModelID & Chr(39)
-    End If
-
-End Function
-
-
-
-'***************************************************************************************************
-' ■■■ Windows API mciSendString  に関するメソッド ■■■
-'***************************************************************************************************
-'* 機能　　：トーストの通知音を自分好みの音源ファイルに指定して鳴らす
+'* 機能　　：Windows API:mciSendString を利用して、疑似的にトーストの通知音を自分好みの音源ファイルに指定して鳴らします
 '---------------------------------------------------------------------------------------------------
 '* 引数　　：SoundURI   音源ファイルパス(ローカルパスはもちろん、インターネット上も指定可能です)
 '---------------------------------------------------------------------------------------------------
@@ -1864,59 +1817,6 @@ Public Property Let CustomNotificationSoundPlay(ByVal SoundURI As String)
     mciSendString "Play """ & SoundURI & Chr(34), "", 0, 0
 End Property
 
-
-
-'***************************************************************************************************
-'                           ■■■ URLDownloadToFile  に関するメソッド ■■■
-'***************************************************************************************************
-'* 機能　　：インターネット上の画像ファイルをダウンロードし、トーストの画像ソースとして使用できる準備をします
-'---------------------------------------------------------------------------------------------------
-'* 返り値　：保存先ローカルパス
-'* 引数　　：SourceURI          画像イメージURL
-'---------------------------------------------------------------------------------------------------
-'* 機能説明：httpソースが使えないAppUserModelIDでも、WindowsAPI:URLDownloadToFile で擬似的にできるようにします。
-'* 注意事項：任意の保存先指定は設けません。「C:\Users\XXX\AppData\Local\Temp」固定です。
-'          ：「Windows Terminal」等のマニフェストにインターネット機能があるパッケージアプリのAppUserModelIDの場合は、ToastConfig.AllowUse_InternetImageFlag を False にしないと予期せぬ挙動を起こすかもしれません
-'***************************************************************************************************
-Private Function UseHttpImageCheck(Source As String) As String
-    'ネット上の画像を使用するように設定しており尚且つ、httpソースとして指定されている場合、次の処理に移ります
-    Dim BaseUriHttpSourceFlag As Boolean: BaseUriHttpSourceFlag = (Left(ElementBinding.Baseuri, 4) = "http")
-    Dim HttpSourceFlag As Boolean: HttpSourceFlag = (Left(Source, 4) = "http")
-    If ToastConfig.AllowUse_InternetImageFlag And (HttpSourceFlag Or BaseUriHttpSourceFlag) Then
-
-        'Sourceが空なら、即抜け
-        If Source = "" Then
-            UseHttpImageCheck = Source
-            Exit Function
-        End If
-
-        'URLの「/」区切りの最後の部分をファイル名として指定
-        Dim SaveImageFileName As String, tmp
-        tmp = Split(Source, "/")
-    
-        '保存時の禁則文字を防ぐため、URLエンコードを使います。
-        SaveImageFileName = WorksheetFunction.EncodeURL(tmp(UBound(tmp)))
-
-        '規定のtempフォルダパスを取得し、保存先パスを取得します
-        Dim TargetFullPass As String: TargetFullPass = WorksheetFunction.TextJoin("\", True, Environ("tmp"), SaveImageFileName)
-
-        'httpソースのベースURIになってたら、連結します
-        If BaseUriHttpSourceFlag And Not (HttpSourceFlag) Then Source = ElementBinding.Baseuri & Source
-
-        'キャッシュが消えてたら再度ダウンロードして保存
-        If Dir(TargetFullPass, vbNormal) = "" Then
-            'ダウンロード開始
-            URLDownloadToFile 0, Source, TargetFullPass, 0, 0
-        End If
-    
-        '返却
-        UseHttpImageCheck = TargetFullPass
-    Else
-        'そのまんま返却
-        UseHttpImageCheck = Source
-    End If
-End Function
-
 '***************************************************************************************************
 '* 処理名　：PresetReminder
 '* 機能　　：リマインダー機能をプリセットします。システム側で用意されているパラメーターをセットすることで、システムの再通知と無視アクションを利用するアラーム通知を作成できます。
@@ -1928,30 +1828,30 @@ End Function
 '           ・1,2つ目のaction要素
 '           ・1つ目のinput要素
 
-'* URL 　　：https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/adaptive-interactive-toasts?tabs=xml#snoozedismiss
+'* URL 　　：https://learn.microsoft.com/ja-jp/windows/apps/develop/notifications/app-notifications/app-notifications-content?tabs=appsdk#snoozedismiss
 '***************************************************************************************************
-Public Sub PresetReminder(RemindMinute1 As LongPtr, Optional RemindMinute2 As LongPtr, Optional RemindMinute3 As LongPtr, Optional RemindMinute4 As LongPtr, Optional RemindMinute5 As LongPtr, Optional Message As String)
+Public Sub PresetReminder(RemindMinute1 As Long, Optional RemindMinute2 As Long, Optional RemindMinute3 As Long, Optional RemindMinute4 As Long, Optional RemindMinute5 As Long, Optional Message As String)
     '紐付け用識別子(なんでもOK)
     Const ReminderID As String = "snoozeTime"
 
 
     '----------------------------1.各Selection要素を用意----------------------------
     '選択肢を用意
-    SetToastSelectionBox(RemindMinute1, RemindMinute1 & " 分後") = 1
-    SetToastSelectionBox(RemindMinute2, RemindMinute2 & " 分後") = 2
-    SetToastSelectionBox(RemindMinute3, RemindMinute3 & " 分後") = 3
-    SetToastSelectionBox(RemindMinute4, RemindMinute4 & " 分後") = 4
-    SetToastSelectionBox(RemindMinute5, RemindMinute5 & " 分後") = 5
+    XmlSelection(CStr(RemindMinute1), RemindMinute1 & " 分後") = 1
+    XmlSelection(CStr(RemindMinute2), RemindMinute2 & " 分後") = 2
+    XmlSelection(CStr(RemindMinute3), RemindMinute3 & " 分後") = 3
+    XmlSelection(CStr(RemindMinute4), RemindMinute4 & " 分後") = 4
+    XmlSelection(CStr(RemindMinute5), RemindMinute5 & " 分後") = 5
 
 
     '----------------------------2.1 で用意したSelection要素をinput要素を作成する際のIndex値を指定し、Type=True でset----------------------------
     '選択肢を1つ目のinput要素に格納
-    SetIToastInput(ReminderID, True, , Message, RemindMinute1) = 1
+    XmlInput(ReminderID, True, , Message, RemindMinute1) = 1
 
 
     '----------------------------3.1,2つ目のaction要素に、それぞれプリセット----------------------------
-    SetIToastActions("", ActionArguments再通知, taSystem, , , , ReminderID) = 1
-    SetIToastActions("", ActionArguments解除, taSystem) = 2
+    XmlAction("", ActionArguments再通知, taSystem, , , , ReminderID) = 1
+    XmlAction("", ActionArguments解除, taSystem) = 2
 End Sub
 
 
