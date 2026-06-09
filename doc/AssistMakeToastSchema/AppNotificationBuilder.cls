@@ -2456,19 +2456,27 @@ End Property
 '                       ■■■ インスタンス生成時に自動で設定する内容 ■■■
 '***************************************************************************************************
 '* 機能　　：・トーストのヘッダー情報を設定します。不要ならコメントアウトしてください。デフォルトで以下にしています
-'               Header_ID           このExcelのファイル名
+'               Header_ID           このExcelのファイルフルパス
 '               Header_Title        このExcelのBook名
 '               Header_Arguments    このExcelの保存フォルダパス
 '
-'            ・タイムゾーンを日本基準にします。
+'            ・タイムゾーンを日本基準にします
+'            ・いくつかの既定値を適用します
 '**************************************************************************************************
 Private Sub Class_Initialize()
     '必ず設定
-    ElementBinding.template = "ToastGeneric"
+    ElementBinding.template = ToastTemplateName
+
+    'いくつかの既定値を適用
+    With ToastConfig
+        .AppUserModelID = AppUserModelID_Excel
+        .Schedule_ID = ToastSchedule
+    End With
 
     'クラスオブジェクト構築時の、ExcelのPIDを取得する
     ThisExcelPID = GetCurrentProcessId()
-    
+
+    '--- ヘッダー要素を適用するための準備 ---
     With ThisWorkbook
         '拡張子の位置を調べる
         Dim FileTypePos As Long: FileTypePos = InStrRev(.Name, ".")
@@ -2477,12 +2485,12 @@ Private Sub Class_Initialize()
         Dim SetHeaderName As String: If FileTypePos Then SetHeaderName = Left(.Name, FileTypePos - 1) Else SetHeaderName = .Name
 
         'ヘッダー情報をセット
-        SetToastHeader = SetHeaderName
+        XmlHeader = SetHeaderName
     End With
 
     'タイムゾーンを日本基準にします
     SetTimeZone 9, 0
-    
+
     'subgroup要素に関する初期値を設定
     SubgroupTotal = -1
     SubgroupInnerTextsTotal = -1
