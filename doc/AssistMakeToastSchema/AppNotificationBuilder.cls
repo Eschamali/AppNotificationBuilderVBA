@@ -262,18 +262,18 @@ Private Const MaxElementSelectionNum    As Integer = 5  '選択肢は最大5つ、入れれ
 
 
 
+
 '***************************************************************************************************
 '                   ■■■ トーストの挙動を決めるユーザー定義型宣言 ■■■
 '***************************************************************************************************
-' 機能：Tag,Group,suppresspopup等といった[Windows.UI.Notifications]関連の設定値をまとめたものです
-'===================================================================================================
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] プロパティ/メソッド等で、決める設定群
+'---------------------------------------------------------------------------------------------------
 Private ToastConfig As ToastNotification
-
 Private Type ToastNotification
     '[Windows.UI.Notifications]の挙動を決める設定値
     AppUserModelID              As String   'https://learn.microsoft.com/ja-jp/windows/win32/shell/appids
-    AllowUse_InternetImageFlag  As Boolean  'インターネット上の画像を使用する権限設定
-    XmlSchema                   As String   'https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema
+    Content                     As String   'https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema
 
     '[Windows.UI.Notifications]の主な設定値
     Tag                         As String   'https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.tag
@@ -284,51 +284,37 @@ Private Type ToastNotification
     SuppressPopup               As Boolean  'https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.suppresspopup
     Schedule_DeliveryTime       As Date     'https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.scheduledtoastnotification.-ctor
     ExpirationTime              As Date     'https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.scheduledtoastnotification.expirationtime OR https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotification.expirationtime
+    Priority                    As Boolean  'https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.toastnotificationpriority
 End Type
 
-'***************************************************************************************************
-'       ■■■ VBA→DLLへの値参照が正しくできるようにするための中継用ユーザー定義型宣言 ■■■
-'***************************************************************************************************
-' 機能：スタック領域の制限の都合上、構造体としてを定義します。
 '---------------------------------------------------------------------------------------------------
-'* 注意事項：・DLL側で、シグネチャ（型や順序）が合うようにすること。
-'          ：・複数の型を混在させる場合、散在せずまとめるようにすること
-'          ：・Type 名は、DLL側の struct と同一にすること
-'          ：・Type 内の変数名も、DLL側の struct 内と同一にすること
-'          ：・DLL 側の型が、 BOOL であっても、こちら VBA 側は、 long 型にすること
-'===================================================================================================
-Private Type ToastNotificationParams
-    '文字列に関するパラメーター　LongPtrを使うことで、ポインタから文字列を取得(const wchar_t*)するようにします。
-    AppUserModelID          As LongPtr
-    XmlTemplate             As LongPtr
-    Tag                     As LongPtr
-    Group                   As LongPtr
-    Schedule_ID             As LongPtr
-    CollectionID            As LongPtr
-    
-    'スイッチングに関するパラメーター　「Boolean」では、上手く行かないため、longにしています
-    ExpiresOnReboot         As Long
-    SuppressPopup           As Long
-    
-    '日付に関するパラメーター
-    Schedule_DeliveryTime As Double
-    ExpirationTime As Double
+' [ SECTION ] データバイディング関連の設定
+'---------------------------------------------------------------------------------------------------
+Private ToastDataBinding As NotificationData
+Private Type NotificationData
+    '最上位レベルのテキスト要素の Text
+    TitleText As String
+    ContentsText As String
+    AttributionText As String
+
+    'ProgressBar 要素
+    ProgressTitle As String
+    ProgressValueStringOverride As String
+    ProgressStatus As String
+    progressValue As Double
+
+    '通知データが古いかどうかを判断
+    SequenceNumber As Long
 End Type
 
-'***************************************************************************************************
-' 機能：データバインディングの定義を用意します
-'===================================================================================================
-Private Type ToastNotificationVariable
-    TitleText                   As LongPtr
-    ContentsText                As LongPtr
-    AttributionText             As LongPtr
-    ProgressTitle               As LongPtr
-    ProgressValueStringOverride As LongPtr
-    ProgressStatus              As LongPtr
-    ProgressValue               As Double
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] タイムゾーンの設定　※日付、時刻データを扱う場合は、UTC基準になる項目があるため
+'---------------------------------------------------------------------------------------------------
+Private TargetTimeZone As TimeZone
+Private Type TimeZone
+    Hour    As Integer  '-23~23
+    Minute  As Integer  '0-59
 End Type
-
-'===================================================================================================
 
 
 
