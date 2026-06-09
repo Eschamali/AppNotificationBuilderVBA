@@ -77,12 +77,124 @@ Private Declare PtrSafe Function mciSendString Lib "winmm.dll" Alias "mciSendStr
 
 
 
-
 '***************************************************************************************************
 '                           ■■■ ユーザー定義エラー番号文言 ■■■
 '***************************************************************************************************
 Private Const vbObjectErrorID_0001 As String = "設定したスケジュールは、現在のシステム日時に対して過去の日時に設定されてます。" & vbCrLf & "設定したスケジュール通知日時が、未来であることを確認してください。 "
 Private Const vbObjectErrorID_0002 As String = "設定したパラメーターは、定義されていません。"
+
+
+
+'***************************************************************************************************
+'                         ■■■ "wpndatabase.db"に関する変数/定数一式 ■■■
+'***************************************************************************************************
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] 最後のSQL実行結果
+'---------------------------------------------------------------------------------------------------
+Private LatestExecuteSQLiteNum      As Long
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] 設定保存相対パス
+'---------------------------------------------------------------------------------------------------
+Private Const ToastNotification_SettingPathDB   As String = "\Microsoft\Windows\Notifications\wpndatabase.db"
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] WNSId
+'---------------------------------------------------------------------------------------------------
+'今のところ、システムでは2種類用意されてる
+Public Enum Wpndatabase_WNSId
+    wsCustom                '好きな文字列指定用
+    wsSystem                'システム
+    wsNonImmersivePackage   '非パッケージ
+End Enum
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] HandlerType
+'---------------------------------------------------------------------------------------------------
+'今のところ、3種類用意されてる
+Public Enum Wpndatabase_HandlerType
+    htDesktop       'Win32アプリ(非パッケージ)
+    htImmersive     'パッケージアプリ(UWP)
+    htSystem        'システムアプリ
+End Enum
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] SettingKey 一覧
+'---------------------------------------------------------------------------------------------------
+'今のところ、28種類用意されてる
+'※ただし、一度でもアプリ側が対応するパラメーターを使用しないと出てこない仕様のため、まだまだあるかも…?
+Public Enum Wpndatabase_SettingKey
+    skS_tickle
+    skC_tile
+    skR_badge
+    skS_lock_toast
+    skS_tile
+    skS_lock_badge
+    skS_banner                              'レジストリとの連携必須
+    skS_lock_tile
+    skR_tile
+    skS_badge
+    skS_audio
+    skS_voip
+    skS_stopCloud
+    skS_listenerEnabled
+    skC_cloud
+    skC_toast
+    skC_internet
+    skC_badge
+    skC_ringing
+    skC_tickle
+    skC_voip
+    skC_storage_toast
+    skS_toast                               'レジストリとの連携必須
+    skC_storage_tile
+    skM_SecondaryTileMigrationComplete
+    skS_cycle_medium
+    skS_cycle_wide
+    skS_cycle_large
+End Enum
+
+
+
+'***************************************************************************************************
+'                         ■■■ レジストリに関する定数/変数一式 ■■■
+'***************************************************************************************************
+Private 最後に実行したレジストリ登録結果    As Long
+
+'登録型一覧(ひとまず、3 + 1 用意)
+Enum RegistryType
+    REG_Delete = -1 '削除用
+    REG_DWORD
+    REG_SZ
+    REG_EXPAND_SZ
+End Enum
+
+'通知関連のレジストリパスIDを用意
+Enum ToastRegistryPathMode
+    NotificationsSettings
+    ClassesAppUserModelId
+End Enum
+
+'レジストリで設定できるパラメーターを用意
+Enum RegistrySetting
+    'コンピューター\HKEY_CURRENT_USER\Software\Classes\AppUserModelId
+    ShowInSettings
+    displayName
+    iconUri
+    IconBackgroundColor
+    CustomActivator
+    
+    'コンピューター\HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings
+    '--wpndatabase.db 連携必須--
+    enabled
+    ShowBanner
+    '--wpndatabase.db 連携不要--
+    SoundFile
+    AllowContentAboveLock
+    Rank
+    ShowInActionCenter
+    AllowUrgentNotifications
+End Enum
 
 
 
@@ -262,7 +374,6 @@ Private Const MaxElementSelectionNum    As Integer = 5  '選択肢は最大5つ、入れれ
 
 
 
-
 '***************************************************************************************************
 '                   ■■■ トーストの挙動を決めるユーザー定義型宣言 ■■■
 '***************************************************************************************************
@@ -315,102 +426,6 @@ Private Type TimeZone
     Hour    As Integer  '-23~23
     Minute  As Integer  '0-59
 End Type
-
-
-
-'***************************************************************************************************
-'                         ■■■ "wpndatabase.db"に関する定数/変数一式 ■■■
-'***************************************************************************************************
-'-----基本-----
-Private LatestExecuteSQLiteNum      As Long
-Private Const 設定DB保存相対パス    As String = "\Microsoft\Windows\Notifications\wpndatabase.db"
-'-----WNSId 一覧(今のところ、システムでは2種類用意されてる)-----
-Public Enum Wpndatabase_WNSId
-    wsCustom                '好きな文字列指定用
-    wsSystem                'システム
-    wsNonImmersivePackage   '非パッケージ
-End Enum
-'-----HandlerType 一覧(今のところ、3種類用意されてる)-----
-Public Enum Wpndatabase_HandlerType
-    htDesktop       'Win32アプリ(非パッケージ)
-    htImmersive     'パッケージアプリ(UWP)
-    htSystem        'システムアプリ
-End Enum
-'-----SettingKey 一覧(今のところ、28種類用意されてる)-----
-'ただし、一度でもアプリ側が対応するパラメーターを使用しないと出てこない仕様のため、まだまだあるかも…?
-Public Enum Wpndatabase_SettingKey
-    skS_tickle
-    skC_tile
-    skR_badge
-    skS_lock_toast
-    skS_tile
-    skS_lock_badge
-    skS_banner                              'レジストリとの連携必須
-    skS_lock_tile
-    skR_tile
-    skS_badge
-    skS_audio
-    skS_voip
-    skS_stopCloud
-    skS_listenerEnabled
-    skC_cloud
-    skC_toast
-    skC_internet
-    skC_badge
-    skC_ringing
-    skC_tickle
-    skC_voip
-    skC_storage_toast
-    skS_toast                               'レジストリとの連携必須
-    skC_storage_tile
-    skM_SecondaryTileMigrationComplete
-    skS_cycle_medium
-    skS_cycle_wide
-    skS_cycle_large
-End Enum
-
-
-
-'***************************************************************************************************
-'                         ■■■ レジストリに関する定数/変数一式 ■■■
-'***************************************************************************************************
-Private Const パラメーター区切り文字        As String = "|"
-Private 最後に実行したレジストリ登録結果    As Long
-
-'登録型一覧(ひとまず、3 + 1 用意)
-Enum RegistryType
-    REG_Delete = -1 '削除用
-    REG_DWORD
-    REG_SZ
-    REG_EXPAND_SZ
-End Enum
-
-'通知関連のレジストリパスIDを用意
-Enum ToastRegistryPathMode
-    NotificationsSettings
-    ClassesAppUserModelId
-End Enum
-
-'レジストリで設定できるパラメーターを用意
-Enum RegistrySetting
-    'コンピューター\HKEY_CURRENT_USER\Software\Classes\AppUserModelId
-    ShowInSettings
-    DisplayName
-    IconUri
-    IconBackgroundColor
-    CustomActivator
-    
-    'コンピューター\HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings
-    '--wpndatabase.db 連携必須--
-    Enabled
-    ShowBanner
-    '--wpndatabase.db 連携不要--
-    SoundFile
-    AllowContentAboveLock
-    Rank
-    ShowInActionCenter
-    AllowUrgentNotifications
-End Enum
 
 
 
@@ -662,7 +677,8 @@ Private Function EnumToStringToastScenario(param As EnumToastScenario) As String
         Case EnumToastScenario.tsReminder:      EnumToStringToastScenario = "reminder"     '通知を永遠に表示する。action要素がないと効果は発動しないが、任意の通知音に設定可能
         Case EnumToastScenario.tsIncomingCall:  EnumToStringToastScenario = "incomingCall" '通知を永遠に表示する。action要素がなくても効果発動。最後のボタン位置のみ、Windowsのテーマ色に基づく着色が施され、位置が必ず下側になる。通知音は呼び出し系(Call)か、ミュートのみ設定可能
         Case EnumToastScenario.tsUrgent:        EnumToStringToastScenario = "urgent"       '重要な通知として表示。応答不可にしても表示されますが、設定で表示させないようにすることが可能です。とりあえず常に表示させたい場合は、シナリオ：「アラーム」にしましょう
-        Case Else   '通常の通知として表示。属性：duration  あるいは、アクセシビリティ→視覚効果→この時間が経過したら通知を破棄する  に基づく表示時間となります    End Select
+        Case Else   '通常の通知として表示。属性：duration  あるいは、アクセシビリティ→視覚効果→この時間が経過したら通知を破棄する  に基づく表示時間となります
+    End Select
 End Function
 
 '---------------------------------------------------------------------------------------------------
@@ -781,94 +797,6 @@ Private Function EnumToStringAdaptiveTextAlign(param As EnumAdaptiveTextStyle) A
         Case EnumAdaptiveTextAlign.TextAlign_Right:     EnumToStringAdaptiveTextAlign = "right"
         Case Else   '既定値
     End Select
-End Function
-
-
-
-'***************************************************************************************************
-'                                  ■■■ Toast全般の設定 ■■■
-'***************************************************************************************************
-'* 機能    ：この通知をどのアプリで出すかを設定します
-'---------------------------------------------------------------------------------------------------
-'* 機能説明：設定すると、ExcelのAppUserModelIDよりも優先して設定されます。batファイル等、VBAと直接関係なくなり、アイコンが噛み合わない時に使います。
-'* 注意事項：存在しない(未インストール)AppID、無効な文字列を指定すると、Toastが発行されないのでご注意ください。
-'---------------------------------------------------------------------------------------------------
-Public Property Let SetAppUserModelID(appId As String)
-    ToastConfig.AppUserModelID = appId
-End Property
-
-'***************************************************************************************************
-'* 機能    ：タイムゾーンを変更します。デフォルトは、日本基準のため日本在宅者は基本、使用する必要はありません
-'---------------------------------------------------------------------------------------------------
-'* 注意事項：Class_Initialize　で、日本時間にセットされます
-'---------------------------------------------------------------------------------------------------
-Public Sub SetTimeZone(ArgUTC_Hour As Integer, ArgUTC_Minute As Integer)
-    With TargetTimeZone
-        .Hour = ArgUTC_Hour
-        .Minute = ArgUTC_Minute
-    End With
-End Sub
-
-'***************************************************************************************************
-'* 機能　　：トーストからマクロ実行するためのブック情報を提供します
-'---------------------------------------------------------------------------------------------------
-'* 返り値　：ブック名|プロセスID　という形式
-'---------------------------------------------------------------------------------------------------
-'* 機能説明：ToastNotification.Group プロパティの設定に使い、使用中のブックをユニークに特定します
-'            これは、コールバックでの特定に使います
-'***************************************************************************************************
-Private Function GetUniqueBookInfo() As String
-    GetUniqueBookInfo = ThisWorkbook.Name & パラメーター区切り文字 & ThisExcelPID
-End Function
-
-
-
-'***************************************************************************************************
-'                                    ■■■ 変換用 ■■■
-'***************************************************************************************************
-'* 機能    ：WinRT 直呼び出し用の設定構造体へ変換します
-'---------------------------------------------------------------------------------------------------
-'* 機能説明：基本は、As Is ですが日時系は、UTC基準になるため、一部変換が入ります
-'***************************************************************************************************
-Private Function ParamsConvertForWinRT(ToastSetting As ToastNotification) As WinRT_ToastConfig
-    With ParamsConvertForWinRT
-        .AppUserModelID = ToastSetting.AppUserModelID
-        .XmlTemplate = ToastSetting.Content
-        .Tag = ToastSetting.Tag
-        .Group = ToastSetting.Group
-        .Schedule_ID = ToastSetting.Schedule_ID
-        .CollectionID = ToastSetting.CollectionID
-        .ExpiresOnReboot = ToastSetting.ExpiresOnReboot
-        .SuppressPopup = ToastSetting.SuppressPopup
-
-        .Schedule_DeliveryTimeLocal = ToastSetting.Schedule_DeliveryTime
-        .Schedule_DeliveryTime = DateAdd("h", TargetTimeZone.Hour * -1, ToastSetting.Schedule_DeliveryTime)
-        .Schedule_DeliveryTime = DateAdd("n", TargetTimeZone.Minute * -1, .Schedule_DeliveryTime)
-
-        .ExpirationTime = DateAdd("h", TargetTimeZone.Hour * -1, ToastSetting.ExpirationTime)
-        .ExpirationTime = DateAdd("n", TargetTimeZone.Minute * -1, .ExpirationTime)
-    End With
-End Function
-
-'***************************************************************************************************
-'* 機能    ：WinRT 直呼び出し用のデータバインディング構造体へ変換します
-'***************************************************************************************************
-Private Function DataBindingConvertForWinRT() As WinRT_DataBinding
-    With DataBindingConvertForWinRT
-        '最上位のテキスト要素部分
-        .TitleText = ElementsText.Title.Value
-        .ContentsText = ElementsText.Body.Value
-        .AttributionText = ElementsText.Attribution.Value
-
-        'プログレスバー
-        '※必須項目が入ってたら、他の項目も適用させます
-        If StrPtr(ElementProgress.status) Then
-            .ProgressTitle = ElementProgress.Title
-            .ProgressStatus = ElementProgress.status
-            .progressValue = ElementProgress.Value
-            .ProgressValueStringOverride = ElementProgress.ValueStringOverride
-        End If
-    End With
 End Function
 
 
@@ -1419,6 +1347,7 @@ Public Property Let XmlHeader(Optional ID As String, Optional Arguments As Strin
         .Title = Title
     End With
 End Property
+
 '---------------------------------------------------------------------------------------------------
 ' [ SECTION ] トースト スキーマ生成
 ' [ document] https://learn.microsoft.com/ja-jp/uwp/schemas/tiles/toastschema/schema-root
@@ -1798,6 +1727,94 @@ End Property
 
 
 '***************************************************************************************************
+'                                  ■■■ Toast全般の設定 ■■■
+'***************************************************************************************************
+'* 機能    ：この通知をどのアプリで出すかを設定します
+'---------------------------------------------------------------------------------------------------
+'* 機能説明：設定すると、ExcelのAppUserModelIDよりも優先して設定されます。batファイル等、VBAと直接関係なくなり、アイコンが噛み合わない時に使います。
+'* 注意事項：存在しない(未インストール)AppID、無効な文字列を指定すると、Toastが発行されないのでご注意ください。
+'---------------------------------------------------------------------------------------------------
+Public Property Let SetAppUserModelID(appId As String)
+    ToastConfig.AppUserModelID = appId
+End Property
+
+'***************************************************************************************************
+'* 機能    ：タイムゾーンを変更します。デフォルトは、日本基準のため日本在宅者は基本、使用する必要はありません
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：Class_Initialize　で、日本時間にセットされます
+'---------------------------------------------------------------------------------------------------
+Public Sub SetTimeZone(ArgUTC_Hour As Integer, ArgUTC_Minute As Integer)
+    With TargetTimeZone
+        .Hour = ArgUTC_Hour
+        .Minute = ArgUTC_Minute
+    End With
+End Sub
+
+'***************************************************************************************************
+'* 機能　　：トーストからマクロ実行するためのブック情報を提供します
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：ブック名|プロセスID　という形式
+'---------------------------------------------------------------------------------------------------
+'* 機能説明：ToastNotification.Group プロパティの設定に使い、使用中のブックをユニークに特定します
+'            これは、コールバックでの特定に使います
+'***************************************************************************************************
+Private Function GetUniqueBookInfo() As String
+    GetUniqueBookInfo = ThisWorkbook.Name & パラメーター区切り文字 & ThisExcelPID
+End Function
+
+
+
+'***************************************************************************************************
+'                                    ■■■ 変換用 ■■■
+'***************************************************************************************************
+'* 機能    ：WinRT 直呼び出し用の設定構造体へ変換します
+'---------------------------------------------------------------------------------------------------
+'* 機能説明：基本は、As Is ですが日時系は、UTC基準になるため、一部変換が入ります
+'***************************************************************************************************
+Private Function ParamsConvertForWinRT(ToastSetting As ToastNotification) As WinRT_ToastConfig
+    With ParamsConvertForWinRT
+        .AppUserModelID = ToastSetting.AppUserModelID
+        .XmlTemplate = ToastSetting.Content
+        .Tag = ToastSetting.Tag
+        .Group = ToastSetting.Group
+        .Schedule_ID = ToastSetting.Schedule_ID
+        .CollectionID = ToastSetting.CollectionID
+        .ExpiresOnReboot = ToastSetting.ExpiresOnReboot
+        .SuppressPopup = ToastSetting.SuppressPopup
+
+        .Schedule_DeliveryTimeLocal = ToastSetting.Schedule_DeliveryTime
+        .Schedule_DeliveryTime = DateAdd("h", TargetTimeZone.Hour * -1, ToastSetting.Schedule_DeliveryTime)
+        .Schedule_DeliveryTime = DateAdd("n", TargetTimeZone.Minute * -1, .Schedule_DeliveryTime)
+
+        .ExpirationTime = DateAdd("h", TargetTimeZone.Hour * -1, ToastSetting.ExpirationTime)
+        .ExpirationTime = DateAdd("n", TargetTimeZone.Minute * -1, .ExpirationTime)
+    End With
+End Function
+
+'***************************************************************************************************
+'* 機能    ：WinRT 直呼び出し用のデータバインディング構造体へ変換します
+'***************************************************************************************************
+Private Function DataBindingConvertForWinRT() As WinRT_DataBinding
+    With DataBindingConvertForWinRT
+        '最上位のテキスト要素部分
+        .TitleText = ElementsText.Title.Value
+        .ContentsText = ElementsText.Body.Value
+        .AttributionText = ElementsText.Attribution.Value
+
+        'プログレスバー
+        '※必須項目が入ってたら、他の項目も適用させます
+        If StrPtr(ElementProgress.status) Then
+            .ProgressTitle = ElementProgress.Title
+            .ProgressStatus = ElementProgress.status
+            .progressValue = ElementProgress.Value
+            .ProgressValueStringOverride = ElementProgress.ValueStringOverride
+        End If
+    End With
+End Function
+
+
+
+'***************************************************************************************************
 '                                   ■■■ 各種便利機能 ■■■
 '***************************************************************************************************
 '* 機能　　：Windows API:mciSendString を利用して、疑似的にトーストの通知音を自分好みの音源ファイルに指定して鳴らします
@@ -2016,6 +2033,15 @@ Public Property Get CheckNotificationSetting(Optional CollectionID As String) As
     '2. チェック
     CheckNotificationSetting = WinRT_CheckNotificationSetting(ParamsConvertForWinRT(ToastConfig))
 End Property
+
+
+
+'***************************************************************************************************
+'                     ■■■ WinRT-API へ直接アクセスするためのメソッド群 ■■■
+'***************************************************************************************************
+
+
+
 
 
 
