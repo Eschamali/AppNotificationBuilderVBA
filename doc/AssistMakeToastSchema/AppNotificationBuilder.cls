@@ -305,6 +305,7 @@ Private WinRT_pScheduledToastFactory As LongPtr
 Private WinRT_pToastCollectionFactory As LongPtr
 Private WinRT_pUriFactory As LongPtr
 Private WinRT_pPropertyValueStatics As LongPtr
+Private WinRT_HStringCache As Object
 
 
 '---------------------------------------------------------------------------------------------------
@@ -2259,8 +2260,8 @@ Private Function WinRT_UpdateToastNotification(ByRef Config As WinRT_ToastConfig
     pData = WinRT_CreateNotificationData(Binding)
     If pData = 0 Then Err.Raise 513, , "CreateNotificationData failed."
 
-    hStrTag = WinRT_CreateHString(Config.Tag)
-    hStrGroup = WinRT_CreateHString(Config.Group)
+    hStrTag = WinRT_CachedHString(Config.Tag)
+    hStrGroup = WinRT_CachedHString(Config.Group)
     updateResult = 0
     WinRT_CallComMethod pNotifier2, VT_IToastNotifier2_UpdateWithTagAndGroup, vbLong, WinRT_vbPtr, pData, WinRT_vbPtr, hStrTag, WinRT_vbPtr, hStrGroup, WinRT_vbPtr, VarPtr(updateResult)
 
@@ -2272,8 +2273,6 @@ Cleanup:
         WinRT_UpdateToastNotification = Err.Number
     End If
     On Error Resume Next
-    If hStrGroup <> 0 Then WindowsDeleteString hStrGroup
-    If hStrTag <> 0 Then WindowsDeleteString hStrTag
     If pData <> 0 Then WinRT_CallComMethod pData, VT_RELEASE, vbLong
     If pNotifier2 <> 0 Then WinRT_CallComMethod pNotifier2, VT_RELEASE, vbLong
     If pNotifier <> 0 Then WinRT_CallComMethod pNotifier, VT_RELEASE, vbLong
@@ -2312,9 +2311,9 @@ Private Sub WinRT_RemoveToastNotification(ByRef Config As WinRT_ToastConfig)
     pHistory = WinRT_GetToastHistory(Config.CollectionID)
     If pHistory = 0 Then Err.Raise 513, , "GetToastHistory failed."
 
-    hStrTag = WinRT_CreateHString(Config.Tag)
-    hStrGroup = WinRT_CreateHString(Config.Group)
-    hStrAppId = WinRT_CreateHString(Config.AppUserModelID)
+    hStrTag = WinRT_CachedHString(Config.Tag)
+    hStrGroup = WinRT_CachedHString(Config.Group)
+    hStrAppId = WinRT_CachedHString(Config.AppUserModelID)
 
     If Len(Config.Tag) > 0 Then
         WinRT_CallComMethod pHistory, VT_IToastNotificationHistory_RemoveGroupedTagWithId, vbLong, WinRT_vbPtr, hStrTag, WinRT_vbPtr, hStrGroup, WinRT_vbPtr, hStrAppId
@@ -2327,9 +2326,6 @@ Private Sub WinRT_RemoveToastNotification(ByRef Config As WinRT_ToastConfig)
 Cleanup:
     If Err.Number <> 0 Then Err.Raise Err.Number, "WinRT_RemoveToastNotification", Err.Description
     On Error Resume Next
-    If hStrAppId <> 0 Then WindowsDeleteString hStrAppId
-    If hStrGroup <> 0 Then WindowsDeleteString hStrGroup
-    If hStrTag <> 0 Then WindowsDeleteString hStrTag
     If pHistory <> 0 Then WinRT_CallComMethod pHistory, VT_RELEASE, vbLong
     On Error GoTo 0
 End Sub
@@ -2401,7 +2397,7 @@ Private Function WinRT_RemoveToastCollection(ByRef Config As WinRT_ToastConfig) 
 
     pAsync = 0
     If Len(Config.CollectionID) > 0 Then
-        hStrCollectionId = WinRT_CreateHString(Config.CollectionID)
+        hStrCollectionId = WinRT_CachedHString(Config.CollectionID)
         WinRT_CallComMethod pManager, VT_IToastCollectionManager_RemoveToastCollectionAsync, vbLong, WinRT_vbPtr, hStrCollectionId, WinRT_vbPtr, VarPtr(pAsync)
     Else
         WinRT_CallComMethod pManager, VT_IToastCollectionManager_RemoveAllToastCollectionsAsync, vbLong, WinRT_vbPtr, VarPtr(pAsync)
@@ -2411,7 +2407,6 @@ Private Function WinRT_RemoveToastCollection(ByRef Config As WinRT_ToastConfig) 
 Cleanup:
     If Err.Number <> 0 Then WinRT_RemoveToastCollection = Err.Number
     On Error Resume Next
-    If hStrCollectionId <> 0 Then WindowsDeleteString hStrCollectionId
     If pAsync <> 0 Then WinRT_CallComMethod pAsync, VT_RELEASE, vbLong
     If pManager <> 0 Then WinRT_CallComMethod pManager, VT_RELEASE, vbLong
     On Error GoTo 0
@@ -2434,9 +2429,8 @@ Private Function WinRT_GetToastCollectionManager(ByVal appId As String) As LongP
     WinRT_CallComMethod pManagerForUser, VT_RELEASE, vbLong
     If pManagerForUser2 = 0 Then Exit Function
 
-    hStrAppId = WinRT_CreateHString(appId)
+    hStrAppId = WinRT_CachedHString(appId)
     WinRT_CallComMethod pManagerForUser2, VT_IToastNotificationManagerForUser2_GetToastCollectionManagerWithAppId, vbLong, WinRT_vbPtr, hStrAppId, WinRT_vbPtr, VarPtr(pCollectionManager)
-    If hStrAppId <> 0 Then WindowsDeleteString hStrAppId
     WinRT_CallComMethod pManagerForUser2, VT_RELEASE, vbLong
 
     WinRT_GetToastCollectionManager = pCollectionManager
@@ -2454,17 +2448,14 @@ Private Function WinRT_CreateToastCollection(ByVal CollectionID As String, ByVal
 
     pFactory = WinRT_pToastCollectionFactory
     If pFactory <> 0 Then
-        hStrCollectionId = WinRT_CreateHString(CollectionID)
-        hStrDisplayName = WinRT_CreateHString(displayName)
-        hStrLaunchArgs = WinRT_CreateHString(launchArgs)
+        hStrCollectionId = WinRT_CachedHString(CollectionID)
+        hStrDisplayName = WinRT_CachedHString(displayName)
+        hStrLaunchArgs = WinRT_CachedHString(launchArgs)
 
         WinRT_CallComMethod pFactory, VT_IToastCollectionFactory_CreateInstance, vbLong, _
             WinRT_vbPtr, hStrCollectionId, WinRT_vbPtr, hStrDisplayName, WinRT_vbPtr, hStrLaunchArgs, WinRT_vbPtr, pUri, WinRT_vbPtr, VarPtr(pCollection)
     End If
 
-    If hStrCollectionId <> 0 Then WindowsDeleteString hStrCollectionId
-    If hStrDisplayName <> 0 Then WindowsDeleteString hStrDisplayName
-    If hStrLaunchArgs <> 0 Then WindowsDeleteString hStrLaunchArgs
     If pUri <> 0 Then WinRT_CallComMethod pUri, VT_RELEASE, vbLong
     WinRT_CreateToastCollection = pCollection
 End Function
@@ -2479,9 +2470,8 @@ Private Function WinRT_CreateUri(ByVal uri As String) As LongPtr
     pFactory = WinRT_pUriFactory
     If pFactory = 0 Then Exit Function
 
-    hStrUri = WinRT_CreateHString(uri)
+    hStrUri = WinRT_CachedHString(uri)
     WinRT_CallComMethod pFactory, VT_IUriFactory_CreateUri, vbLong, WinRT_vbPtr, hStrUri, WinRT_vbPtr, VarPtr(pUri)
-    If hStrUri <> 0 Then WindowsDeleteString hStrUri
     WinRT_CreateUri = pUri
 End Function
 
@@ -2517,8 +2507,8 @@ Private Sub WinRT_ShowImmediateToast(ByRef Config As WinRT_ToastConfig, ByRef Bi
 
     WinRT_CallComMethod pToast, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidToast2), WinRT_vbPtr, VarPtr(pToast2)
     If pToast2 <> 0 Then
-        hStrTag = WinRT_CreateHString(Config.Tag)
-        hStrGroup = WinRT_CreateHString(Config.Group)
+        hStrTag = WinRT_CachedHString(Config.Tag)
+        hStrGroup = WinRT_CachedHString(Config.Group)
         If hStrTag <> 0 Then WinRT_CallComMethod pToast2, VT_IToastNotification2_SetTag, vbLong, WinRT_vbPtr, hStrTag
         If hStrGroup <> 0 Then WinRT_CallComMethod pToast2, VT_IToastNotification2_SetGroup, vbLong, WinRT_vbPtr, hStrGroup
         If Config.SuppressPopup Then WinRT_CallComMethod pToast2, VT_IToastNotification2_SetSuppressPopup, vbLong, vbByte, CByte(1)
@@ -2545,8 +2535,6 @@ Private Sub WinRT_ShowImmediateToast(ByRef Config As WinRT_ToastConfig, ByRef Bi
     If pNotifier = 0 Then Err.Raise 513, , "CreateToastNotifier failed."
     WinRT_CallComMethod pNotifier, VT_IToastNotifier_Show, vbLong, WinRT_vbPtr, pToast
 
-    If hStrTag <> 0 Then WindowsDeleteString hStrTag
-    If hStrGroup <> 0 Then WindowsDeleteString hStrGroup
     If pNotifier <> 0 Then WinRT_CallComMethod pNotifier, VT_RELEASE, vbLong
     If pToast <> 0 Then WinRT_CallComMethod pToast, VT_RELEASE, vbLong
 End Sub
@@ -2584,10 +2572,10 @@ Private Sub WinRT_ShowScheduledToast(ByRef Config As WinRT_ToastConfig)
     WinRT_CallComMethod pScheduled, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidScheduled2), WinRT_vbPtr, VarPtr(pScheduled2)
     If pScheduled2 <> 0 Then
         If Len(Config.Schedule_ID) > 0 Then
-            hStrScheduleId = WinRT_CreateHString(WinRT_NormalizeScheduleId(Config.Schedule_ID))
+            hStrScheduleId = WinRT_CachedHString(WinRT_NormalizeScheduleId(Config.Schedule_ID))
         End If
-        hStrTag = WinRT_CreateHString(Config.Tag)
-        hStrGroup = WinRT_CreateHString(Config.Group)
+        hStrTag = WinRT_CachedHString(Config.Tag)
+        hStrGroup = WinRT_CachedHString(Config.Group)
         If hStrScheduleId <> 0 Then WinRT_CallComMethod pScheduled, VT_IScheduledToastNotification_SetId, vbLong, WinRT_vbPtr, hStrScheduleId
         If hStrTag <> 0 Then WinRT_CallComMethod pScheduled2, VT_IToastNotification2_SetTag, vbLong, WinRT_vbPtr, hStrTag
         If hStrGroup <> 0 Then WinRT_CallComMethod pScheduled2, VT_IToastNotification2_SetGroup, vbLong, WinRT_vbPtr, hStrGroup
@@ -2610,9 +2598,6 @@ Private Sub WinRT_ShowScheduledToast(ByRef Config As WinRT_ToastConfig)
     If pNotifier = 0 Then Err.Raise 513, , "CreateToastNotifier failed."
     WinRT_CallComMethod pNotifier, VT_IToastNotifier_AddToSchedule, vbLong, WinRT_vbPtr, pScheduled
 
-    If hStrScheduleId <> 0 Then WindowsDeleteString hStrScheduleId
-    If hStrTag <> 0 Then WindowsDeleteString hStrTag
-    If hStrGroup <> 0 Then WindowsDeleteString hStrGroup
     If pNotifier <> 0 Then WinRT_CallComMethod pNotifier, VT_RELEASE, vbLong
     If pScheduled <> 0 Then WinRT_CallComMethod pScheduled, VT_RELEASE, vbLong
 End Sub
@@ -2630,9 +2615,8 @@ Private Function WinRT_CreateToastNotifierWithAppId(ByVal AppUserModelID As Stri
     Dim pNotifier As LongPtr
 
     If WinRT_pManagerStatics = 0 Then Exit Function
-    hStrAppId = WinRT_CreateHString(AppUserModelID)
+    hStrAppId = WinRT_CachedHString(AppUserModelID)
     WinRT_CallComMethod WinRT_pManagerStatics, 7, vbLong, WinRT_vbPtr, hStrAppId, WinRT_vbPtr, VarPtr(pNotifier)
-    If hStrAppId <> 0 Then WindowsDeleteString hStrAppId
     WinRT_CreateToastNotifierWithAppId = pNotifier
 End Function
 
@@ -2654,9 +2638,8 @@ Private Function WinRT_CreateToastNotifierForCollection(ByVal CollectionID As St
     WinRT_CallComMethod pManagerForUser, VT_RELEASE, vbLong
     If pManagerForUser2 = 0 Then Exit Function
 
-    hStrCollectionId = WinRT_CreateHString(CollectionID)
+    hStrCollectionId = WinRT_CachedHString(CollectionID)
     WinRT_CallComMethod pManagerForUser2, 6, vbLong, WinRT_vbPtr, hStrCollectionId, WinRT_vbPtr, VarPtr(pAsync)
-    If hStrCollectionId <> 0 Then WindowsDeleteString hStrCollectionId
     WinRT_CallComMethod pManagerForUser2, VT_RELEASE, vbLong
 
     If pAsync <> 0 Then
@@ -2706,9 +2689,8 @@ Private Function WinRT_GetHistoryForCollection(ByVal CollectionID As String) As 
     WinRT_CallComMethod pManagerForUser, VT_RELEASE, vbLong
     If pManagerForUser2 = 0 Then Exit Function
 
-    hStrCollectionId = WinRT_CreateHString(CollectionID)
+    hStrCollectionId = WinRT_CachedHString(CollectionID)
     WinRT_CallComMethod pManagerForUser2, 7, vbLong, WinRT_vbPtr, hStrCollectionId, WinRT_vbPtr, VarPtr(pAsync)
-    If hStrCollectionId <> 0 Then WindowsDeleteString hStrCollectionId
     WinRT_CallComMethod pManagerForUser2, VT_RELEASE, vbLong
 
     If pAsync <> 0 Then
@@ -2728,9 +2710,8 @@ Private Function WinRT_LoadXmlDocument(ByVal xml As String) As LongPtr
     Dim pInspectable As LongPtr
     Dim pXmlDocIO As LongPtr
     Dim pXmlDoc As LongPtr
-    hStrXmlClass = WinRT_CreateHString("Windows.Data.Xml.Dom.XmlDocument")
+    hStrXmlClass = WinRT_CachedHString("Windows.Data.Xml.Dom.XmlDocument")
     RoActivateInstance hStrXmlClass, pInspectable
-    If hStrXmlClass <> 0 Then WindowsDeleteString hStrXmlClass
     If pInspectable = 0 Then Exit Function
 
     WinRT_CallComMethod pInspectable, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidXmlDocIO), WinRT_vbPtr, VarPtr(pXmlDocIO)
@@ -2763,9 +2744,8 @@ Private Function WinRT_CreateNotificationData(ByRef Binding As WinRT_DataBinding
 
     If Not WinRT_DataBindingHasContent(Binding) Then Exit Function
 
-    hStrClass = WinRT_CreateHString("Windows.UI.Notifications.NotificationData")
+    hStrClass = WinRT_CachedHString("Windows.UI.Notifications.NotificationData")
     RoActivateInstance hStrClass, pInspectable
-    If hStrClass <> 0 Then WindowsDeleteString hStrClass
     If pInspectable = 0 Then Exit Function
 
     WinRT_CallComMethod pInspectable, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidNotificationData), WinRT_vbPtr, VarPtr(pData)
@@ -2883,18 +2863,41 @@ Private Sub WinRT_InsertMapValue(ByVal pMap As LongPtr, ByVal key As String, ByV
     Dim hKey As LongPtr
     Dim hVal As LongPtr
     Dim replaced As Byte
-    hKey = WinRT_CreateHString(key)
+    hKey = WinRT_CachedHString(key)
     hVal = WinRT_CreateHString(val)
     WinRT_CallComMethod pMap, 10, vbLong, WinRT_vbPtr, hKey, WinRT_vbPtr, hVal, WinRT_vbPtr, VarPtr(replaced)
-    WindowsDeleteString hKey
     WindowsDeleteString hVal
 End Sub
 
 Private Sub WinRT_GetActivationFactory(ByVal className As String, ByRef iid As WinRT_GUID, ByRef factory As LongPtr)
-    Dim hStrClass As LongPtr
-    hStrClass = WinRT_CreateHString(className)
-    RoGetActivationFactory hStrClass, iid, factory
-    If hStrClass <> 0 Then WindowsDeleteString hStrClass
+    RoGetActivationFactory WinRT_CachedHString(className), iid, factory
+End Sub
+
+Private Function WinRT_CachedHString(ByVal s As String) As LongPtr
+    Dim hStr As LongPtr
+
+    If WinRT_HStringCache Is Nothing Then Set WinRT_HStringCache = CreateObject("Scripting.Dictionary")
+    If WinRT_HStringCache.Exists(s) Then
+        WinRT_CachedHString = WinRT_HStringCache(s)
+        Exit Function
+    End If
+
+    hStr = WinRT_CreateHString(s)
+    WinRT_HStringCache.Add s, hStr
+    WinRT_CachedHString = hStr
+End Function
+
+Private Sub WinRT_ReleaseHStringCache()
+    On Error Resume Next
+    Dim k As Variant
+    Dim h As LongPtr
+    If WinRT_HStringCache Is Nothing Then Exit Sub
+    For Each k In WinRT_HStringCache.Keys
+        h = WinRT_HStringCache(k)
+        If h <> 0 Then WindowsDeleteString h
+    Next k
+    WinRT_HStringCache.RemoveAll
+    On Error GoTo 0
 End Sub
 
 Private Function WinRT_CreateHString(ByVal s As String) As LongPtr
@@ -3029,9 +3032,8 @@ Private Sub WinRT_ScheduleDateToWinRTDateTimeFillViaTlb(ByVal deliverySerial As 
     minutes = DateDiff("n", Now, deliverySerial)
     If minutes < 1 Then Err.Raise 5, "WinRT_ScheduleDateToWinRTDateTimeFillViaTlb", "Schedule delivery time must be in the future."
 
-    hClass = WinRT_CreateHString("Windows.Globalization.Calendar")
+    hClass = WinRT_CachedHString("Windows.Globalization.Calendar")
     hr = RoActivateInstanceObj(hClass, cal)
-    If hClass <> 0 Then WindowsDeleteString hClass
     If hr < 0 Then Err.Raise hr, "WinRT_ScheduleDateToWinRTDateTimeFillViaTlb", "RoActivateInstance Calendar failed: 0x" & Hex$(hr)
 
     hr = cal.SetToNow()
@@ -3222,6 +3224,7 @@ Private Sub WinRT_InitCache()
 End Sub
 
 Private Sub WinRT_ReleaseCache()
+    WinRT_ReleaseHStringCache
     On Error Resume Next
     If WinRT_pManagerStatics2 <> 0 Then WinRT_CallComMethod WinRT_pManagerStatics2, VT_RELEASE, vbLong: WinRT_pManagerStatics2 = 0
     If WinRT_pManagerStatics <> 0 Then WinRT_CallComMethod WinRT_pManagerStatics, VT_RELEASE, vbLong: WinRT_pManagerStatics = 0
@@ -3801,6 +3804,7 @@ Private Sub Class_Initialize()
     SubgroupInnerImagesTotal = -1
     SubgroupInnerTotal = -1
 
+    Set WinRT_HStringCache = CreateObject("Scripting.Dictionary")
     WinRT_InitCache
 End Sub
 
