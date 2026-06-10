@@ -3322,9 +3322,12 @@ End Function
 
 Private Function WinRT_CallComMethod(ByVal pUnk As LongPtr, ByVal vTableIndex As Long, ByVal retType As Integer, ParamArray args() As Variant) As Variant
     Dim vTableOffset As LongPtr
-    Dim argTypes() As Integer
-    Dim argPointers() As LongPtr
-    Dim argValues() As Variant
+
+    ' 【チート！】ReDimを一切使わない、最初から16個の空き地を確保した固定長配列！
+    Dim argTypes(0 To 15) As Integer
+    Dim argPointers(0 To 15) As LongPtr
+    Dim argValues(0 To 15) As Variant
+
     Dim argCount As Long
     Dim i As Long
     Dim hRes As Long
@@ -3337,21 +3340,27 @@ Private Function WinRT_CallComMethod(ByVal pUnk As LongPtr, ByVal vTableIndex As
     vTableOffset = vTableIndex * 4
 #End If
 
+    ' 引数の数を計算（(要素数 + 1) / 2）
     argCount = (UBound(args) + 1) \ 2
+
+    ' 万が一、16個を超える引数が渡されたらエラーにする（普通のAPIならあり得ません）
+    If argCount > 16 Then Err.Raise 513, "WinRT_CallComMethod", "Too many arguments. Max is 16."
+
     If argCount > 0 Then
-        ReDim argTypes(0 To argCount - 1)
-        ReDim argPointers(0 To argCount - 1)
-        ReDim argValues(0 To argCount - 1)
+        ' ReDimを一切通さず、固定の箱に直接値を当てはめていく（爆速！）
         For i = 0 To argCount - 1
             argTypes(i) = CInt(args(i * 2))
             argValues(i) = args(i * 2 + 1)
             argPointers(i) = VarPtr(argValues(i))
         Next i
+
+        ' 配列の「先頭（0番目）」の番地を渡す。DispCallFuncは、argCount分の数だけしか読み込まない
         hRes = DispCallFunc(pUnk, vTableOffset, 4, retType, argCount, argTypes(0), argPointers(0), vResult)
     Else
         hRes = DispCallFunc(pUnk, vTableOffset, 4, retType, 0, ByVal 0&, ByVal 0&, vResult)
     End If
 
+    ' --- エラー処理とお掃除はそのまま ---
     If hRes <> 0 Then Err.Raise hRes, "WinRT_CallComMethod", "DispCallFunc failed at vtable index " & vTableIndex & ": 0x" & Hex$(hRes)
     If vTableIndex <> VT_RELEASE Then
         Select Case VarType(vResult)
