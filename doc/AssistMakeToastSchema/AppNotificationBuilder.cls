@@ -2875,15 +2875,27 @@ End Sub
 
 Private Function WinRT_CachedHString(ByVal s As String) As LongPtr
     Dim hStr As LongPtr
+    Dim cy As Currency
 
     If WinRT_HStringCache Is Nothing Then Set WinRT_HStringCache = CreateObject("Scripting.Dictionary")
     If WinRT_HStringCache.Exists(s) Then
-        WinRT_CachedHString = WinRT_HStringCache(s)
-        Exit Function
+        cy = WinRT_HStringCache(s)
+#If Win64 Then
+        RtlMoveMemory WinRT_CachedHString, cy, 8
+#Else
+        RtlMoveMemory WinRT_CachedHString, cy, 4
+#End If
+        If WinRT_CachedHString <> 0 Then Exit Function
+        WinRT_HStringCache.Remove s
     End If
 
     hStr = WinRT_CreateHString(s)
-    WinRT_HStringCache.Add s, hStr
+#If Win64 Then
+    RtlMoveMemory cy, hStr, 8
+#Else
+    RtlMoveMemory cy, hStr, 4
+#End If
+    WinRT_HStringCache.Add s, cy
     WinRT_CachedHString = hStr
 End Function
 
@@ -2891,9 +2903,15 @@ Private Sub WinRT_ReleaseHStringCache()
     On Error Resume Next
     Dim k As Variant
     Dim h As LongPtr
+    Dim cy As Currency
     If WinRT_HStringCache Is Nothing Then Exit Sub
     For Each k In WinRT_HStringCache.Keys
-        h = WinRT_HStringCache(k)
+        cy = WinRT_HStringCache(k)
+#If Win64 Then
+        RtlMoveMemory h, cy, 8
+#Else
+        RtlMoveMemory h, cy, 4
+#End If
         If h <> 0 Then WindowsDeleteString h
     Next k
     WinRT_HStringCache.RemoveAll
