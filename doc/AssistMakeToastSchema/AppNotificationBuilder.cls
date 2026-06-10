@@ -275,6 +275,38 @@ Private Const WinRT_IID_IAsyncInfo As String = "{00000036-0000-0000-C000-0000000
 Private WinRT_RoInitialized As Boolean
 Private WinRT_ToastDataSequenceNumber As Long
 
+' WinRT cache (Class_Initialize / Class_Terminate)
+Private WinRT_CacheReady As Boolean
+Private WinRT_iidNotifier2 As WinRT_GUID
+Private WinRT_iidManagerStatics As WinRT_GUID
+Private WinRT_iidManagerStatics2 As WinRT_GUID
+Private WinRT_iidManagerStatics5 As WinRT_GUID
+Private WinRT_iidManagerForUser2 As WinRT_GUID
+Private WinRT_iidToastCollectionFactory As WinRT_GUID
+Private WinRT_iidUriFactory As WinRT_GUID
+Private WinRT_iidToast4 As WinRT_GUID
+Private WinRT_iidToast2 As WinRT_GUID
+Private WinRT_iidToast6 As WinRT_GUID
+Private WinRT_iidScheduledFactory As WinRT_GUID
+Private WinRT_iidScheduled2 As WinRT_GUID
+Private WinRT_iidScheduled4 As WinRT_GUID
+Private WinRT_iidXmlDocIO As WinRT_GUID
+Private WinRT_iidXmlDoc As WinRT_GUID
+Private WinRT_iidToastFactory As WinRT_GUID
+Private WinRT_iidNotificationData As WinRT_GUID
+Private WinRT_iidPropertyValueStatics As WinRT_GUID
+Private WinRT_iidReferenceDateTime As WinRT_GUID
+Private WinRT_iidAsyncInfo As WinRT_GUID
+Private WinRT_pManagerStatics As LongPtr
+Private WinRT_pManagerStatics2 As LongPtr
+Private WinRT_pManagerStatics5 As LongPtr
+Private WinRT_pToastFactory As LongPtr
+Private WinRT_pScheduledToastFactory As LongPtr
+Private WinRT_pToastCollectionFactory As LongPtr
+Private WinRT_pUriFactory As LongPtr
+Private WinRT_pPropertyValueStatics As LongPtr
+
+
 '---------------------------------------------------------------------------------------------------
 ' [ SECTION ] 主要
 '---------------------------------------------------------------------------------------------------
@@ -2185,9 +2217,8 @@ End Property
 '                     ■■■ WinRT-API へ直接アクセスするためのメソッド群 ■■■
 '***************************************************************************************************
 Private Sub WinRT_ShowToastNotification(ByRef Config As WinRT_ToastConfig, ByRef Binding As WinRT_DataBinding)
-    Dim initialized As Boolean
     On Error GoTo Cleanup
-    WinRT_EnsureRoInitialized initialized
+
     WinRT_ValidateToastIdentity Config, "WinRT_ShowToastNotification"
 
     If WinRT_DataBindingHasContent(Binding) Then
@@ -2202,21 +2233,17 @@ Private Sub WinRT_ShowToastNotification(ByRef Config As WinRT_ToastConfig, ByRef
 
 Cleanup:
     If Err.Number <> 0 Then Err.Raise Err.Number, "WinRT_ShowToastNotification", Err.Description
-    WinRT_FinalizeRo initialized
 End Sub
 
 Private Function WinRT_UpdateToastNotification(ByRef Config As WinRT_ToastConfig, ByRef Binding As WinRT_DataBinding) As Long
-    Dim initialized As Boolean
     Dim pNotifier As LongPtr
     Dim pNotifier2 As LongPtr
     Dim pData As LongPtr
     Dim hStrTag As LongPtr
     Dim hStrGroup As LongPtr
-    Dim iidNotifier2 As WinRT_GUID
     Dim updateResult As Long
 
     On Error GoTo Cleanup
-    WinRT_EnsureRoInitialized initialized
     WinRT_ValidateToastIdentity Config, "WinRT_UpdateToastNotification"
 
     If WinRT_DataBindingHasContent(Binding) Then
@@ -2226,8 +2253,7 @@ Private Function WinRT_UpdateToastNotification(ByRef Config As WinRT_ToastConfig
     pNotifier = WinRT_CreateToastNotifier(Config.AppUserModelID, Config.CollectionID)
     If pNotifier = 0 Then Err.Raise 513, , "CreateToastNotifier failed."
 
-    IIDFromString StrPtr("{354389C6-7C01-4BD5-9C20-604340CD2B74}"), iidNotifier2
-    WinRT_CallComMethod pNotifier, VT_QI, vbLong, WinRT_vbPtr, VarPtr(iidNotifier2), WinRT_vbPtr, VarPtr(pNotifier2)
+    WinRT_CallComMethod pNotifier, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidNotifier2), WinRT_vbPtr, VarPtr(pNotifier2)
     If pNotifier2 = 0 Then Err.Raise 513, , "QueryInterface IToastNotifier2 failed."
 
     pData = WinRT_CreateNotificationData(Binding)
@@ -2251,11 +2277,11 @@ Cleanup:
     If pData <> 0 Then WinRT_CallComMethod pData, VT_RELEASE, vbLong
     If pNotifier2 <> 0 Then WinRT_CallComMethod pNotifier2, VT_RELEASE, vbLong
     If pNotifier <> 0 Then WinRT_CallComMethod pNotifier, VT_RELEASE, vbLong
-    WinRT_FinalizeRo initialized
     On Error GoTo 0
 End Function
 
 Private Sub WinRT_Shutdown()
+    WinRT_ReleaseCache
     If WinRT_RoInitialized Then
         RoUninitialize
         WinRT_RoInitialized = False
@@ -2273,14 +2299,12 @@ Private Function WinRT_NextToastDataSequence() As Long
 End Function
 
 Private Sub WinRT_RemoveToastNotification(ByRef Config As WinRT_ToastConfig)
-    Dim initialized As Boolean
     Dim pHistory As LongPtr
     Dim hStrTag As LongPtr
     Dim hStrGroup As LongPtr
     Dim hStrAppId As LongPtr
 
     On Error GoTo Cleanup
-    WinRT_EnsureRoInitialized initialized
 
     If Len(Config.AppUserModelID) = 0 Then Err.Raise 513, "WinRT_RemoveToastNotification", "AppUserModelID is required."
     If Len(Config.Tag) > 0 And Len(Config.Group) = 0 Then Err.Raise 513, "WinRT_RemoveToastNotification", "Group is required when Tag is specified."
@@ -2307,17 +2331,14 @@ Cleanup:
     If hStrGroup <> 0 Then WindowsDeleteString hStrGroup
     If hStrTag <> 0 Then WindowsDeleteString hStrTag
     If pHistory <> 0 Then WinRT_CallComMethod pHistory, VT_RELEASE, vbLong
-    WinRT_FinalizeRo initialized
     On Error GoTo 0
 End Sub
 
 Private Function WinRT_CheckNotificationSetting(ByRef Config As WinRT_ToastConfig) As Long
-    Dim initialized As Boolean
     Dim pNotifier As LongPtr
     Dim settingValue As Long
 
     On Error GoTo Cleanup
-    WinRT_EnsureRoInitialized initialized
 
     pNotifier = WinRT_CreateToastNotifier(Config.AppUserModelID, Config.CollectionID)
     If pNotifier = 0 Then Err.Raise 513, , "CreateToastNotifier failed."
@@ -2332,19 +2353,16 @@ Cleanup:
     If Err.Number <> 0 Then WinRT_CheckNotificationSetting = Err.Number
     On Error Resume Next
     If pNotifier <> 0 Then WinRT_CallComMethod pNotifier, VT_RELEASE, vbLong
-    WinRT_FinalizeRo initialized
     On Error GoTo 0
 End Function
 
 ' CollectionNotice.cpp CreateToastCollection と同等（WinRT 直呼び）。0=成功
 Private Function WinRT_SaveToastCollection(ByRef Config As WinRT_ToastConfig, ByVal displayName As String, ByVal launchArgs As String, ByVal iconUri As String) As Long
-    Dim initialized As Boolean
     Dim pManager As LongPtr
     Dim pCollection As LongPtr
     Dim pAsync As LongPtr
 
     On Error GoTo Cleanup
-    WinRT_EnsureRoInitialized initialized
 
     If Len(Config.AppUserModelID) = 0 Then Err.Raise 513, "WinRT_SaveToastCollection", "AppUserModelID is required."
     If Len(Config.CollectionID) = 0 Then Err.Raise 513, "WinRT_SaveToastCollection", "CollectionID is required."
@@ -2365,19 +2383,16 @@ Cleanup:
     If pAsync <> 0 Then WinRT_CallComMethod pAsync, VT_RELEASE, vbLong
     If pCollection <> 0 Then WinRT_CallComMethod pCollection, VT_RELEASE, vbLong
     If pManager <> 0 Then WinRT_CallComMethod pManager, VT_RELEASE, vbLong
-    WinRT_FinalizeRo initialized
     On Error GoTo 0
 End Function
 
 ' CollectionNotice.cpp DeleteToastCollection と同等。CollectionID 省略時は全削除。0=成功
 Private Function WinRT_RemoveToastCollection(ByRef Config As WinRT_ToastConfig) As Long
-    Dim initialized As Boolean
     Dim pManager As LongPtr
     Dim pAsync As LongPtr
     Dim hStrCollectionId As LongPtr
 
     On Error GoTo Cleanup
-    WinRT_EnsureRoInitialized initialized
 
     If Len(Config.AppUserModelID) = 0 Then Err.Raise 513, "WinRT_RemoveToastCollection", "AppUserModelID is required."
 
@@ -2399,7 +2414,6 @@ Cleanup:
     If hStrCollectionId <> 0 Then WindowsDeleteString hStrCollectionId
     If pAsync <> 0 Then WinRT_CallComMethod pAsync, VT_RELEASE, vbLong
     If pManager <> 0 Then WinRT_CallComMethod pManager, VT_RELEASE, vbLong
-    WinRT_FinalizeRo initialized
     On Error GoTo 0
 End Function
 
@@ -2410,20 +2424,13 @@ Private Function WinRT_GetToastCollectionManager(ByVal appId As String) As LongP
     Dim pManagerForUser2 As LongPtr
     Dim pCollectionManager As LongPtr
     Dim hStrAppId As LongPtr
-    Dim iidManagerStatics5 As WinRT_GUID
-    Dim iidManagerForUser2 As WinRT_GUID
-
-    IIDFromString StrPtr("{D6F5F569-D40D-407C-8989-88CAB42CFD14}"), iidManagerStatics5
-    IIDFromString StrPtr("{679C64B7-81AB-42C2-8819-C958767753F4}"), iidManagerForUser2
-
-    WinRT_GetActivationFactory "Windows.UI.Notifications.ToastNotificationManager", iidManagerStatics5, pManagerStatics5
-    If pManagerStatics5 = 0 Then Exit Function
+    If WinRT_pManagerStatics5 = 0 Then Exit Function
+    pManagerStatics5 = WinRT_pManagerStatics5
 
     WinRT_CallComMethod pManagerStatics5, VT_IToastNotificationManagerStatics5_GetDefault, vbLong, WinRT_vbPtr, VarPtr(pManagerForUser)
-    WinRT_CallComMethod pManagerStatics5, VT_RELEASE, vbLong
     If pManagerForUser = 0 Then Exit Function
 
-    WinRT_CallComMethod pManagerForUser, VT_QI, vbLong, WinRT_vbPtr, VarPtr(iidManagerForUser2), WinRT_vbPtr, VarPtr(pManagerForUser2)
+    WinRT_CallComMethod pManagerForUser, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidManagerForUser2), WinRT_vbPtr, VarPtr(pManagerForUser2)
     WinRT_CallComMethod pManagerForUser, VT_RELEASE, vbLong
     If pManagerForUser2 = 0 Then Exit Function
 
@@ -2443,12 +2450,9 @@ Private Function WinRT_CreateToastCollection(ByVal CollectionID As String, ByVal
     Dim hStrCollectionId As LongPtr
     Dim hStrDisplayName As LongPtr
     Dim hStrLaunchArgs As LongPtr
-    Dim iidFactory As WinRT_GUID
-
     pUri = WinRT_CreateUri(iconUri)
 
-    IIDFromString StrPtr("{164DD3D7-73C4-44F7-B4FF-FB6D4BF1F4C6}"), iidFactory
-    WinRT_GetActivationFactory "Windows.UI.Notifications.ToastCollection", iidFactory, pFactory
+    pFactory = WinRT_pToastCollectionFactory
     If pFactory <> 0 Then
         hStrCollectionId = WinRT_CreateHString(CollectionID)
         hStrDisplayName = WinRT_CreateHString(displayName)
@@ -2462,7 +2466,6 @@ Private Function WinRT_CreateToastCollection(ByVal CollectionID As String, ByVal
     If hStrDisplayName <> 0 Then WindowsDeleteString hStrDisplayName
     If hStrLaunchArgs <> 0 Then WindowsDeleteString hStrLaunchArgs
     If pUri <> 0 Then WinRT_CallComMethod pUri, VT_RELEASE, vbLong
-    If pFactory <> 0 Then WinRT_CallComMethod pFactory, VT_RELEASE, vbLong
     WinRT_CreateToastCollection = pCollection
 End Function
 
@@ -2471,18 +2474,14 @@ Private Function WinRT_CreateUri(ByVal uri As String) As LongPtr
     Dim pFactory As LongPtr
     Dim pUri As LongPtr
     Dim hStrUri As LongPtr
-    Dim iidFactory As WinRT_GUID
-
     If Len(uri) = 0 Then Exit Function
 
-    IIDFromString StrPtr("{44A9796F-723E-4FDF-A218-033E75B0C084}"), iidFactory
-    WinRT_GetActivationFactory "Windows.Foundation.Uri", iidFactory, pFactory
+    pFactory = WinRT_pUriFactory
     If pFactory = 0 Then Exit Function
 
     hStrUri = WinRT_CreateHString(uri)
     WinRT_CallComMethod pFactory, VT_IUriFactory_CreateUri, vbLong, WinRT_vbPtr, hStrUri, WinRT_vbPtr, VarPtr(pUri)
     If hStrUri <> 0 Then WindowsDeleteString hStrUri
-    WinRT_CallComMethod pFactory, VT_RELEASE, vbLong
     WinRT_CreateUri = pUri
 End Function
 
@@ -2496,10 +2495,6 @@ Private Sub WinRT_ShowImmediateToast(ByRef Config As WinRT_ToastConfig, ByRef Bi
     Dim pData As LongPtr
     Dim hStrTag As LongPtr
     Dim hStrGroup As LongPtr
-    Dim iidToast2 As WinRT_GUID
-    Dim iidToast4 As WinRT_GUID
-    Dim iidToast6 As WinRT_GUID
-
     pXmlDoc = WinRT_LoadXmlDocument(Config.XmlTemplate)
     If pXmlDoc = 0 Then Err.Raise 513, , "LoadXmlDocument failed."
 
@@ -2510,8 +2505,7 @@ Private Sub WinRT_ShowImmediateToast(ByRef Config As WinRT_ToastConfig, ByRef Bi
 
     pData = WinRT_CreateNotificationData(Binding)
     If pData <> 0 Then
-        IIDFromString StrPtr("{15154935-28EA-4727-88E9-C58680E2D118}"), iidToast4
-        WinRT_CallComMethod pToast, VT_QI, vbLong, WinRT_vbPtr, VarPtr(iidToast4), WinRT_vbPtr, VarPtr(pToast4)
+        WinRT_CallComMethod pToast, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidToast4), WinRT_vbPtr, VarPtr(pToast4)
         If pToast4 <> 0 Then
             WinRT_CallComMethod pToast4, VT_IToastNotification4_SetData, vbLong, WinRT_vbPtr, pData
             WinRT_CallComMethod pToast4, VT_RELEASE, vbLong
@@ -2521,8 +2515,7 @@ Private Sub WinRT_ShowImmediateToast(ByRef Config As WinRT_ToastConfig, ByRef Bi
         pData = 0
     End If
 
-    IIDFromString StrPtr("{9DFB9FD1-143A-490E-90BF-B9FBA7132DE7}"), iidToast2
-    WinRT_CallComMethod pToast, VT_QI, vbLong, WinRT_vbPtr, VarPtr(iidToast2), WinRT_vbPtr, VarPtr(pToast2)
+    WinRT_CallComMethod pToast, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidToast2), WinRT_vbPtr, VarPtr(pToast2)
     If pToast2 <> 0 Then
         hStrTag = WinRT_CreateHString(Config.Tag)
         hStrGroup = WinRT_CreateHString(Config.Group)
@@ -2534,8 +2527,7 @@ Private Sub WinRT_ShowImmediateToast(ByRef Config As WinRT_ToastConfig, ByRef Bi
     End If
 
     If Config.ExpiresOnReboot Then
-        IIDFromString StrPtr("{43EBFE53-89AE-5C1E-A279-3AECFE9B6F54}"), iidToast6
-        WinRT_CallComMethod pToast, VT_QI, vbLong, WinRT_vbPtr, VarPtr(iidToast6), WinRT_vbPtr, VarPtr(pToast6)
+        WinRT_CallComMethod pToast, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidToast6), WinRT_vbPtr, VarPtr(pToast6)
         If pToast6 <> 0 Then
             WinRT_CallComMethod pToast6, VT_IToastNotification6_SetExpiresOnReboot, vbLong, vbByte, CByte(1)
             WinRT_CallComMethod pToast6, VT_RELEASE, vbLong
@@ -2576,28 +2568,20 @@ Private Sub WinRT_ShowScheduledToast(ByRef Config As WinRT_ToastConfig)
     Dim hStrTag As LongPtr
     Dim hStrGroup As LongPtr
     Dim deliveryTime As WRT_DateTime
-    Dim iidScheduledFactory As WinRT_GUID
-    Dim iidScheduled2 As WinRT_GUID
-    Dim iidScheduled4 As WinRT_GUID
-
     pXmlDoc = WinRT_LoadXmlDocument(Config.XmlTemplate)
     If pXmlDoc = 0 Then Err.Raise 513, , "LoadXmlDocument failed."
 
-    IIDFromString StrPtr("{E7BED191-0BB9-4189-8394-31761B476FD7}"), iidScheduledFactory
-    WinRT_GetActivationFactory "Windows.UI.Notifications.ScheduledToastNotification", iidScheduledFactory, pScheduledFactory
+    pScheduledFactory = WinRT_pScheduledToastFactory
     If pScheduledFactory = 0 Then Err.Raise 513, , "ScheduledToastNotification factory failed."
 
     WinRT_ScheduleDateToWinRTDateTimeFillFromConfig Config, deliveryTime
     pScheduled = 0
     WinRT_FactoryCreateScheduledToast pScheduledFactory, pXmlDoc, deliveryTime, pScheduled
-    WinRT_CallComMethod pScheduledFactory, VT_RELEASE, vbLong
     WinRT_CallComMethod pXmlDoc, VT_RELEASE, vbLong
-    pScheduledFactory = 0
     pXmlDoc = 0
     If pScheduled = 0 Then Err.Raise 513, , "CreateScheduledToastNotification failed."
 
-    IIDFromString StrPtr("{A66EA09C-31B4-43B0-B5DD-7A40E85363B1}"), iidScheduled2
-    WinRT_CallComMethod pScheduled, VT_QI, vbLong, WinRT_vbPtr, VarPtr(iidScheduled2), WinRT_vbPtr, VarPtr(pScheduled2)
+    WinRT_CallComMethod pScheduled, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidScheduled2), WinRT_vbPtr, VarPtr(pScheduled2)
     If pScheduled2 <> 0 Then
         If Len(Config.Schedule_ID) > 0 Then
             hStrScheduleId = WinRT_CreateHString(WinRT_NormalizeScheduleId(Config.Schedule_ID))
@@ -2614,8 +2598,7 @@ Private Sub WinRT_ShowScheduledToast(ByRef Config As WinRT_ToastConfig)
 
     If Config.ExpirationTime > 0 Then
         ' IScheduledToastNotification4（1D4761FD...）。98429E8B... は v3 で ExpirationTime は存在しない
-        IIDFromString StrPtr("{1D4761FD-BDEF-4E4A-96BE-0101369B58D2}"), iidScheduled4
-        WinRT_CallComMethod pScheduled, VT_QI, vbLong, WinRT_vbPtr, VarPtr(iidScheduled4), WinRT_vbPtr, VarPtr(pScheduled4)
+        WinRT_CallComMethod pScheduled, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidScheduled4), WinRT_vbPtr, VarPtr(pScheduled4)
         If pScheduled4 <> 0 Then
             WinRT_ApplyExpirationTime pScheduled4, VT_IScheduledToastNotification4_SetExpirationTime, Config
             WinRT_CallComMethod pScheduled4, VT_RELEASE, vbLong
@@ -2643,22 +2626,13 @@ Private Function WinRT_CreateToastNotifier(ByVal AppUserModelID As String, ByVal
 End Function
 
 Private Function WinRT_CreateToastNotifierWithAppId(ByVal AppUserModelID As String) As LongPtr
-    Dim hStrManagerClass As LongPtr
     Dim hStrAppId As LongPtr
-    Dim pManagerStatics As LongPtr
     Dim pNotifier As LongPtr
-    Dim iidManagerStatics As WinRT_GUID
 
-    IIDFromString StrPtr("{50AC103F-D235-4598-BBEF-98FE4D1A3AD4}"), iidManagerStatics
-    hStrManagerClass = WinRT_CreateHString("Windows.UI.Notifications.ToastNotificationManager")
-    RoGetActivationFactory hStrManagerClass, iidManagerStatics, pManagerStatics
-    If hStrManagerClass <> 0 Then WindowsDeleteString hStrManagerClass
-
-    If pManagerStatics = 0 Then Exit Function
+    If WinRT_pManagerStatics = 0 Then Exit Function
     hStrAppId = WinRT_CreateHString(AppUserModelID)
-    WinRT_CallComMethod pManagerStatics, 7, vbLong, WinRT_vbPtr, hStrAppId, WinRT_vbPtr, VarPtr(pNotifier)
+    WinRT_CallComMethod WinRT_pManagerStatics, 7, vbLong, WinRT_vbPtr, hStrAppId, WinRT_vbPtr, VarPtr(pNotifier)
     If hStrAppId <> 0 Then WindowsDeleteString hStrAppId
-    WinRT_CallComMethod pManagerStatics, VT_RELEASE, vbLong
     WinRT_CreateToastNotifierWithAppId = pNotifier
 End Function
 
@@ -2670,20 +2644,13 @@ Private Function WinRT_CreateToastNotifierForCollection(ByVal CollectionID As St
     Dim pAsync As LongPtr
     Dim pNotifier As LongPtr
     Dim hr As Long
-    Dim iidManagerStatics5 As WinRT_GUID
-    Dim iidManagerForUser2 As WinRT_GUID
-
-    IIDFromString StrPtr("{D6F5F569-D40D-407C-8989-88CAB42CFD14}"), iidManagerStatics5
-    IIDFromString StrPtr("{679C64B7-81AB-42C2-8819-C958767753F4}"), iidManagerForUser2
-
-    WinRT_GetActivationFactory "Windows.UI.Notifications.ToastNotificationManager", iidManagerStatics5, pManagerStatics5
-    If pManagerStatics5 = 0 Then Exit Function
+    If WinRT_pManagerStatics5 = 0 Then Exit Function
+    pManagerStatics5 = WinRT_pManagerStatics5
 
     WinRT_CallComMethod pManagerStatics5, 6, vbLong, WinRT_vbPtr, VarPtr(pManagerForUser)
-    WinRT_CallComMethod pManagerStatics5, VT_RELEASE, vbLong
     If pManagerForUser = 0 Then Exit Function
 
-    WinRT_CallComMethod pManagerForUser, VT_QI, vbLong, WinRT_vbPtr, VarPtr(iidManagerForUser2), WinRT_vbPtr, VarPtr(pManagerForUser2)
+    WinRT_CallComMethod pManagerForUser, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidManagerForUser2), WinRT_vbPtr, VarPtr(pManagerForUser2)
     WinRT_CallComMethod pManagerForUser, VT_RELEASE, vbLong
     If pManagerForUser2 = 0 Then Exit Function
 
@@ -2712,25 +2679,12 @@ Private Function WinRT_GetToastHistory(ByVal CollectionID As String) As LongPtr
 End Function
 
 Private Function WinRT_GetDefaultHistory() As LongPtr
-    Dim pManagerStatics As LongPtr
-    Dim pManagerStatics2 As LongPtr
     Dim pHistory As LongPtr
-    Dim iidManagerStatics As WinRT_GUID
-    Dim iidManagerStatics2 As WinRT_GUID
 
-    IIDFromString StrPtr("{50AC103F-D235-4598-BBEF-98FE4D1A3AD4}"), iidManagerStatics
-    IIDFromString StrPtr("{7AB93C52-0E48-4750-BA9D-1A4113981847}"), iidManagerStatics2
-
-    WinRT_GetActivationFactory "Windows.UI.Notifications.ToastNotificationManager", iidManagerStatics, pManagerStatics
-    If pManagerStatics = 0 Then Exit Function
-
-    WinRT_CallComMethod pManagerStatics, VT_QI, vbLong, WinRT_vbPtr, VarPtr(iidManagerStatics2), WinRT_vbPtr, VarPtr(pManagerStatics2)
-    WinRT_CallComMethod pManagerStatics, VT_RELEASE, vbLong
-    If pManagerStatics2 = 0 Then Exit Function
+    If WinRT_pManagerStatics2 = 0 Then Exit Function
 
     pHistory = 0
-    WinRT_CallComMethod pManagerStatics2, VT_IToastNotificationManagerStatics2_GetHistory, vbLong, WinRT_vbPtr, VarPtr(pHistory)
-    WinRT_CallComMethod pManagerStatics2, VT_RELEASE, vbLong
+    WinRT_CallComMethod WinRT_pManagerStatics2, VT_IToastNotificationManagerStatics2_GetHistory, vbLong, WinRT_vbPtr, VarPtr(pHistory)
     WinRT_GetDefaultHistory = pHistory
 End Function
 
@@ -2742,20 +2696,13 @@ Private Function WinRT_GetHistoryForCollection(ByVal CollectionID As String) As 
     Dim pAsync As LongPtr
     Dim pHistory As LongPtr
     Dim hr As Long
-    Dim iidManagerStatics5 As WinRT_GUID
-    Dim iidManagerForUser2 As WinRT_GUID
-
-    IIDFromString StrPtr("{D6F5F569-D40D-407C-8989-88CAB42CFD14}"), iidManagerStatics5
-    IIDFromString StrPtr("{679C64B7-81AB-42C2-8819-C958767753F4}"), iidManagerForUser2
-
-    WinRT_GetActivationFactory "Windows.UI.Notifications.ToastNotificationManager", iidManagerStatics5, pManagerStatics5
-    If pManagerStatics5 = 0 Then Exit Function
+    If WinRT_pManagerStatics5 = 0 Then Exit Function
+    pManagerStatics5 = WinRT_pManagerStatics5
 
     WinRT_CallComMethod pManagerStatics5, 6, vbLong, WinRT_vbPtr, VarPtr(pManagerForUser)
-    WinRT_CallComMethod pManagerStatics5, VT_RELEASE, vbLong
     If pManagerForUser = 0 Then Exit Function
 
-    WinRT_CallComMethod pManagerForUser, VT_QI, vbLong, WinRT_vbPtr, VarPtr(iidManagerForUser2), WinRT_vbPtr, VarPtr(pManagerForUser2)
+    WinRT_CallComMethod pManagerForUser, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidManagerForUser2), WinRT_vbPtr, VarPtr(pManagerForUser2)
     WinRT_CallComMethod pManagerForUser, VT_RELEASE, vbLong
     If pManagerForUser2 = 0 Then Exit Function
 
@@ -2781,43 +2728,29 @@ Private Function WinRT_LoadXmlDocument(ByVal xml As String) As LongPtr
     Dim pInspectable As LongPtr
     Dim pXmlDocIO As LongPtr
     Dim pXmlDoc As LongPtr
-    Dim iidXmlDocIO As WinRT_GUID
-    Dim iidXmlDoc As WinRT_GUID
-
-    IIDFromString StrPtr("{6CD0E74E-EE65-4489-9EBF-CA43E87BA637}"), iidXmlDocIO
-    IIDFromString StrPtr("{F7F3A506-1E87-42D6-BCFB-B8C809FA5494}"), iidXmlDoc
-
     hStrXmlClass = WinRT_CreateHString("Windows.Data.Xml.Dom.XmlDocument")
     RoActivateInstance hStrXmlClass, pInspectable
     If hStrXmlClass <> 0 Then WindowsDeleteString hStrXmlClass
     If pInspectable = 0 Then Exit Function
 
-    WinRT_CallComMethod pInspectable, VT_QI, vbLong, WinRT_vbPtr, VarPtr(iidXmlDocIO), WinRT_vbPtr, VarPtr(pXmlDocIO)
+    WinRT_CallComMethod pInspectable, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidXmlDocIO), WinRT_vbPtr, VarPtr(pXmlDocIO)
     hStrXml = WinRT_CreateHString(xml)
     WinRT_CallComMethod pXmlDocIO, 6, vbLong, WinRT_vbPtr, hStrXml
     If hStrXml <> 0 Then WindowsDeleteString hStrXml
     WinRT_CallComMethod pXmlDocIO, VT_RELEASE, vbLong
     pXmlDocIO = 0
 
-    WinRT_CallComMethod pInspectable, VT_QI, vbLong, WinRT_vbPtr, VarPtr(iidXmlDoc), WinRT_vbPtr, VarPtr(pXmlDoc)
+    WinRT_CallComMethod pInspectable, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidXmlDoc), WinRT_vbPtr, VarPtr(pXmlDoc)
     WinRT_CallComMethod pInspectable, VT_RELEASE, vbLong
     WinRT_LoadXmlDocument = pXmlDoc
 End Function
 
 Private Function WinRT_CreateToastNotification(ByVal pXmlDoc As LongPtr) As LongPtr
-    Dim hStrToastClass As LongPtr
-    Dim pToastFactory As LongPtr
     Dim pToast As LongPtr
-    Dim iidToastFactory As WinRT_GUID
 
-    IIDFromString StrPtr("{04124B20-82C6-4229-B109-FD9ED4662B53}"), iidToastFactory
-    hStrToastClass = WinRT_CreateHString("Windows.UI.Notifications.ToastNotification")
-    RoGetActivationFactory hStrToastClass, iidToastFactory, pToastFactory
-    If hStrToastClass <> 0 Then WindowsDeleteString hStrToastClass
-    If pToastFactory = 0 Then Exit Function
+    If WinRT_pToastFactory = 0 Then Exit Function
 
-    WinRT_CallComMethod pToastFactory, 6, vbLong, WinRT_vbPtr, pXmlDoc, WinRT_vbPtr, VarPtr(pToast)
-    WinRT_CallComMethod pToastFactory, VT_RELEASE, vbLong
+    WinRT_CallComMethod WinRT_pToastFactory, 6, vbLong, WinRT_vbPtr, pXmlDoc, WinRT_vbPtr, VarPtr(pToast)
     WinRT_CreateToastNotification = pToast
 End Function
 
@@ -2826,19 +2759,16 @@ Private Function WinRT_CreateNotificationData(ByRef Binding As WinRT_DataBinding
     Dim pInspectable As LongPtr
     Dim pData As LongPtr
     Dim pMap As LongPtr
-    Dim iidData As WinRT_GUID
     Dim hasProgress As Boolean
 
     If Not WinRT_DataBindingHasContent(Binding) Then Exit Function
-
-    IIDFromString StrPtr("{9FFD2312-9D6A-4AAF-B6AC-FF17F0C1F280}"), iidData
 
     hStrClass = WinRT_CreateHString("Windows.UI.Notifications.NotificationData")
     RoActivateInstance hStrClass, pInspectable
     If hStrClass <> 0 Then WindowsDeleteString hStrClass
     If pInspectable = 0 Then Exit Function
 
-    WinRT_CallComMethod pInspectable, VT_QI, vbLong, WinRT_vbPtr, VarPtr(iidData), WinRT_vbPtr, VarPtr(pData)
+    WinRT_CallComMethod pInspectable, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidNotificationData), WinRT_vbPtr, VarPtr(pData)
     WinRT_CallComMethod pInspectable, VT_RELEASE, vbLong
     If pData = 0 Then Exit Function
 
@@ -2932,28 +2862,17 @@ Private Sub WinRT_ApplyExpirationTime(ByVal pNotification As LongPtr, ByVal vTab
 End Sub
 
 Private Function WinRT_CreateDateTimeReferenceFromDateTime(ByRef dateTimeValue As WRT_DateTime) As LongPtr
-    Dim hStrClass As LongPtr
-    Dim pPropertyValueStatics As LongPtr
     Dim pPropertyValue As LongPtr
     Dim pReference As LongPtr
-    Dim iidPropertyValueStatics As WinRT_GUID
-    Dim iidReferenceDateTime As WinRT_GUID
 
-    IIDFromString StrPtr("{629BDBC8-D932-4FF4-96B9-8D96C5C1E858}"), iidPropertyValueStatics
+    If WinRT_pPropertyValueStatics = 0 Then Exit Function
 
-    hStrClass = WinRT_CreateHString("Windows.Foundation.PropertyValue")
-    RoGetActivationFactory hStrClass, iidPropertyValueStatics, pPropertyValueStatics
-    If hStrClass <> 0 Then WindowsDeleteString hStrClass
-    If pPropertyValueStatics = 0 Then Exit Function
-
-    WinRT_PropertyValueCreateDateTime pPropertyValueStatics, dateTimeValue, pPropertyValue
-    WinRT_CallComMethod pPropertyValueStatics, VT_RELEASE, vbLong
+    WinRT_PropertyValueCreateDateTime WinRT_pPropertyValueStatics, dateTimeValue, pPropertyValue
     If pPropertyValue = 0 Then Exit Function
 
     ' CreateDateTime は IPropertyValue を返すが、ExpirationTime は IReference<DateTime> を要求する。
     ' 別 vtable なので必ず QueryInterface してから渡す（直接渡すと値が壊れる）。
-    IIDFromString StrPtr("{5541D8A7-497C-5AA4-86FC-7713ADBF2A2C}"), iidReferenceDateTime
-    WinRT_CallComMethod pPropertyValue, VT_QI, vbLong, WinRT_vbPtr, VarPtr(iidReferenceDateTime), WinRT_vbPtr, VarPtr(pReference)
+    WinRT_CallComMethod pPropertyValue, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidReferenceDateTime), WinRT_vbPtr, VarPtr(pReference)
     WinRT_CallComMethod pPropertyValue, VT_RELEASE, vbLong
     If pReference = 0 Then Exit Function
 
@@ -3259,6 +3178,63 @@ Private Function WinRT_NormalizeScheduleId(ByVal scheduleId As String) As String
     End If
 End Function
 
+Private Sub WinRT_InitCache()
+    Dim initialized As Boolean
+
+    If WinRT_CacheReady Then Exit Sub
+
+    WinRT_EnsureRoInitialized initialized
+
+    IIDFromString StrPtr("{354389C6-7C01-4BD5-9C20-604340CD2B74}"), WinRT_iidNotifier2
+    IIDFromString StrPtr("{50AC103F-D235-4598-BBEF-98FE4D1A3AD4}"), WinRT_iidManagerStatics
+    IIDFromString StrPtr("{7AB93C52-0E48-4750-BA9D-1A4113981847}"), WinRT_iidManagerStatics2
+    IIDFromString StrPtr("{D6F5F569-D40D-407C-8989-88CAB42CFD14}"), WinRT_iidManagerStatics5
+    IIDFromString StrPtr("{679C64B7-81AB-42C2-8819-C958767753F4}"), WinRT_iidManagerForUser2
+    IIDFromString StrPtr("{164DD3D7-73C4-44F7-B4FF-FB6D4BF1F4C6}"), WinRT_iidToastCollectionFactory
+    IIDFromString StrPtr("{44A9796F-723E-4FDF-A218-033E75B0C084}"), WinRT_iidUriFactory
+    IIDFromString StrPtr("{15154935-28EA-4727-88E9-C58680E2D118}"), WinRT_iidToast4
+    IIDFromString StrPtr("{9DFB9FD1-143A-490E-90BF-B9FBA7132DE7}"), WinRT_iidToast2
+    IIDFromString StrPtr("{43EBFE53-89AE-5C1E-A279-3AECFE9B6F54}"), WinRT_iidToast6
+    IIDFromString StrPtr("{E7BED191-0BB9-4189-8394-31761B476FD7}"), WinRT_iidScheduledFactory
+    IIDFromString StrPtr("{A66EA09C-31B4-43B0-B5DD-7A40E85363B1}"), WinRT_iidScheduled2
+    IIDFromString StrPtr("{1D4761FD-BDEF-4E4A-96BE-0101369B58D2}"), WinRT_iidScheduled4
+    IIDFromString StrPtr("{6CD0E74E-EE65-4489-9EBF-CA43E87BA637}"), WinRT_iidXmlDocIO
+    IIDFromString StrPtr("{F7F3A506-1E87-42D6-BCFB-B8C809FA5494}"), WinRT_iidXmlDoc
+    IIDFromString StrPtr("{04124B20-82C6-4229-B109-FD9ED4662B53}"), WinRT_iidToastFactory
+    IIDFromString StrPtr("{9FFD2312-9D6A-4AAF-B6AC-FF17F0C1F280}"), WinRT_iidNotificationData
+    IIDFromString StrPtr("{629BDBC8-D932-4FF4-96B9-8D96C5C1E858}"), WinRT_iidPropertyValueStatics
+    IIDFromString StrPtr("{5541D8A7-497C-5AA4-86FC-7713ADBF2A2C}"), WinRT_iidReferenceDateTime
+    IIDFromString StrPtr(WinRT_IID_IAsyncInfo), WinRT_iidAsyncInfo
+
+    WinRT_GetActivationFactory "Windows.UI.Notifications.ToastNotificationManager", WinRT_iidManagerStatics, WinRT_pManagerStatics
+    WinRT_GetActivationFactory "Windows.UI.Notifications.ToastNotificationManager", WinRT_iidManagerStatics5, WinRT_pManagerStatics5
+    WinRT_GetActivationFactory "Windows.UI.Notifications.ToastNotification", WinRT_iidToastFactory, WinRT_pToastFactory
+    WinRT_GetActivationFactory "Windows.UI.Notifications.ScheduledToastNotification", WinRT_iidScheduledFactory, WinRT_pScheduledToastFactory
+    WinRT_GetActivationFactory "Windows.UI.Notifications.ToastCollection", WinRT_iidToastCollectionFactory, WinRT_pToastCollectionFactory
+    WinRT_GetActivationFactory "Windows.Foundation.Uri", WinRT_iidUriFactory, WinRT_pUriFactory
+    WinRT_GetActivationFactory "Windows.Foundation.PropertyValue", WinRT_iidPropertyValueStatics, WinRT_pPropertyValueStatics
+
+    If WinRT_pManagerStatics <> 0 Then
+        WinRT_CallComMethod WinRT_pManagerStatics, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidManagerStatics2), WinRT_vbPtr, VarPtr(WinRT_pManagerStatics2)
+    End If
+
+    WinRT_CacheReady = True
+End Sub
+
+Private Sub WinRT_ReleaseCache()
+    On Error Resume Next
+    If WinRT_pManagerStatics2 <> 0 Then WinRT_CallComMethod WinRT_pManagerStatics2, VT_RELEASE, vbLong: WinRT_pManagerStatics2 = 0
+    If WinRT_pManagerStatics <> 0 Then WinRT_CallComMethod WinRT_pManagerStatics, VT_RELEASE, vbLong: WinRT_pManagerStatics = 0
+    If WinRT_pManagerStatics5 <> 0 Then WinRT_CallComMethod WinRT_pManagerStatics5, VT_RELEASE, vbLong: WinRT_pManagerStatics5 = 0
+    If WinRT_pToastFactory <> 0 Then WinRT_CallComMethod WinRT_pToastFactory, VT_RELEASE, vbLong: WinRT_pToastFactory = 0
+    If WinRT_pScheduledToastFactory <> 0 Then WinRT_CallComMethod WinRT_pScheduledToastFactory, VT_RELEASE, vbLong: WinRT_pScheduledToastFactory = 0
+    If WinRT_pToastCollectionFactory <> 0 Then WinRT_CallComMethod WinRT_pToastCollectionFactory, VT_RELEASE, vbLong: WinRT_pToastCollectionFactory = 0
+    If WinRT_pUriFactory <> 0 Then WinRT_CallComMethod WinRT_pUriFactory, VT_RELEASE, vbLong: WinRT_pUriFactory = 0
+    If WinRT_pPropertyValueStatics <> 0 Then WinRT_CallComMethod WinRT_pPropertyValueStatics, VT_RELEASE, vbLong: WinRT_pPropertyValueStatics = 0
+    WinRT_CacheReady = False
+    On Error GoTo 0
+End Sub
+
 Private Sub WinRT_FinalizeRo(ByVal initialized As Boolean)
     ' 通知表示→更新の連続呼び出しで WinRT ランタイムを破棄しない
 End Sub
@@ -3279,7 +3255,6 @@ End Sub
 ' IAsyncOperation / IAsyncAction の完了を待ち、完了後の HRESULT(ErrorCode) を返す。0=成功。
 ' WinRT 非同期は QI で IAsyncInfo を取り、Status を Started 以外になるまでポーリングする。
 Private Function WinRT_WaitAsync(ByVal pAsync As LongPtr) As Long
-    Dim iidAsyncInfo As WinRT_GUID
     Dim pAsyncInfo As LongPtr
     Dim status As Long
     Dim errorCode As Long
@@ -3290,9 +3265,8 @@ Private Function WinRT_WaitAsync(ByVal pAsync As LongPtr) As Long
         Exit Function
     End If
 
-    IIDFromString StrPtr(WinRT_IID_IAsyncInfo), iidAsyncInfo
     pAsyncInfo = 0
-    WinRT_CallComMethod pAsync, VT_QI, vbLong, WinRT_vbPtr, VarPtr(iidAsyncInfo), WinRT_vbPtr, VarPtr(pAsyncInfo)
+    WinRT_CallComMethod pAsync, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidAsyncInfo), WinRT_vbPtr, VarPtr(pAsyncInfo)
     If pAsyncInfo = 0 Then
         WinRT_WaitAsync = &H80004002
         Exit Function
@@ -3826,4 +3800,10 @@ Private Sub Class_Initialize()
     SubgroupInnerTextsTotal = -1
     SubgroupInnerImagesTotal = -1
     SubgroupInnerTotal = -1
+
+    WinRT_InitCache
+End Sub
+
+Private Sub Class_Terminate()
+    WinRT_ReleaseCache
 End Sub
