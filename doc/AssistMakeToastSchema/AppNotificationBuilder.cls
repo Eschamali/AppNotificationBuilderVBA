@@ -256,6 +256,10 @@ Private Const VT_IToastNotifier2_UpdateWithTagAndGroup As Long = 6
 Private Const VT_IToastNotifier2_UpdateWithTag As Long = 7
 Private Const VT_INotificationData_SetSequenceNumber As Long = 8
 Private Const VT_IPropertyValueStatics_CreateDateTime As Long = 21
+Private Const VT_IBadgeUpdateManagerStatics_CreateBadgeUpdaterForApplicationWithId As Long = 7
+Private Const VT_IBadgeNotificationFactory_CreateBadgeNotification As Long = 6
+Private Const VT_IBadgeUpdater_Update As Long = 6
+Private Const VT_IBadgeUpdater_Clear As Long = 7
 
 '---------------------------------------------------------------------------------------------------
 ' [ SECTION ] その他
@@ -297,6 +301,8 @@ Private WinRT_iidNotificationData As WinRT_GUID
 Private WinRT_iidPropertyValueStatics As WinRT_GUID
 Private WinRT_iidReferenceDateTime As WinRT_GUID
 Private WinRT_iidAsyncInfo As WinRT_GUID
+Private WinRT_iidBadgeManagerStatics As WinRT_GUID
+Private WinRT_iidBadgeNotificationFactory As WinRT_GUID
 Private WinRT_pManagerStatics As LongPtr
 Private WinRT_pManagerStatics2 As LongPtr
 Private WinRT_pManagerStatics5 As LongPtr
@@ -305,6 +311,8 @@ Private WinRT_pScheduledToastFactory As LongPtr
 Private WinRT_pToastCollectionFactory As LongPtr
 Private WinRT_pUriFactory As LongPtr
 Private WinRT_pPropertyValueStatics As LongPtr
+Private WinRT_pBadgeManagerStatics As LongPtr
+Private WinRT_pBadgeNotificationFactory As LongPtr
 Private WinRT_HStringCache As Object
 
 
@@ -2168,6 +2176,26 @@ Public Property Get CheckNotificationSetting(Optional CollectionID As String) As
     CheckNotificationSetting = WinRT_CheckNotificationSetting
 End Property
 
+'***************************************************************************************************
+'* 機能　　：指定 AppUserModelID のタスクバーボタンに UWP 形式のバッジを表示します
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：badgeValue       1 以上は数値バッジ、-1～-12 は組み込みグリフ（activity 等）、0 以下で削除
+'*            AppUserModelID  省略時は ToastConfig.AppUserModelID（既定は Excel）
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：デスクトップアプリでは wpndatabase の s:badge 有効化が必要な場合があります（README 参照）
+'* URL     ：https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/badges
+'***************************************************************************************************
+Public Sub SetTaskbarOverlayBadge(badgeValue As Long, Optional AppUserModelID As String)
+    Dim appId As String
+    If Len(AppUserModelID) > 0 Then
+        appId = AppUserModelID
+    Else
+        appId = ToastConfig.AppUserModelID
+    End If
+    If Len(appId) = 0 Then Err.Raise 513, "SetTaskbarOverlayBadge", "AppUserModelID is required."
+    WinRT_SetTaskbarOverlayBadge badgeValue, appId
+End Sub
+
 
 
 '***************************************************************************************************
@@ -2187,6 +2215,7 @@ End Property
 '            [G] 日時変換（VBA Date ? WinRT DateTime / FILETIME）
 '            [H] HSTRING・ActivationFactory ユーティリティ
 '            [I] 初期化・キャッシュ管理・COM 呼び出し基盤
+'            [J] タスクバーバッジ（BadgeUpdateManager / BadgeNotification）
 '---------------------------------------------------------------------------------------------------
 '* 注意事項：このコードセクションは本来、cppのコンパイラーでやってる役割を、AIを駆使して、VBAの`DispCallFunc × Vtable`でエミュレーションしたものです。
 '            基本的にこの領域は、AIにメンテナンスしてください。人間がやると精神的なダメージを負います。
@@ -2938,6 +2967,102 @@ Private Function WinRT_CreateToastNotification(ByVal pXmlDoc As LongPtr) As Long
 End Function
 
 '---------------------------------------------------------------------------------------------------
+' [ SECTION J ] タスクバーバッジ（SetTaskbarOverlayBadge）
+'---------------------------------------------------------------------------------------------------
+'***************************************************************************************************
+'* 機能　　：OverlayIcon.cpp の SetTaskbarOverlayBadge 相当（WinRT BadgeNotification 経路）
+'---------------------------------------------------------------------------------------------------
+'* 処理概要：BadgeUpdateManager → BadgeUpdater → Update / Clear
+'***************************************************************************************************
+Private Sub WinRT_SetTaskbarOverlayBadge(ByVal badgeValue As Long, ByVal appUserModelID As String)
+    Dim pUpdater As LongPtr
+    Dim pXmlDoc As LongPtr
+    Dim pBadge As LongPtr
+    Dim badgeXml As String
+
+    On Error GoTo Cleanup
+    WinRT_InitCache
+    If WinRT_pBadgeManagerStatics = 0 Then Err.Raise 513, "WinRT_SetTaskbarOverlayBadge", "BadgeUpdateManager factory is not available."
+
+    pUpdater = WinRT_CreateBadgeUpdaterForApplication(appUserModelID)
+    If pUpdater = 0 Then Err.Raise 513, "WinRT_SetTaskbarOverlayBadge", "CreateBadgeUpdaterForApplication failed."
+
+    If badgeValue <= 0 Then
+        WinRT_CallComMethod pUpdater, VT_IBadgeUpdater_Clear, vbLong
+        GoTo Cleanup
+    End If
+
+    badgeXml = "<badge value=""" & WinRT_BadgeValueToString(badgeValue) & """/>"
+    pXmlDoc = WinRT_LoadXmlDocument(badgeXml)
+    If pXmlDoc = 0 Then Err.Raise 513, "WinRT_SetTaskbarOverlayBadge", "LoadXmlDocument failed."
+
+    pBadge = WinRT_CreateBadgeNotification(pXmlDoc)
+    If pBadge = 0 Then Err.Raise 513, "WinRT_SetTaskbarOverlayBadge", "CreateBadgeNotification failed."
+
+    WinRT_CallComMethod pUpdater, VT_IBadgeUpdater_Update, vbLong, WinRT_vbPtr, pBadge
+
+Cleanup:
+    On Error Resume Next
+    If pBadge <> 0 Then WinRT_CallComMethod pBadge, VT_RELEASE, vbLong
+    If pXmlDoc <> 0 Then WinRT_CallComMethod pXmlDoc, VT_RELEASE, vbLong
+    If pUpdater <> 0 Then WinRT_CallComMethod pUpdater, VT_RELEASE, vbLong
+    On Error GoTo 0
+    If Err.Number <> 0 Then Err.Raise Err.Number, "WinRT_SetTaskbarOverlayBadge", Err.Description
+End Sub
+
+'***************************************************************************************************
+'* 機能　　：BadgeUpdateManager.CreateBadgeUpdaterForApplication(appId) を取得します
+'***************************************************************************************************
+Private Function WinRT_CreateBadgeUpdaterForApplication(ByVal appUserModelID As String) As LongPtr
+    Dim hStrAppId As LongPtr
+    Dim pUpdater As LongPtr
+
+    If WinRT_pBadgeManagerStatics = 0 Then Exit Function
+    hStrAppId = WinRT_CachedHString(appUserModelID)
+    WinRT_CallComMethod WinRT_pBadgeManagerStatics, VT_IBadgeUpdateManagerStatics_CreateBadgeUpdaterForApplicationWithId, vbLong, _
+        WinRT_vbPtr, hStrAppId, WinRT_vbPtr, VarPtr(pUpdater)
+    WinRT_CreateBadgeUpdaterForApplication = pUpdater
+End Function
+
+'***************************************************************************************************
+'* 機能　　：XmlDocument から BadgeNotification オブジェクトを生成します
+'***************************************************************************************************
+Private Function WinRT_CreateBadgeNotification(ByVal pXmlDoc As LongPtr) As LongPtr
+    Dim pBadge As LongPtr
+
+    If WinRT_pBadgeNotificationFactory = 0 Then Exit Function
+    WinRT_CallComMethod WinRT_pBadgeNotificationFactory, VT_IBadgeNotificationFactory_CreateBadgeNotification, vbLong, _
+        WinRT_vbPtr, pXmlDoc, WinRT_vbPtr, VarPtr(pBadge)
+    WinRT_CreateBadgeNotification = pBadge
+End Function
+
+'***************************************************************************************************
+'* 機能　　：バッジ XML の value 属性用文字列へ変換します（OverlayIcon.cpp GetBadgeValueString 相当）
+'***************************************************************************************************
+Private Function WinRT_BadgeValueToString(ByVal badgeValue As Long) As String
+    Select Case badgeValue
+        Case -1:  WinRT_BadgeValueToString = "activity"
+        Case -2:  WinRT_BadgeValueToString = "alert"
+        Case -3:  WinRT_BadgeValueToString = "alarm"
+        Case -4:  WinRT_BadgeValueToString = "available"
+        Case -5:  WinRT_BadgeValueToString = "away"
+        Case -6:  WinRT_BadgeValueToString = "busy"
+        Case -7:  WinRT_BadgeValueToString = "newMessage"
+        Case -8:  WinRT_BadgeValueToString = "paused"
+        Case -9:  WinRT_BadgeValueToString = "playing"
+        Case -10: WinRT_BadgeValueToString = "unavailable"
+        Case -11: WinRT_BadgeValueToString = "error"
+        Case -12: WinRT_BadgeValueToString = "attention"
+        Case Else
+            If badgeValue <= -13 Then
+                WinRT_BadgeValueToString = "none"
+            Else
+                WinRT_BadgeValueToString = CStr(badgeValue)
+            End If
+    End Select
+End Function
+
+'---------------------------------------------------------------------------------------------------
 ' [ SECTION F ] データバインディング（NotificationData マップ構築）
 '---------------------------------------------------------------------------------------------------
 '***************************************************************************************************
@@ -3602,6 +3727,8 @@ Private Sub WinRT_InitCache()
     IIDFromString StrPtr("{629BDBC8-D932-4FF4-96B9-8D96C5C1E858}"), WinRT_iidPropertyValueStatics
     IIDFromString StrPtr("{5541D8A7-497C-5AA4-86FC-7713ADBF2A2C}"), WinRT_iidReferenceDateTime
     IIDFromString StrPtr(WinRT_IID_IAsyncInfo), WinRT_iidAsyncInfo
+    IIDFromString StrPtr("{33400FAA-6DD5-4105-AEBC-9B50FCA492DA}"), WinRT_iidBadgeManagerStatics
+    IIDFromString StrPtr("{EDF255CE-0618-4D59-948A-5A61040C52F9}"), WinRT_iidBadgeNotificationFactory
 
     ' 各 WinRT クラスの Activation Factory を取得（セッション中は使い回す）
     WinRT_GetActivationFactory "Windows.UI.Notifications.ToastNotificationManager", WinRT_iidManagerStatics, WinRT_pManagerStatics
@@ -3611,6 +3738,8 @@ Private Sub WinRT_InitCache()
     WinRT_GetActivationFactory "Windows.UI.Notifications.ToastCollection", WinRT_iidToastCollectionFactory, WinRT_pToastCollectionFactory
     WinRT_GetActivationFactory "Windows.Foundation.Uri", WinRT_iidUriFactory, WinRT_pUriFactory
     WinRT_GetActivationFactory "Windows.Foundation.PropertyValue", WinRT_iidPropertyValueStatics, WinRT_pPropertyValueStatics
+    WinRT_GetActivationFactory "Windows.UI.Notifications.BadgeUpdateManager", WinRT_iidBadgeManagerStatics, WinRT_pBadgeManagerStatics
+    WinRT_GetActivationFactory "Windows.UI.Notifications.BadgeNotification", WinRT_iidBadgeNotificationFactory, WinRT_pBadgeNotificationFactory
 
     ' History 取得用の Statics2 は ManagerStatics から QI で別途取得
     If WinRT_pManagerStatics <> 0 Then
@@ -3637,6 +3766,8 @@ Private Sub WinRT_ReleaseCache()
     If WinRT_pToastCollectionFactory <> 0 Then WinRT_CallComMethod WinRT_pToastCollectionFactory, VT_RELEASE, vbLong: WinRT_pToastCollectionFactory = 0
     If WinRT_pUriFactory <> 0 Then WinRT_CallComMethod WinRT_pUriFactory, VT_RELEASE, vbLong: WinRT_pUriFactory = 0
     If WinRT_pPropertyValueStatics <> 0 Then WinRT_CallComMethod WinRT_pPropertyValueStatics, VT_RELEASE, vbLong: WinRT_pPropertyValueStatics = 0
+    If WinRT_pBadgeManagerStatics <> 0 Then WinRT_CallComMethod WinRT_pBadgeManagerStatics, VT_RELEASE, vbLong: WinRT_pBadgeManagerStatics = 0
+    If WinRT_pBadgeNotificationFactory <> 0 Then WinRT_CallComMethod WinRT_pBadgeNotificationFactory, VT_RELEASE, vbLong: WinRT_pBadgeNotificationFactory = 0
     WinRT_CacheReady = False
     On Error GoTo 0
 End Sub
