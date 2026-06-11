@@ -2974,7 +2974,7 @@ End Function
 '---------------------------------------------------------------------------------------------------
 '* 処理概要：BadgeUpdateManager → BadgeUpdater → Update / Clear
 '***************************************************************************************************
-Private Sub WinRT_SetTaskbarOverlayBadge(ByVal badgeValue As Long, ByVal appUserModelID As String)
+Private Sub WinRT_SetTaskbarOverlayBadge(ByVal badgeValue As Long, ByVal AppUserModelID As String)
     Dim pUpdater As LongPtr
     Dim pXmlDoc As LongPtr
     Dim pBadge As LongPtr
@@ -2984,13 +2984,8 @@ Private Sub WinRT_SetTaskbarOverlayBadge(ByVal badgeValue As Long, ByVal appUser
     WinRT_InitCache
     If WinRT_pBadgeManagerStatics = 0 Then Err.Raise 513, "WinRT_SetTaskbarOverlayBadge", "BadgeUpdateManager factory is not available."
 
-    pUpdater = WinRT_CreateBadgeUpdaterForApplication(appUserModelID)
+    pUpdater = WinRT_CreateBadgeUpdaterForApplication(AppUserModelID)
     If pUpdater = 0 Then Err.Raise 513, "WinRT_SetTaskbarOverlayBadge", "CreateBadgeUpdaterForApplication failed."
-
-    If badgeValue <= 0 Then
-        WinRT_CallComMethod pUpdater, VT_IBadgeUpdater_Clear, vbLong
-        GoTo Cleanup
-    End If
 
     badgeXml = "<badge value=""" & WinRT_BadgeValueToString(badgeValue) & """/>"
     pXmlDoc = WinRT_LoadXmlDocument(badgeXml)
@@ -3013,12 +3008,12 @@ End Sub
 '***************************************************************************************************
 '* 機能　　：BadgeUpdateManager.CreateBadgeUpdaterForApplication(appId) を取得します
 '***************************************************************************************************
-Private Function WinRT_CreateBadgeUpdaterForApplication(ByVal appUserModelID As String) As LongPtr
+Private Function WinRT_CreateBadgeUpdaterForApplication(ByVal AppUserModelID As String) As LongPtr
     Dim hStrAppId As LongPtr
     Dim pUpdater As LongPtr
 
     If WinRT_pBadgeManagerStatics = 0 Then Exit Function
-    hStrAppId = WinRT_CachedHString(appUserModelID)
+    hStrAppId = WinRT_CachedHString(AppUserModelID)
     WinRT_CallComMethod WinRT_pBadgeManagerStatics, VT_IBadgeUpdateManagerStatics_CreateBadgeUpdaterForApplicationWithId, vbLong, _
         WinRT_vbPtr, hStrAppId, WinRT_vbPtr, VarPtr(pUpdater)
     WinRT_CreateBadgeUpdaterForApplication = pUpdater
