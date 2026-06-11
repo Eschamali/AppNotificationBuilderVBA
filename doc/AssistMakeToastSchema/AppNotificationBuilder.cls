@@ -2216,27 +2216,72 @@ End Property
 
 '***************************************************************************************************
 '                     ■■■ WinRT-API へ直接アクセスするためのメソッド群 ■■■
+'---------------------------------------------------------------------------------------------------
+'* 概要　　：元々 C++ DLL が担っていた WinRT (Windows.UI.Notifications) 呼び出しを、
+'            VBA 単体で再現するための内部実装層です。
+'* 仕組み　：RoInitialize → RoGetActivationFactory / RoActivateInstance で COM オブジェクトを取得し、
+'            DispCallFunc で vtable のメソッドを直接呼び出します（WinRT_CallComMethod が中核）。
+'            文字列は HSTRING（WindowsCreateString）に変換し、Dictionary でキャッシュします。
+'* 構成　　：[A] トースト操作のエントリポイント（表示・更新・削除・設定確認）
+'            [B] ToastCollection の保存・削除
+'            [C] 即時通知 / スケジュール通知の組み立てと送出
+'            [D] IToastNotifier / IToastNotificationHistory の取得
+'            [E] WinRT オブジェクト生成（XmlDocument, Toast, NotificationData 等）
+'            [F] データバインディング（NotificationData マップ構築）
+'            [G] 日時変換（VBA Date ? WinRT DateTime / FILETIME）
+'            [H] HSTRING・ActivationFactory ユーティリティ
+'            [I] 初期化・キャッシュ管理・COM 呼び出し基盤
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：このコードセクションは本来、cppのコンパイラーでやってる役割を、AIを駆使して、VBAの`DispCallFunc × Vtable`でエミュレーションしたものです。
+'            基本的にこの領域は、AIにメンテナンスしてください。人間がやると精神的なダメージを負います。
+'            vtable インデックスは上部の「各種WinRT-API関連変数/定数」セクションの VT_* 定数を参照してください。
 '***************************************************************************************************
-Private Sub WinRT_ShowToastNotification(ByRef Config As WinRT_ToastConfig, ByRef Binding As WinRT_DataBinding)
-    On Error GoTo Cleanup
 
-    WinRT_ValidateToastIdentity Config, "WinRT_ShowToastNotification"
+'---------------------------------------------------------------------------------------------------
+' [ SECTION A ] トースト操作のエントリポイント
+'---------------------------------------------------------------------------------------------------
+'***************************************************************************************************
+'* 機能　　：トースト通知を表示する。RunToastNotifierShow から呼ばれる最上位の WinRT エントリ。
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：Binding    データバインディング用の値（NotificationData に載せるテキスト・進捗情報）
+'---------------------------------------------------------------------------------------------------
+'* 処理概要：Tag / Group / AppUserModelID を検証 → バインディングがあればシーケンス番号を採番 →
+'            Schedule_DeliveryTime の有無で即時表示（WinRT_ShowImmediateToast）か
+'            スケジュール登録（WinRT_ShowScheduledToast）に分岐します。
+'***************************************************************************************************
+Private Sub WinRT_ShowToastNotification(Binding As WinRT_DataBinding)
+'    On Error GoTo Cleanup
 
+    ' Tag / Group / AppUserModelID が未設定ならここで停止
+    WinRT_ValidateToastIdentity "WinRT_ShowToastNotification"
+
+    ' バインディングあり → シーケンス番号を振って Update 可能な状態にする
     If WinRT_DataBindingHasContent(Binding) Then
-        Binding.SequenceNumber = WinRT_NextToastDataSequence()
+        Binding.SequenceNumber = WinRT_NextToastDataSequence
     End If
 
-    If Config.Schedule_DeliveryTime > 0 Or Config.Schedule_DeliveryTimeLocal > 0 Then
-        WinRT_ShowScheduledToast Config
+    ' 配信日時が指定されていればスケジュール登録、なければ即時表示
+    If ToastConfig.Schedule_DeliveryTime Then
+        WinRT_ShowScheduledToast
     Else
-        WinRT_ShowImmediateToast Config, Binding
+        WinRT_ShowImmediateToast Binding
     End If
 
 Cleanup:
     If Err.Number <> 0 Then Err.Raise Err.Number, "WinRT_ShowToastNotification", Err.Description
 End Sub
 
-Private Function WinRT_UpdateToastNotification(ByRef Config As WinRT_ToastConfig, ByRef Binding As WinRT_DataBinding) As Long
+'***************************************************************************************************
+'* 機能　　：表示中のトーストを Tag + Group で特定し、NotificationData で内容を更新します。
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：NotificationUpdateResult（0=Succeeded, 1=Failed, 2=NotificationNotFound）
+'            エラー時は Err.Number を返します（Err.Source が空の場合は Raise しません）。
+'* 引数　　：Binding    更新後のデータバインディング値
+'---------------------------------------------------------------------------------------------------
+'* 処理概要：IToastNotifier2.UpdateWithTagAndGroup を呼び出します。
+'            事前に同じ Tag/Group で Show した通知が存在しないと NotificationNotFound になります。
+'***************************************************************************************************
+Private Function WinRT_UpdateToastNotification(Binding As WinRT_DataBinding) As Long
     Dim pNotifier As LongPtr
     Dim pNotifier2 As LongPtr
     Dim pData As LongPtr
@@ -2245,13 +2290,15 @@ Private Function WinRT_UpdateToastNotification(ByRef Config As WinRT_ToastConfig
     Dim updateResult As Long
 
     On Error GoTo Cleanup
-    WinRT_ValidateToastIdentity Config, "WinRT_UpdateToastNotification"
+    WinRT_ValidateToastIdentity "WinRT_UpdateToastNotification"
 
+    ' 更新のたびにシーケンス番号を上げないと Windows が変更を無視する
     If WinRT_DataBindingHasContent(Binding) Then
         Binding.SequenceNumber = WinRT_NextToastDataSequence()
     End If
 
-    pNotifier = WinRT_CreateToastNotifier(Config.AppUserModelID, Config.CollectionID)
+    ' IToastNotifier → IToastNotifier2（UpdateWithTagAndGroup は v2 専用）
+    pNotifier = WinRT_CreateToastNotifier(ToastConfig.AppUserModelID, ToastConfig.CollectionID)
     If pNotifier = 0 Then Err.Raise 513, , "CreateToastNotifier failed."
 
     WinRT_CallComMethod pNotifier, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidNotifier2), WinRT_vbPtr, VarPtr(pNotifier2)
@@ -2260,8 +2307,9 @@ Private Function WinRT_UpdateToastNotification(ByRef Config As WinRT_ToastConfig
     pData = WinRT_CreateNotificationData(Binding)
     If pData = 0 Then Err.Raise 513, , "CreateNotificationData failed."
 
-    hStrTag = WinRT_CachedHString(Config.Tag)
-    hStrGroup = WinRT_CachedHString(Config.Group)
+    ' Tag + Group で既存通知を特定して中身だけ差し替え
+    hStrTag = WinRT_CachedHString(ToastConfig.Tag)
+    hStrGroup = WinRT_CachedHString(ToastConfig.Group)
     updateResult = 0
     WinRT_CallComMethod pNotifier2, VT_IToastNotifier2_UpdateWithTagAndGroup, vbLong, WinRT_vbPtr, pData, WinRT_vbPtr, hStrTag, WinRT_vbPtr, hStrGroup, WinRT_vbPtr, VarPtr(updateResult)
 
@@ -2272,6 +2320,7 @@ Cleanup:
         If Err.Source = "" Then Err.Raise Err.Number, "WinRT_UpdateToastNotification", Err.Description
         WinRT_UpdateToastNotification = Err.Number
     End If
+    ' COM 参照カウントを戻す（メモリリーク防止）
     On Error Resume Next
     If pData <> 0 Then WinRT_CallComMethod pData, VT_RELEASE, vbLong
     If pNotifier2 <> 0 Then WinRT_CallComMethod pNotifier2, VT_RELEASE, vbLong
@@ -2279,25 +2328,47 @@ Cleanup:
     On Error GoTo 0
 End Function
 
+'***************************************************************************************************
+'* 機能　　：WinRT ランタイムとキャッシュを解放し、セッションを終了します。
+'---------------------------------------------------------------------------------------------------
+'* 呼び出し：Class_Terminate 等から使用。Show→Update の連続利用時は RoUninitialize しない設計です。
+'***************************************************************************************************
 Private Sub WinRT_Shutdown()
-    WinRT_ReleaseCache
+    WinRT_ReleaseCache          ' Factory ポインタと HSTRING キャッシュを解放
     If WinRT_RoInitialized Then
-        RoUninitialize
+        RoUninitialize          ' WinRT ランタイム本体を終了
         WinRT_RoInitialized = False
     End If
     WinRT_ToastDataSequenceNumber = 0
 End Sub
 
+'***************************************************************************************************
+'* 機能　　：NotificationData のシーケンス番号カウンタを 0 にリセットします。
+'***************************************************************************************************
 Private Sub WinRT_ResetToastDataSequence()
     WinRT_ToastDataSequenceNumber = 0
 End Sub
 
+'***************************************************************************************************
+'* 機能　　：NotificationData 用のシーケンス番号を 1 ずつインクリメントして返します。
+'---------------------------------------------------------------------------------------------------
+'* 用途　　：同じ Tag のトーストを Update する際、Windows が「新しいデータ」と認識するために必要です。
+'***************************************************************************************************
 Private Function WinRT_NextToastDataSequence() As Long
     WinRT_ToastDataSequenceNumber = WinRT_ToastDataSequenceNumber + 1
     WinRT_NextToastDataSequence = WinRT_ToastDataSequenceNumber
 End Function
 
-Private Sub WinRT_RemoveToastNotification(ByRef Config As WinRT_ToastConfig)
+'***************************************************************************************************
+'* 機能　　：アクションセンターからトースト通知を削除します。
+'---------------------------------------------------------------------------------------------------
+'* 削除範囲：Tag 指定あり → Tag+Group+AppId の組み合わせで 1 件削除
+'            Group のみ   → グループ単位で削除
+'            両方なし     → AppUserModelID に紐づく全通知を削除（ClearWithId）
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：Tag を指定する場合は Group も必須です。
+'***************************************************************************************************
+Private Sub WinRT_RemoveToastNotification()
     Dim pHistory As LongPtr
     Dim hStrTag As LongPtr
     Dim hStrGroup As LongPtr
@@ -2305,23 +2376,30 @@ Private Sub WinRT_RemoveToastNotification(ByRef Config As WinRT_ToastConfig)
 
     On Error GoTo Cleanup
 
-    If Len(Config.AppUserModelID) = 0 Then Err.Raise 513, "WinRT_RemoveToastNotification", "AppUserModelID is required."
-    If Len(Config.Tag) > 0 And Len(Config.Group) = 0 Then Err.Raise 513, "WinRT_RemoveToastNotification", "Group is required when Tag is specified."
+    With ToastConfig
+        If Len(.AppUserModelID) = 0 Then Err.Raise 513, "WinRT_RemoveToastNotification", "AppUserModelID is required."
+        If Len(.Tag) > 0 And Len(.Group) = 0 Then Err.Raise 513, "WinRT_RemoveToastNotification", "Group is required when Tag is specified."
+    
+        ' コレクション指定時はコレクション用 History、なければデフォルト
+        pHistory = WinRT_GetToastHistory(.CollectionID)
+        If pHistory = 0 Then Err.Raise 513, , "GetToastHistory failed."
+    
+        hStrTag = WinRT_CachedHString(.Tag)
+        hStrGroup = WinRT_CachedHString(.Group)
+        hStrAppId = WinRT_CachedHString(.AppUserModelID)
 
-    pHistory = WinRT_GetToastHistory(Config.CollectionID)
-    If pHistory = 0 Then Err.Raise 513, , "GetToastHistory failed."
-
-    hStrTag = WinRT_CachedHString(Config.Tag)
-    hStrGroup = WinRT_CachedHString(Config.Group)
-    hStrAppId = WinRT_CachedHString(Config.AppUserModelID)
-
-    If Len(Config.Tag) > 0 Then
-        WinRT_CallComMethod pHistory, VT_IToastNotificationHistory_RemoveGroupedTagWithId, vbLong, WinRT_vbPtr, hStrTag, WinRT_vbPtr, hStrGroup, WinRT_vbPtr, hStrAppId
-    ElseIf Len(Config.Group) > 0 Then
-        WinRT_CallComMethod pHistory, VT_IToastNotificationHistory_RemoveGroupWithId, vbLong, WinRT_vbPtr, hStrGroup, WinRT_vbPtr, hStrAppId
-    Else
-        WinRT_CallComMethod pHistory, VT_IToastNotificationHistory_ClearWithId, vbLong, WinRT_vbPtr, hStrAppId
-    End If
+        ' 指定の粒度に応じて削除 API を切り替え
+        If Len(.Tag) > 0 Then
+            ' 1 件削除（Tag + Group + AppId）
+            WinRT_CallComMethod pHistory, VT_IToastNotificationHistory_RemoveGroupedTagWithId, vbLong, WinRT_vbPtr, hStrTag, WinRT_vbPtr, hStrGroup, WinRT_vbPtr, hStrAppId
+        ElseIf Len(.Group) > 0 Then
+            ' グループ単位で削除
+            WinRT_CallComMethod pHistory, VT_IToastNotificationHistory_RemoveGroupWithId, vbLong, WinRT_vbPtr, hStrGroup, WinRT_vbPtr, hStrAppId
+        Else
+            ' AppId に紐づく全通知を削除
+            WinRT_CallComMethod pHistory, VT_IToastNotificationHistory_ClearWithId, vbLong, WinRT_vbPtr, hStrAppId
+        End If
+    End With
 
 Cleanup:
     If Err.Number <> 0 Then Err.Raise Err.Number, "WinRT_RemoveToastNotification", Err.Description
@@ -2330,13 +2408,22 @@ Cleanup:
     On Error GoTo 0
 End Sub
 
-Private Function WinRT_CheckNotificationSetting(ByRef Config As WinRT_ToastConfig) As Long
+'***************************************************************************************************
+'* 機能　　：トースト通知が OS 設定上、表示可能かどうかを確認します。
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：NotificationSetting 列挙値（0=Enabled, 1=DisabledForApplication 等）
+'            エラー時は Err.Number を返します。
+'---------------------------------------------------------------------------------------------------
+'* URL     ：https://learn.microsoft.com/ja-jp/uwp/api/windows.ui.notifications.notificationsetting
+'***************************************************************************************************
+Private Function WinRT_CheckNotificationSetting() As Long
     Dim pNotifier As LongPtr
     Dim settingValue As Long
 
     On Error GoTo Cleanup
 
-    pNotifier = WinRT_CreateToastNotifier(Config.AppUserModelID, Config.CollectionID)
+    ' 通知設定の確認は Notifier 経由で行う（Collection 指定時はコレクション側の設定）
+    pNotifier = WinRT_CreateToastNotifier(ToastConfig.AppUserModelID, ToastConfig.CollectionID)
     If pNotifier = 0 Then Err.Raise 513, , "CreateToastNotifier failed."
 
     ' IToastNotifier.Setting は HRESULT get_Setting(NotificationSetting* out)。
@@ -2352,23 +2439,40 @@ Cleanup:
     On Error GoTo 0
 End Function
 
-' CollectionNotice.cpp CreateToastCollection と同等（WinRT 直呼び）。0=成功
-Private Function WinRT_SaveToastCollection(ByRef Config As WinRT_ToastConfig, ByVal displayName As String, ByVal launchArgs As String, ByVal iconUri As String) As Long
+'---------------------------------------------------------------------------------------------------
+' [ SECTION B ] ToastCollection（コレクション通知グループ）の管理
+'---------------------------------------------------------------------------------------------------
+'***************************************************************************************************
+'* 機能　　：アクションセンター上にトーストコレクション（通知グループ）を登録します。
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：0=成功。失敗時は Err.Number。
+'* 引数　　：displayName    グループの表示名
+'            launchArgs     グループタイトルクリック時のアプリ起動引数
+'            iconUri        グループアイコンの URI（空ならアイコンなし）
+'---------------------------------------------------------------------------------------------------
+'* 前提　　：ToastConfig.AppUserModelID / CollectionID が設定済みであること。
+'* 参考　　：CollectionNotice.cpp CreateToastCollection と同等（WinRT 直呼び）。
+'***************************************************************************************************
+Private Function WinRT_SaveToastCollection(displayName As String, launchArgs As String, iconUri As String) As Long
     Dim pManager As LongPtr
     Dim pCollection As LongPtr
     Dim pAsync As LongPtr
 
     On Error GoTo Cleanup
 
-    If Len(Config.AppUserModelID) = 0 Then Err.Raise 513, "WinRT_SaveToastCollection", "AppUserModelID is required."
-    If Len(Config.CollectionID) = 0 Then Err.Raise 513, "WinRT_SaveToastCollection", "CollectionID is required."
+    With ToastConfig
+        If Len(.AppUserModelID) = 0 Then Err.Raise 513, "WinRT_SaveToastCollection", "AppUserModelID is required."
+        If Len(.CollectionID) = 0 Then Err.Raise 513, "WinRT_SaveToastCollection", "CollectionID is required."
+    
+        pManager = WinRT_GetToastCollectionManager(.AppUserModelID)
+        If pManager = 0 Then Err.Raise 513, , "GetToastCollectionManager failed."
+    
+        ' コレクションオブジェクトを組み立て（この時点ではまだ OS 未登録）
+        pCollection = WinRT_CreateToastCollection(.CollectionID, displayName, launchArgs, iconUri)
+        If pCollection = 0 Then Err.Raise 513, , "CreateToastCollection failed."
+    End With
 
-    pManager = WinRT_GetToastCollectionManager(Config.AppUserModelID)
-    If pManager = 0 Then Err.Raise 513, , "GetToastCollectionManager failed."
-
-    pCollection = WinRT_CreateToastCollection(Config.CollectionID, displayName, launchArgs, iconUri)
-    If pCollection = 0 Then Err.Raise 513, , "CreateToastCollection failed."
-
+    ' 非同期で保存（完了待ちはしない。Fire-and-forget）
     pAsync = 0
     WinRT_CallComMethod pManager, VT_IToastCollectionManager_SaveToastCollectionAsync, vbLong, WinRT_vbPtr, pCollection, WinRT_vbPtr, VarPtr(pAsync)
     WinRT_SaveToastCollection = 0
@@ -2382,26 +2486,39 @@ Cleanup:
     On Error GoTo 0
 End Function
 
-' CollectionNotice.cpp DeleteToastCollection と同等。CollectionID 省略時は全削除。0=成功
-Private Function WinRT_RemoveToastCollection(ByRef Config As WinRT_ToastConfig) As Long
+'***************************************************************************************************
+'* 機能　　：登録済みのトーストコレクションを削除します。
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：0=成功。失敗時は Err.Number。
+'---------------------------------------------------------------------------------------------------
+'* 削除範囲：CollectionID 指定あり → 該当コレクションのみ削除
+'            CollectionID 省略   → 全コレクション削除（RemoveAllToastCollectionsAsync）
+'* 参考　　：CollectionNotice.cpp DeleteToastCollection と同等。
+'***************************************************************************************************
+Private Function WinRT_RemoveToastCollection() As Long
     Dim pManager As LongPtr
     Dim pAsync As LongPtr
     Dim hStrCollectionId As LongPtr
 
     On Error GoTo Cleanup
 
-    If Len(Config.AppUserModelID) = 0 Then Err.Raise 513, "WinRT_RemoveToastCollection", "AppUserModelID is required."
+    With ToastConfig
+        If Len(.AppUserModelID) = 0 Then Err.Raise 513, "WinRT_RemoveToastCollection", "AppUserModelID is required."
+    
+        pManager = WinRT_GetToastCollectionManager(.AppUserModelID)
+        If pManager = 0 Then Err.Raise 513, , "GetToastCollectionManager failed."
+    
+        pAsync = 0
+        If Len(.CollectionID) > 0 Then
+            ' 指定 ID のコレクションのみ削除
+            hStrCollectionId = WinRT_CachedHString(.CollectionID)
+            WinRT_CallComMethod pManager, VT_IToastCollectionManager_RemoveToastCollectionAsync, vbLong, WinRT_vbPtr, hStrCollectionId, WinRT_vbPtr, VarPtr(pAsync)
+        Else
+            ' CollectionID 省略時は全コレクション削除
+            WinRT_CallComMethod pManager, VT_IToastCollectionManager_RemoveAllToastCollectionsAsync, vbLong, WinRT_vbPtr, VarPtr(pAsync)
+        End If
+    End With
 
-    pManager = WinRT_GetToastCollectionManager(Config.AppUserModelID)
-    If pManager = 0 Then Err.Raise 513, , "GetToastCollectionManager failed."
-
-    pAsync = 0
-    If Len(Config.CollectionID) > 0 Then
-        hStrCollectionId = WinRT_CachedHString(Config.CollectionID)
-        WinRT_CallComMethod pManager, VT_IToastCollectionManager_RemoveToastCollectionAsync, vbLong, WinRT_vbPtr, hStrCollectionId, WinRT_vbPtr, VarPtr(pAsync)
-    Else
-        WinRT_CallComMethod pManager, VT_IToastCollectionManager_RemoveAllToastCollectionsAsync, vbLong, WinRT_vbPtr, VarPtr(pAsync)
-    End If
     WinRT_RemoveToastCollection = 0
 
 Cleanup:
@@ -2412,7 +2529,15 @@ Cleanup:
     On Error GoTo 0
 End Function
 
-' ToastNotificationManager.GetDefault → IToastNotificationManagerForUser2.GetToastCollectionManager(appId)
+'***************************************************************************************************
+'* 機能　　：IToastCollectionManager インターフェースポインタを取得します。
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：COM オブジェクトポインタ（失敗時 0）。呼び出し側で Release 必須。
+'* 引数　　：appId    AppUserModelID
+'---------------------------------------------------------------------------------------------------
+'* 呼び出し経路：ToastNotificationManager.GetDefault
+'               → IToastNotificationManagerForUser2.GetToastCollectionManager(appId)
+'***************************************************************************************************
 Private Function WinRT_GetToastCollectionManager(ByVal appId As String) As LongPtr
     Dim pManagerStatics5 As LongPtr
     Dim pManagerForUser As LongPtr
@@ -2422,9 +2547,11 @@ Private Function WinRT_GetToastCollectionManager(ByVal appId As String) As LongP
     If WinRT_pManagerStatics5 = 0 Then Exit Function
     pManagerStatics5 = WinRT_pManagerStatics5
 
+    ' ToastNotificationManager.GetDefault() でユーザー別マネージャを取得
     WinRT_CallComMethod pManagerStatics5, VT_IToastNotificationManagerStatics5_GetDefault, vbLong, WinRT_vbPtr, VarPtr(pManagerForUser)
     If pManagerForUser = 0 Then Exit Function
 
+    ' IToastNotificationManagerForUser → ForUser2（コレクション API は v2 以降）
     WinRT_CallComMethod pManagerForUser, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidManagerForUser2), WinRT_vbPtr, VarPtr(pManagerForUser2)
     WinRT_CallComMethod pManagerForUser, VT_RELEASE, vbLong
     If pManagerForUser2 = 0 Then Exit Function
@@ -2436,7 +2563,14 @@ Private Function WinRT_GetToastCollectionManager(ByVal appId As String) As LongP
     WinRT_GetToastCollectionManager = pCollectionManager
 End Function
 
-' ToastCollection(collectionId, displayName, launchArgs, iconUri)
+'***************************************************************************************************
+'* 機能　　：ToastCollection オブジェクトを生成します（まだ保存はしない）。
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：IToastCollection ポインタ（失敗時 0）。
+'* 引数　　：CollectionID / displayName / launchArgs / iconUri
+'---------------------------------------------------------------------------------------------------
+'* 対応 API：ToastCollection(collectionId, displayName, launchArgs, iconUri)
+'***************************************************************************************************
 Private Function WinRT_CreateToastCollection(ByVal CollectionID As String, ByVal displayName As String, ByVal launchArgs As String, ByVal iconUri As String) As LongPtr
     Dim pFactory As LongPtr
     Dim pUri As LongPtr
@@ -2444,7 +2578,7 @@ Private Function WinRT_CreateToastCollection(ByVal CollectionID As String, ByVal
     Dim hStrCollectionId As LongPtr
     Dim hStrDisplayName As LongPtr
     Dim hStrLaunchArgs As LongPtr
-    pUri = WinRT_CreateUri(iconUri)
+    pUri = WinRT_CreateUri(iconUri)   ' 空文字なら 0（アイコンなし）
 
     pFactory = WinRT_pToastCollectionFactory
     If pFactory <> 0 Then
@@ -2460,7 +2594,12 @@ Private Function WinRT_CreateToastCollection(ByVal CollectionID As String, ByVal
     WinRT_CreateToastCollection = pCollection
 End Function
 
-' Windows.Foundation.Uri を生成（空文字なら 0）
+'***************************************************************************************************
+'* 機能　　：Windows.Foundation.Uri オブジェクトを生成します。
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：IUriRuntimeClass ポインタ。uri が空文字の場合は 0 を返します。
+'* 用途　　：ToastCollection の iconUri 等に使用。
+'***************************************************************************************************
 Private Function WinRT_CreateUri(ByVal uri As String) As LongPtr
     Dim pFactory As LongPtr
     Dim pUri As LongPtr
@@ -2475,7 +2614,19 @@ Private Function WinRT_CreateUri(ByVal uri As String) As LongPtr
     WinRT_CreateUri = pUri
 End Function
 
-Private Sub WinRT_ShowImmediateToast(ByRef Config As WinRT_ToastConfig, ByRef Binding As WinRT_DataBinding)
+'---------------------------------------------------------------------------------------------------
+' [ SECTION C ] 即時通知 / スケジュール通知の組み立てと送出
+'---------------------------------------------------------------------------------------------------
+'***************************************************************************************************
+'* 機能　　：即時トースト通知を組み立てて表示します（IToastNotifier.Show）。
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：Binding    データバインディング（あれば IToastNotification4.SetData に設定）
+'---------------------------------------------------------------------------------------------------
+'* 処理概要：ToastConfig.Content の XML を XmlDocument 化
+'            → ToastNotification 生成 → Tag/Group/SuppressPopup/ExpiresOnReboot/ExpirationTime 設定
+'            → イベントハンドラ登録 → Notifier 取得 → Show
+'***************************************************************************************************
+Private Sub WinRT_ShowImmediateToast(Binding As WinRT_DataBinding)
     Dim pXmlDoc As LongPtr
     Dim pToast As LongPtr
     Dim pToast2 As LongPtr
@@ -2485,14 +2636,17 @@ Private Sub WinRT_ShowImmediateToast(ByRef Config As WinRT_ToastConfig, ByRef Bi
     Dim pData As LongPtr
     Dim hStrTag As LongPtr
     Dim hStrGroup As LongPtr
-    pXmlDoc = WinRT_LoadXmlDocument(Config.XmlTemplate)
+
+    '--- 1. XML → ToastNotification オブジェクト生成 ---
+    pXmlDoc = WinRT_LoadXmlDocument(ToastConfig.Content)
     If pXmlDoc = 0 Then Err.Raise 513, , "LoadXmlDocument failed."
 
     pToast = WinRT_CreateToastNotification(pXmlDoc)
     If pToast = 0 Then Err.Raise 513, , "CreateToastNotification failed."
-    WinRT_CallComMethod pXmlDoc, VT_RELEASE, vbLong
+    WinRT_CallComMethod pXmlDoc, VT_RELEASE, vbLong   ' XmlDoc は Toast に渡したので不要
     pXmlDoc = 0
 
+    '--- 2. データバインディング（NotificationData）を載せる ---
     pData = WinRT_CreateNotificationData(Binding)
     If pData <> 0 Then
         WinRT_CallComMethod pToast, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidToast4), WinRT_vbPtr, VarPtr(pToast4)
@@ -2505,47 +2659,70 @@ Private Sub WinRT_ShowImmediateToast(ByRef Config As WinRT_ToastConfig, ByRef Bi
         pData = 0
     End If
 
+    '--- 3. Tag / Group / 表示オプションを設定 ---
     WinRT_CallComMethod pToast, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidToast2), WinRT_vbPtr, VarPtr(pToast2)
-    If pToast2 <> 0 Then
-        hStrTag = WinRT_CachedHString(Config.Tag)
-        hStrGroup = WinRT_CachedHString(Config.Group)
-        If hStrTag <> 0 Then WinRT_CallComMethod pToast2, VT_IToastNotification2_SetTag, vbLong, WinRT_vbPtr, hStrTag
-        If hStrGroup <> 0 Then WinRT_CallComMethod pToast2, VT_IToastNotification2_SetGroup, vbLong, WinRT_vbPtr, hStrGroup
-        If Config.SuppressPopup Then WinRT_CallComMethod pToast2, VT_IToastNotification2_SetSuppressPopup, vbLong, vbByte, CByte(1)
-        WinRT_CallComMethod pToast2, VT_RELEASE, vbLong
-        pToast2 = 0
-    End If
 
-    If Config.ExpiresOnReboot Then
-        WinRT_CallComMethod pToast, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidToast6), WinRT_vbPtr, VarPtr(pToast6)
-        If pToast6 <> 0 Then
-            WinRT_CallComMethod pToast6, VT_IToastNotification6_SetExpiresOnReboot, vbLong, vbByte, CByte(1)
-            WinRT_CallComMethod pToast6, VT_RELEASE, vbLong
-            pToast6 = 0
+    With ToastConfig
+        If pToast2 <> 0 Then
+            hStrTag = WinRT_CachedHString(.Tag)
+            hStrGroup = WinRT_CachedHString(.Group)
+            If hStrTag <> 0 Then WinRT_CallComMethod pToast2, VT_IToastNotification2_SetTag, vbLong, WinRT_vbPtr, hStrTag
+            If hStrGroup <> 0 Then WinRT_CallComMethod pToast2, VT_IToastNotification2_SetGroup, vbLong, WinRT_vbPtr, hStrGroup
+            If .SuppressPopup Then WinRT_CallComMethod pToast2, VT_IToastNotification2_SetSuppressPopup, vbLong, vbByte, CByte(1)
+            WinRT_CallComMethod pToast2, VT_RELEASE, vbLong
+            pToast2 = 0
         End If
-    End If
-
-    WinRT_ApplyExpirationTime pToast, VT_IToastNotification_SetExpirationTime, Config
-
-    ' Activated / Dismissed / Failed を登録（DLL 版 GeneralNotice.cpp と同等）。
-    ' トーストクリック・ボタン押下で launch / action arguments のマクロを実行する。
-    WinRT_RegisterToastEventHandlers pToast
-
-    pNotifier = WinRT_CreateToastNotifier(Config.AppUserModelID, Config.CollectionID)
-    If pNotifier = 0 Then Err.Raise 513, , "CreateToastNotifier failed."
-    WinRT_CallComMethod pNotifier, VT_IToastNotifier_Show, vbLong, WinRT_vbPtr, pToast
+    
+        ' 再起動時に消えるフラグ（IToastNotification6）
+        If .ExpiresOnReboot Then
+            WinRT_CallComMethod pToast, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidToast6), WinRT_vbPtr, VarPtr(pToast6)
+            If pToast6 <> 0 Then
+                WinRT_CallComMethod pToast6, VT_IToastNotification6_SetExpiresOnReboot, vbLong, vbByte, CByte(1)
+                WinRT_CallComMethod pToast6, VT_RELEASE, vbLong
+                pToast6 = 0
+            End If
+        End If
+    
+        WinRT_ApplyExpirationTime pToast, VT_IToastNotification_SetExpirationTime
+    
+        '--- 4. クリック/ボタン押下のイベントハンドラ登録 ---
+        ' Activated / Dismissed / Failed を登録（DLL 版 GeneralNotice.cpp と同等）。
+        ' トーストクリック・ボタン押下で launch / action arguments のマクロを実行する。
+        ToastCallbackCore.RegisterToastHandlers pToast
+    
+        '--- 5. Notifier 取得 → Show で画面に出す ---
+        pNotifier = WinRT_CreateToastNotifier(.AppUserModelID, .CollectionID)
+        If pNotifier = 0 Then Err.Raise 513, , "CreateToastNotifier failed."
+        WinRT_CallComMethod pNotifier, VT_IToastNotifier_Show, vbLong, WinRT_vbPtr, pToast
+    End With
 
     If pNotifier <> 0 Then WinRT_CallComMethod pNotifier, VT_RELEASE, vbLong
     If pToast <> 0 Then WinRT_CallComMethod pToast, VT_RELEASE, vbLong
 End Sub
 
-Private Sub WinRT_ValidateToastIdentity(ByRef Config As WinRT_ToastConfig, ByVal procName As String)
-    If Len(Config.Tag) = 0 Then Err.Raise 513, procName, "Tag is required."
-    If Len(Config.Group) = 0 Then Err.Raise 513, procName, "Group is required."
-    If Len(Config.AppUserModelID) = 0 Then Err.Raise 513, procName, "AppUserModelID is required."
+'***************************************************************************************************
+'* 機能　　：トーストの識別に必須の Tag / Group / AppUserModelID が設定されているか検証します。
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：procName    エラー発生時の Err.Source に使う呼び出し元プロシージャ名
+'***************************************************************************************************
+Private Sub WinRT_ValidateToastIdentity(procName As String)
+    With ToastConfig
+        If Len(.Tag) = 0 Then Err.Raise 513, procName, "Tag is required."
+        If Len(.Group) = 0 Then Err.Raise 513, procName, "Group is required."
+        If Len(.AppUserModelID) = 0 Then Err.Raise 513, procName, "AppUserModelID is required."
+    End With
 End Sub
 
-Private Sub WinRT_ShowScheduledToast(ByRef Config As WinRT_ToastConfig)
+'***************************************************************************************************
+'* 機能　　：指定日時に配信するスケジュールトーストを登録します（IToastNotifier.AddToSchedule）。
+'---------------------------------------------------------------------------------------------------
+'* 処理概要：ToastConfig.Schedule_DeliveryTime を WinRT DateTime に変換
+'            → ScheduledToastNotification 生成 → Id/Tag/Group/SuppressPopup/ExpirationTime 設定
+'            → Notifier 取得 → AddToSchedule
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：スケジュール通知ではデータバインディング（NotificationData）は使用しません。
+'***************************************************************************************************
+Private Sub WinRT_ShowScheduledToast()
     Dim pXmlDoc As LongPtr
     Dim pScheduledFactory As LongPtr
     Dim pScheduled As LongPtr
@@ -2556,53 +2733,72 @@ Private Sub WinRT_ShowScheduledToast(ByRef Config As WinRT_ToastConfig)
     Dim hStrTag As LongPtr
     Dim hStrGroup As LongPtr
     Dim deliveryTime As WRT_DateTime
-    pXmlDoc = WinRT_LoadXmlDocument(Config.XmlTemplate)
+
+    '--- 1. XML → ScheduledToastNotification 生成 ---
+    pXmlDoc = WinRT_LoadXmlDocument(ToastConfig.Content)
     If pXmlDoc = 0 Then Err.Raise 513, , "LoadXmlDocument failed."
 
     pScheduledFactory = WinRT_pScheduledToastFactory
     If pScheduledFactory = 0 Then Err.Raise 513, , "ScheduledToastNotification factory failed."
 
-    WinRT_ScheduleDateToWinRTDateTimeFillFromConfig Config, deliveryTime
+    WinRT_ScheduleDateToWinRTDateTimeFillFromConfig deliveryTime   ' VBA Date → UTC FILETIME
     pScheduled = 0
     WinRT_FactoryCreateScheduledToast pScheduledFactory, pXmlDoc, deliveryTime, pScheduled
     WinRT_CallComMethod pXmlDoc, VT_RELEASE, vbLong
     pXmlDoc = 0
     If pScheduled = 0 Then Err.Raise 513, , "CreateScheduledToastNotification failed."
 
+    '--- 2. Id / Tag / Group / SuppressPopup を設定 ---
     WinRT_CallComMethod pScheduled, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidScheduled2), WinRT_vbPtr, VarPtr(pScheduled2)
-    If pScheduled2 <> 0 Then
-        If Len(Config.Schedule_ID) > 0 Then
-            hStrScheduleId = WinRT_CachedHString(WinRT_NormalizeScheduleId(Config.Schedule_ID))
-        End If
-        hStrTag = WinRT_CachedHString(Config.Tag)
-        hStrGroup = WinRT_CachedHString(Config.Group)
-        If hStrScheduleId <> 0 Then WinRT_CallComMethod pScheduled, VT_IScheduledToastNotification_SetId, vbLong, WinRT_vbPtr, hStrScheduleId
-        If hStrTag <> 0 Then WinRT_CallComMethod pScheduled2, VT_IToastNotification2_SetTag, vbLong, WinRT_vbPtr, hStrTag
-        If hStrGroup <> 0 Then WinRT_CallComMethod pScheduled2, VT_IToastNotification2_SetGroup, vbLong, WinRT_vbPtr, hStrGroup
-        If Config.SuppressPopup Then WinRT_CallComMethod pScheduled2, VT_IToastNotification2_SetSuppressPopup, vbLong, vbByte, CByte(1)
-        WinRT_CallComMethod pScheduled2, VT_RELEASE, vbLong
-        pScheduled2 = 0
-    End If
 
-    If Config.ExpirationTime > 0 Then
-        ' IScheduledToastNotification4（1D4761FD...）。98429E8B... は v3 で ExpirationTime は存在しない
-        WinRT_CallComMethod pScheduled, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidScheduled4), WinRT_vbPtr, VarPtr(pScheduled4)
-        If pScheduled4 <> 0 Then
-            WinRT_ApplyExpirationTime pScheduled4, VT_IScheduledToastNotification4_SetExpirationTime, Config
-            WinRT_CallComMethod pScheduled4, VT_RELEASE, vbLong
-            pScheduled4 = 0
+    With ToastConfig
+        If pScheduled2 <> 0 Then
+            If Len(.Schedule_ID) > 0 Then
+                hStrScheduleId = WinRT_CachedHString(WinRT_NormalizeScheduleId(.Schedule_ID))
+            End If
+            hStrTag = WinRT_CachedHString(.Tag)
+            hStrGroup = WinRT_CachedHString(.Group)
+            If hStrScheduleId <> 0 Then WinRT_CallComMethod pScheduled, VT_IScheduledToastNotification_SetId, vbLong, WinRT_vbPtr, hStrScheduleId
+            If hStrTag <> 0 Then WinRT_CallComMethod pScheduled2, VT_IToastNotification2_SetTag, vbLong, WinRT_vbPtr, hStrTag
+            If hStrGroup <> 0 Then WinRT_CallComMethod pScheduled2, VT_IToastNotification2_SetGroup, vbLong, WinRT_vbPtr, hStrGroup
+            If .SuppressPopup Then WinRT_CallComMethod pScheduled2, VT_IToastNotification2_SetSuppressPopup, vbLong, vbByte, CByte(1)
+            WinRT_CallComMethod pScheduled2, VT_RELEASE, vbLong
+            pScheduled2 = 0
         End If
-    End If
-
-    pNotifier = WinRT_CreateToastNotifier(Config.AppUserModelID, Config.CollectionID)
-    If pNotifier = 0 Then Err.Raise 513, , "CreateToastNotifier failed."
-    WinRT_CallComMethod pNotifier, VT_IToastNotifier_AddToSchedule, vbLong, WinRT_vbPtr, pScheduled
+    
+        '--- 3. 有効期限（IScheduledToastNotification4 が必要） ---
+        If .ExpirationTime > 0 Then
+            ' IScheduledToastNotification4（1D4761FD...）。98429E8B... は v3 で ExpirationTime は存在しない
+            WinRT_CallComMethod pScheduled, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidScheduled4), WinRT_vbPtr, VarPtr(pScheduled4)
+            If pScheduled4 <> 0 Then
+                WinRT_ApplyExpirationTime pScheduled4, VT_IScheduledToastNotification4_SetExpirationTime
+                WinRT_CallComMethod pScheduled4, VT_RELEASE, vbLong
+                pScheduled4 = 0
+            End If
+        End If
+    
+        '--- 4. スケジュールに登録（即時表示ではなく AddToSchedule） ---
+        pNotifier = WinRT_CreateToastNotifier(.AppUserModelID, .CollectionID)
+        If pNotifier = 0 Then Err.Raise 513, , "CreateToastNotifier failed."
+        WinRT_CallComMethod pNotifier, VT_IToastNotifier_AddToSchedule, vbLong, WinRT_vbPtr, pScheduled
+    End With
 
     If pNotifier <> 0 Then WinRT_CallComMethod pNotifier, VT_RELEASE, vbLong
     If pScheduled <> 0 Then WinRT_CallComMethod pScheduled, VT_RELEASE, vbLong
 End Sub
 
+'---------------------------------------------------------------------------------------------------
+' [ SECTION D ] IToastNotifier / IToastNotificationHistory の取得
+'---------------------------------------------------------------------------------------------------
+'***************************************************************************************************
+'* 機能　　：IToastNotifier を取得します。CollectionID の有無で取得経路が分岐します。
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：IToastNotifier ポインタ（失敗時 0）。呼び出し側で Release 必須。
+'* 分岐　　：CollectionID あり → コレクション用 Notifier（非同期取得を同期的に待機）
+'            CollectionID なし → AppUserModelID 指定の通常 Notifier
+'***************************************************************************************************
 Private Function WinRT_CreateToastNotifier(ByVal AppUserModelID As String, ByVal CollectionID As String) As LongPtr
+    ' コレクション通知なら非同期取得ルート、通常通知なら AppId 直指定
     If Len(CollectionID) > 0 Then
         WinRT_CreateToastNotifier = WinRT_CreateToastNotifierForCollection(CollectionID)
     Else
@@ -2610,16 +2806,28 @@ Private Function WinRT_CreateToastNotifier(ByVal AppUserModelID As String, ByVal
     End If
 End Function
 
+'***************************************************************************************************
+'* 機能　　：AppUserModelID を指定して IToastNotifier を取得します。
+'---------------------------------------------------------------------------------------------------
+'* 対応 API：ToastNotificationManager.CreateToastNotifier(appId)
+'***************************************************************************************************
 Private Function WinRT_CreateToastNotifierWithAppId(ByVal AppUserModelID As String) As LongPtr
     Dim hStrAppId As LongPtr
     Dim pNotifier As LongPtr
 
     If WinRT_pManagerStatics = 0 Then Exit Function
     hStrAppId = WinRT_CachedHString(AppUserModelID)
-    WinRT_CallComMethod WinRT_pManagerStatics, 7, vbLong, WinRT_vbPtr, hStrAppId, WinRT_vbPtr, VarPtr(pNotifier)
+    WinRT_CallComMethod WinRT_pManagerStatics, 7, vbLong, WinRT_vbPtr, hStrAppId, WinRT_vbPtr, VarPtr(pNotifier)   ' CreateToastNotifier(appId)
     WinRT_CreateToastNotifierWithAppId = pNotifier
 End Function
 
+'***************************************************************************************************
+'* 機能　　：CollectionID を指定してコレクション用 IToastNotifier を取得します。
+'---------------------------------------------------------------------------------------------------
+'* 処理概要：GetDefault → IToastNotificationManagerForUser2
+'            → GetToastNotifierForToastCollectionIdAsync → WinRT_WaitAsync で完了待ち
+'            → GetResults で Notifier ポインタ取得
+'***************************************************************************************************
 Private Function WinRT_CreateToastNotifierForCollection(ByVal CollectionID As String) As LongPtr
     Dim hStrCollectionId As LongPtr
     Dim pManagerStatics5 As LongPtr
@@ -2631,6 +2839,7 @@ Private Function WinRT_CreateToastNotifierForCollection(ByVal CollectionID As St
     If WinRT_pManagerStatics5 = 0 Then Exit Function
     pManagerStatics5 = WinRT_pManagerStatics5
 
+    ' GetDefault → ForUser2 まで（コレクション API 用インターフェース）
     WinRT_CallComMethod pManagerStatics5, 6, vbLong, WinRT_vbPtr, VarPtr(pManagerForUser)
     If pManagerForUser = 0 Then Exit Function
 
@@ -2638,10 +2847,12 @@ Private Function WinRT_CreateToastNotifierForCollection(ByVal CollectionID As St
     WinRT_CallComMethod pManagerForUser, VT_RELEASE, vbLong
     If pManagerForUser2 = 0 Then Exit Function
 
+    ' 非同期でコレクション用 Notifier を要求
     hStrCollectionId = WinRT_CachedHString(CollectionID)
     WinRT_CallComMethod pManagerForUser2, 6, vbLong, WinRT_vbPtr, hStrCollectionId, WinRT_vbPtr, VarPtr(pAsync)
     WinRT_CallComMethod pManagerForUser2, VT_RELEASE, vbLong
 
+    ' VBA では await が使えないのでポーリングで完了待ち → 結果取得
     If pAsync <> 0 Then
         hr = WinRT_WaitAsync(pAsync)
         If hr = 0 Then
@@ -2653,7 +2864,13 @@ Private Function WinRT_CreateToastNotifierForCollection(ByVal CollectionID As St
     WinRT_CreateToastNotifierForCollection = pNotifier
 End Function
 
+'***************************************************************************************************
+'* 機能　　：IToastNotificationHistory を取得します。CollectionID の有無で取得経路が分岐します。
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：IToastNotificationHistory ポインタ（失敗時 0）。
+'***************************************************************************************************
 Private Function WinRT_GetToastHistory(ByVal CollectionID As String) As LongPtr
+    ' Notifier と同様、コレクション有無で取得 API が異なる
     If Len(CollectionID) > 0 Then
         WinRT_GetToastHistory = WinRT_GetHistoryForCollection(CollectionID)
     Else
@@ -2661,6 +2878,11 @@ Private Function WinRT_GetToastHistory(ByVal CollectionID As String) As LongPtr
     End If
 End Function
 
+'***************************************************************************************************
+'* 機能　　：デフォルトの IToastNotificationHistory を取得します。
+'---------------------------------------------------------------------------------------------------
+'* 対応 API：ToastNotificationManager.History
+'***************************************************************************************************
 Private Function WinRT_GetDefaultHistory() As LongPtr
     Dim pHistory As LongPtr
 
@@ -2671,6 +2893,11 @@ Private Function WinRT_GetDefaultHistory() As LongPtr
     WinRT_GetDefaultHistory = pHistory
 End Function
 
+'***************************************************************************************************
+'* 機能　　：コレクション用の IToastNotificationHistory を非同期取得し、同期的に返します。
+'---------------------------------------------------------------------------------------------------
+'* 処理概要：GetDefault → GetHistoryForToastCollectionIdAsync → WinRT_WaitAsync → GetResults
+'***************************************************************************************************
 Private Function WinRT_GetHistoryForCollection(ByVal CollectionID As String) As LongPtr
     Dim hStrCollectionId As LongPtr
     Dim pManagerStatics5 As LongPtr
@@ -2689,6 +2916,7 @@ Private Function WinRT_GetHistoryForCollection(ByVal CollectionID As String) As 
     WinRT_CallComMethod pManagerForUser, VT_RELEASE, vbLong
     If pManagerForUser2 = 0 Then Exit Function
 
+    ' GetHistoryForToastCollectionIdAsync（vtable index 7）
     hStrCollectionId = WinRT_CachedHString(CollectionID)
     WinRT_CallComMethod pManagerForUser2, 7, vbLong, WinRT_vbPtr, hStrCollectionId, WinRT_vbPtr, VarPtr(pAsync)
     WinRT_CallComMethod pManagerForUser2, VT_RELEASE, vbLong
@@ -2704,6 +2932,16 @@ Private Function WinRT_GetHistoryForCollection(ByVal CollectionID As String) As 
     WinRT_GetHistoryForCollection = pHistory
 End Function
 
+'---------------------------------------------------------------------------------------------------
+' [ SECTION E ] WinRT オブジェクト生成
+'---------------------------------------------------------------------------------------------------
+'***************************************************************************************************
+'* 機能　　：トースト XML 文字列から Windows.Data.Xml.Dom.XmlDocument を生成します。
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：IXmlDocument ポインタ（失敗時 0）。
+'* 処理概要：RoActivateInstance("Windows.Data.Xml.Dom.XmlDocument")
+'            → IXmlDocumentIO.LoadXml → IXmlDocument へ QI
+'***************************************************************************************************
 Private Function WinRT_LoadXmlDocument(ByVal xml As String) As LongPtr
     Dim hStrXmlClass As LongPtr
     Dim hStrXml As LongPtr
@@ -2711,21 +2949,29 @@ Private Function WinRT_LoadXmlDocument(ByVal xml As String) As LongPtr
     Dim pXmlDocIO As LongPtr
     Dim pXmlDoc As LongPtr
     hStrXmlClass = WinRT_CachedHString("Windows.Data.Xml.Dom.XmlDocument")
-    RoActivateInstance hStrXmlClass, pInspectable
+    RoActivateInstance hStrXmlClass, pInspectable       ' XmlDocument インスタンスを生成
     If pInspectable = 0 Then Exit Function
 
+    ' IXmlDocumentIO.LoadXml でトースト XML 文字列をパース
     WinRT_CallComMethod pInspectable, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidXmlDocIO), WinRT_vbPtr, VarPtr(pXmlDocIO)
     hStrXml = WinRT_CreateHString(xml)
     WinRT_CallComMethod pXmlDocIO, 6, vbLong, WinRT_vbPtr, hStrXml
-    If hStrXml <> 0 Then WindowsDeleteString hStrXml
+    If hStrXml <> 0 Then WindowsDeleteString hStrXml   ' 動的生成 HSTRING は即解放
     WinRT_CallComMethod pXmlDocIO, VT_RELEASE, vbLong
     pXmlDocIO = 0
 
+    ' 呼び出し側が使う IXmlDocument インターフェースへ切り替え
     WinRT_CallComMethod pInspectable, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidXmlDoc), WinRT_vbPtr, VarPtr(pXmlDoc)
     WinRT_CallComMethod pInspectable, VT_RELEASE, vbLong
     WinRT_LoadXmlDocument = pXmlDoc
 End Function
 
+'***************************************************************************************************
+'* 機能　　：XmlDocument から ToastNotification オブジェクトを生成します。
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：IToastNotification ポインタ（失敗時 0）。
+'* 対応 API：ToastNotification(xmlDocument)
+'***************************************************************************************************
 Private Function WinRT_CreateToastNotification(ByVal pXmlDoc As LongPtr) As LongPtr
     Dim pToast As LongPtr
 
@@ -2735,6 +2981,18 @@ Private Function WinRT_CreateToastNotification(ByVal pXmlDoc As LongPtr) As Long
     WinRT_CreateToastNotification = pToast
 End Function
 
+'---------------------------------------------------------------------------------------------------
+' [ SECTION F ] データバインディング（NotificationData マップ構築）
+'---------------------------------------------------------------------------------------------------
+'***************************************************************************************************
+'* 機能　　：WinRT_DataBinding の値から NotificationData オブジェクトを構築します。
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：INotificationData ポインタ。バインディング内容が空の場合は 0。
+'---------------------------------------------------------------------------------------------------
+'* 処理概要：RoActivateInstance("Windows.UI.Notifications.NotificationData")
+'            → SequenceNumber 設定 → Values マップ取得 → 各キーにテキスト/進捗値を Insert
+'            キー名は DataBindingTopText_* / DataBindingProgress_* 定数に対応（XML の {token} と一致）。
+'***************************************************************************************************
 Private Function WinRT_CreateNotificationData(ByRef Binding As WinRT_DataBinding) As LongPtr
     Dim hStrClass As LongPtr
     Dim pInspectable As LongPtr
@@ -2744,6 +3002,7 @@ Private Function WinRT_CreateNotificationData(ByRef Binding As WinRT_DataBinding
 
     If Not WinRT_DataBindingHasContent(Binding) Then Exit Function
 
+    ' NotificationData インスタンスを RoActivateInstance で生成
     hStrClass = WinRT_CachedHString("Windows.UI.Notifications.NotificationData")
     RoActivateInstance hStrClass, pInspectable
     If pInspectable = 0 Then Exit Function
@@ -2756,47 +3015,56 @@ Private Function WinRT_CreateNotificationData(ByRef Binding As WinRT_DataBinding
         WinRT_CallComMethod pData, VT_INotificationData_SetSequenceNumber, vbLong, vbLong, Binding.SequenceNumber
     End If
 
-    hasProgress = (Len(Binding.ProgressStatus) > 0)
+    'トースト通知のプログレスバー使用判定
+    hasProgress = (StrPtr(Binding.ProgressStatus) > 0)
+    
+    ' Values プロパティ（IMap）を取得してキー/値を詰めていく
     WinRT_CallComMethod pData, 6, vbLong, WinRT_vbPtr, VarPtr(pMap)
     If pMap = 0 Then
         WinRT_CallComMethod pData, VT_RELEASE, vbLong
         Exit Function
     End If
 
-    If Len(Binding.TitleText) > 0 Then WinRT_InsertMapValue pMap, "TopTextTitle", Binding.TitleText
-    If Len(Binding.ContentsText) > 0 Then WinRT_InsertMapValue pMap, "TopTextContents", Binding.ContentsText
-    If Len(Binding.AttributionText) > 0 Then WinRT_InsertMapValue pMap, "TopTextAttribution", Binding.AttributionText
-    If hasProgress Then
-        If Len(Binding.ProgressTitle) > 0 Then WinRT_InsertMapValue pMap, "ProgressTitle", Binding.ProgressTitle
-        WinRT_InsertMapValue pMap, "ProgressStatus", Binding.ProgressStatus
-        If Binding.progressValue < 0 Then
-            WinRT_InsertMapValue pMap, "ProgressValue", "Indeterminate"
-        Else
-            WinRT_InsertMapValue pMap, "ProgressValue", WinRT_FormatProgressValue(Binding.progressValue)
+    'データバイディング設定
+    With Binding
+        '---- 最上位テキスト要素 ----
+        If StrPtr(.TitleText) Then WinRT_InsertMapValue pMap, DataBindingTopText_Title, .TitleText
+        If StrPtr(.ContentsText) Then WinRT_InsertMapValue pMap, DataBindingTopText_Body, .ContentsText
+        If StrPtr(.AttributionText) Then WinRT_InsertMapValue pMap, DataBindingTopText_Attribute, .AttributionText
+
+        '---- プログレス要素 ----
+        If hasProgress Then
+            'タイトル属性
+            If StrPtr(.ProgressTitle) Then WinRT_InsertMapValue pMap, DataBindingProgress_Title, .ProgressTitle
+
+            '進捗ステータス属性　※ドキュメント上、必須項目
+            WinRT_InsertMapValue pMap, DataBindingProgress_Status, .ProgressStatus
+
+            '純粋な進捗値
+            If Binding.progressValue < 0 Then
+                '負の場合は、不確定進捗(マーキー)として設定
+                WinRT_InsertMapValue pMap, DataBindingProgress_Value, "Indeterminate"
+            Else
+                '進捗値(0~1.0)
+                WinRT_InsertMapValue pMap, DataBindingProgress_Value, .progressValue
+            End If
+
+            '進捗値の代替表現
+            '※未指定の場合は、Windows側の既定書式に委ねます。現時点では、「70%」といったパーセント表記になります
+            If StrPtr(.ProgressValueStringOverride) Then WinRT_InsertMapValue pMap, DataBindingProgress_ValueString, .ProgressValueStringOverride
         End If
-        If Len(Binding.ProgressValueStringOverride) > 0 Then
-            WinRT_InsertMapValue pMap, "ProgressValueString", Binding.ProgressValueStringOverride
-        Else
-            WinRT_InsertMapValue pMap, "ProgressValueString", WinRT_FormatProgressValueString(Binding.progressValue)
-        End If
-    End If
-    WinRT_CallComMethod pMap, VT_RELEASE, vbLong
+    End With
+
+    WinRT_CallComMethod pMap, VT_RELEASE, vbLong   ' マップだけ解放（pData は呼び出し側が Release）
 
     WinRT_CreateNotificationData = pData
 End Function
 
-Private Function WinRT_FormatProgressValue(ByVal progressValue As Double) As String
-    WinRT_FormatProgressValue = Replace(CStr(progressValue), ",", ".")
-End Function
-
-Private Function WinRT_FormatProgressValueString(ByVal progressValue As Double) As String
-    If progressValue < 0 Then
-        WinRT_FormatProgressValueString = "処理中"
-    Else
-        WinRT_FormatProgressValueString = Format$(progressValue, "0%")
-    End If
-End Function
-
+'***************************************************************************************************
+'* 機能　　：DispCallFunc の戻り値 Variant を Long に安全に変換します。
+'---------------------------------------------------------------------------------------------------
+'* 用途　　：COM メソッドの戻り値が Integer/Long/LongLong いずれでも受け取れるようにする。
+'***************************************************************************************************
 Private Function WinRT_CoerceLongResult(ByVal vResult As Variant) As Long
     Select Case VarType(vResult)
         Case vbLong, vbInteger, vbByte
@@ -2808,6 +3076,11 @@ Private Function WinRT_CoerceLongResult(ByVal vResult As Variant) As Long
     End Select
 End Function
 
+'***************************************************************************************************
+'* 機能　　：WinRT_DataBinding に NotificationData として載せるべき値が 1 つでもあるか判定します。
+'---------------------------------------------------------------------------------------------------
+'* 判定対象：TitleText / ContentsText / AttributionText / ProgressStatus
+'***************************************************************************************************
 Private Function WinRT_DataBindingHasContent(ByRef Binding As WinRT_DataBinding) As Boolean
     If Len(Binding.TitleText) > 0 Then WinRT_DataBindingHasContent = True: Exit Function
     If Len(Binding.ContentsText) > 0 Then WinRT_DataBindingHasContent = True: Exit Function
@@ -2815,38 +3088,62 @@ Private Function WinRT_DataBindingHasContent(ByRef Binding As WinRT_DataBinding)
     If Len(Binding.ProgressStatus) > 0 Then WinRT_DataBindingHasContent = True
 End Function
 
-Private Function WinRT_CreateDateTimeReferenceFromConfig(ByRef Config As WinRT_ToastConfig) As LongPtr
+'---------------------------------------------------------------------------------------------------
+' [ SECTION G ] 日時変換・有効期限の適用
+'---------------------------------------------------------------------------------------------------
+'***************************************************************************************************
+'* 機能　　：ToastConfig.ExpirationTime から IReference<DateTime> を生成します。
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：IReference<DateTime> ポインタ（ExpirationTime 未設定時は 0）。
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：ExpirationTime は UTC 補正済みの VBA Date シリアル値です（RunToastNotifierShow で変換済み）。
+'***************************************************************************************************
+Private Function WinRT_CreateDateTimeReferenceFromConfig() As LongPtr
     Dim dateTimeValue As WRT_DateTime
 
     ' DLL (GeneralNotice.cpp) と同一: UTC 補正済みシリアル → VariantTimeToSystemTime → SystemTimeToFileTime。
-    If Config.ExpirationTime <= 0 Then Exit Function
-    WinRT_DateSerialToWinRTDateTimeFill Config.ExpirationTime, dateTimeValue
+    If ToastConfig.ExpirationTime <= 0 Then Exit Function
+    WinRT_DateSerialToWinRTDateTimeFill ToastConfig.ExpirationTime, dateTimeValue
     If WRT_DateTimeIsZero(dateTimeValue) Then Exit Function
 
     WinRT_CreateDateTimeReferenceFromConfig = WinRT_CreateDateTimeReferenceFromDateTime(dateTimeValue)
 End Function
 
-Private Sub WinRT_ApplyExpirationTime(ByVal pNotification As LongPtr, ByVal vTableIndex As Long, ByRef Config As WinRT_ToastConfig)
+'***************************************************************************************************
+'* 機能　　：トースト通知オブジェクトに有効期限（ExpirationTime）を設定します。
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：pNotification    IToastNotification または IScheduledToastNotification4 のポインタ
+'            vTableIndex      呼び出す vtable メソッド（SetExpirationTime のインデックス）
+'***************************************************************************************************
+Private Sub WinRT_ApplyExpirationTime(pNotification As LongPtr, vTableIndex As Long)
     Dim pExpirationRef As LongPtr
 
     If pNotification = 0 Then Exit Sub
-    If Config.ExpirationTime <= 0 Then Exit Sub
+    If ToastConfig.ExpirationTime <= 0 Then Exit Sub
 
-    pExpirationRef = WinRT_CreateDateTimeReferenceFromConfig(Config)
+    pExpirationRef = WinRT_CreateDateTimeReferenceFromConfig   ' IReference<DateTime> を組み立て
     If pExpirationRef = 0 Then
         Err.Raise 513, "WinRT_ApplyExpirationTime", "PropertyValue.CreateDateTime failed for ExpirationTime."
     End If
 
     WinRT_CallComMethod pNotification, vTableIndex, vbLong, WinRT_vbPtr, pExpirationRef
-    WinRT_CallComMethod pExpirationRef, VT_RELEASE, vbLong
+    WinRT_CallComMethod pExpirationRef, VT_RELEASE, vbLong     ' 渡し終わった参照は解放
 End Sub
 
+'***************************************************************************************************
+'* 機能　　：WRT_DateTime（FILETIME 8 バイト）から IReference<DateTime> を生成します。
+'---------------------------------------------------------------------------------------------------
+'* 処理概要：PropertyValue.CreateDateTime → IPropertyValue から IReference<DateTime> へ QI
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：IPropertyValue をそのまま渡すと値が壊れるため、必ず QI で IReference に変換します。
+'***************************************************************************************************
 Private Function WinRT_CreateDateTimeReferenceFromDateTime(ByRef dateTimeValue As WRT_DateTime) As LongPtr
     Dim pPropertyValue As LongPtr
     Dim pReference As LongPtr
 
     If WinRT_pPropertyValueStatics = 0 Then Exit Function
 
+    ' まず IPropertyValue として DateTime ボックス化
     WinRT_PropertyValueCreateDateTime WinRT_pPropertyValueStatics, dateTimeValue, pPropertyValue
     If pPropertyValue = 0 Then Exit Function
 
@@ -2859,73 +3156,97 @@ Private Function WinRT_CreateDateTimeReferenceFromDateTime(ByRef dateTimeValue A
     WinRT_CreateDateTimeReferenceFromDateTime = pReference
 End Function
 
+'***************************************************************************************************
+'* 機能　　：NotificationData の Values マップにキーと値のペアを 1 件挿入します。
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：pMap    IMap<HSTRING,HSTRING> ポインタ
+'            key     バインディングキー（例: "title"）
+'            val     表示テキストまたは進捗値文字列
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：val は毎回新規 HSTRING を生成し、キャッシュしない（値が動的に変わるため）。
+'***************************************************************************************************
 Private Sub WinRT_InsertMapValue(ByVal pMap As LongPtr, ByVal key As String, ByVal val As String)
     Dim hKey As LongPtr
     Dim hVal As LongPtr
     Dim replaced As Byte
-    hKey = WinRT_CachedHString(key)
-    hVal = WinRT_CreateHString(val)
-    WinRT_CallComMethod pMap, 10, vbLong, WinRT_vbPtr, hKey, WinRT_vbPtr, hVal, WinRT_vbPtr, VarPtr(replaced)
+    hKey = WinRT_CachedHString(key)       ' キー名は固定なのでキャッシュ可
+    hVal = WinRT_CreateHString(val)       ' 値は毎回変わるのでキャッシュしない
+    WinRT_CallComMethod pMap, 10, vbLong, WinRT_vbPtr, hKey, WinRT_vbPtr, hVal, WinRT_vbPtr, VarPtr(replaced)   ' IMap.Insert
     WindowsDeleteString hVal
 End Sub
 
+'---------------------------------------------------------------------------------------------------
+' [ SECTION H ] HSTRING・ActivationFactory ユーティリティ
+'---------------------------------------------------------------------------------------------------
+'***************************************************************************************************
+'* 機能　　：WinRT クラスの Activation Factory（静的メソッド群）を取得します。
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：className    完全修飾クラス名（例: "Windows.UI.Notifications.ToastNotificationManager"）
+'            iid          取得したいインターフェースの GUID
+'            factory      出力: IActivationFactory 等のポインタ
+'---------------------------------------------------------------------------------------------------
+'* 対応 API：RoGetActivationFactory
+'***************************************************************************************************
 Private Sub WinRT_GetActivationFactory(ByVal className As String, ByRef iid As WinRT_GUID, ByRef factory As LongPtr)
     RoGetActivationFactory WinRT_CachedHString(className), iid, factory
 End Sub
 
-Private Function WinRT_CachedHString(ByVal s As String) As LongPtr
+'***************************************************************************************************
+'* 機能　　：文字列を HSTRING に変換し、セッション中は Dictionary でキャッシュします。
+'---------------------------------------------------------------------------------------------------
+'* 用途　　：クラス名・AppUserModelID・Tag 等、繰り返し使う固定文字列の RoGetActivationFactory 向け。
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：Dictionary.Add の Item 引数は (hStr) と括弧必須。64bit Dictionary が LongPtr を
+'            参照渡しと誤解して 0 になる不具合を回避するための強制値渡しです。
+'***************************************************************************************************
+Private Function WinRT_CachedHString(s As String) As LongPtr
     Dim hStr As LongPtr
-    Dim cy As Currency
 
     If WinRT_HStringCache Is Nothing Then Set WinRT_HStringCache = CreateObject("Scripting.Dictionary")
+    ' キャッシュヒットなら WindowsCreateString を省略
     If WinRT_HStringCache.Exists(s) Then
-        cy = WinRT_HStringCache(s)
-#If Win64 Then
-        RtlMoveMemory WinRT_CachedHString, cy, 8
-#Else
-        RtlMoveMemory WinRT_CachedHString, cy, 4
-#End If
-        If WinRT_CachedHString <> 0 Then Exit Function
-        WinRT_HStringCache.Remove s
+        WinRT_CachedHString = WinRT_HStringCache(s)
+        Exit Function
     End If
 
     hStr = WinRT_CreateHString(s)
-#If Win64 Then
-    RtlMoveMemory cy, hStr, 8
-#Else
-    RtlMoveMemory cy, hStr, 4
-#End If
-    WinRT_HStringCache.Add s, cy
+    WinRT_HStringCache.Add s, (hStr)    '`Item`引数の「()」は必須：64bit版DictionaryがLongPtr(VT_I8)の参照渡しを正しく解釈できず、値が0になる不具合を回避するため（強制値渡し）
     WinRT_CachedHString = hStr
 End Function
 
+'***************************************************************************************************
+'* 機能　　：HSTRING キャッシュ内の全文字列を WindowsDeleteString で解放します。
+'---------------------------------------------------------------------------------------------------
+'* 呼び出し：WinRT_ReleaseCache / WinRT_Shutdown から使用。
+'***************************************************************************************************
 Private Sub WinRT_ReleaseHStringCache()
     On Error Resume Next
     Dim k As Variant
     Dim h As LongPtr
-    Dim cy As Currency
     If WinRT_HStringCache Is Nothing Then Exit Sub
     For Each k In WinRT_HStringCache.Keys
-        cy = WinRT_HStringCache(k)
-#If Win64 Then
-        RtlMoveMemory h, cy, 8
-#Else
-        RtlMoveMemory h, cy, 4
-#End If
+        h = WinRT_HStringCache(k)
         If h <> 0 Then WindowsDeleteString h
     Next k
     WinRT_HStringCache.RemoveAll
     On Error GoTo 0
 End Sub
 
+'***************************************************************************************************
+'* 機能　　：VBA 文字列を HSTRING ハンドルに変換します（キャッシュなし）。
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：HSTRING ハンドル。失敗時は Err.Raise。
+'---------------------------------------------------------------------------------------------------
+'* 対応 API：WindowsCreateString
+'***************************************************************************************************
 Private Function WinRT_CreateHString(ByVal s As String) As LongPtr
     Dim hStr As LongPtr
     Dim hr As Long
-    Dim length As Long
+    Dim Length As Long
 
-    length = Len(s)
-    If length > 0 Then
-        hr = WindowsCreateString(StrPtr(s), length, hStr)
+    Length = Len(s)
+    If Length > 0 Then
+        hr = WindowsCreateString(StrPtr(s), Length, hStr)
     Else
         hr = WindowsCreateString(StrPtr(""), 0, hStr)
     End If
@@ -2933,47 +3254,78 @@ Private Function WinRT_CreateHString(ByVal s As String) As LongPtr
     WinRT_CreateHString = hStr
 End Function
 
-
+'---------------------------------------------------------------------------------------------------
+' [ SECTION G-2 ] WRT_DateTime ユーティリティ（FILETIME 8 バイト操作）
+'---------------------------------------------------------------------------------------------------
+'***************************************************************************************************
+'* 機能　　：WRT_DateTime が未初期化（ゼロ）かどうかを判定します。
+'***************************************************************************************************
 Private Function WRT_DateTimeIsZero(ByRef dt As WRT_DateTime) As Boolean
     WRT_DateTimeIsZero = (dt.dwLowDateTime = 0 And dt.dwHighDateTime = 0)
 End Function
 
+'***************************************************************************************************
+'* 機能　　：WinRT_FILETIME の 8 バイトを WRT_DateTime UDT にコピーします。
+'***************************************************************************************************
 Private Sub WRT_CopyFileTimeToDateTime(ByRef ft As WinRT_FILETIME, ByRef outDt As WRT_DateTime)
     outDt.dwLowDateTime = ft.dwLowDateTime
     outDt.dwHighDateTime = ft.dwHighDateTime
 End Sub
 
+'***************************************************************************************************
+'* 機能　　：WRT_DateTime の 8 バイトを LongLong（100ns 単位の FILETIME ticks）として読み出します。
+'***************************************************************************************************
 Private Function WRT_DateTimeToLongLong(ByRef dt As WRT_DateTime) As LongLong
     Dim v As LongLong
     RtlMoveMemory v, dt.dwLowDateTime, 8
     WRT_DateTimeToLongLong = v
 End Function
 
+'***************************************************************************************************
+'* 機能　　：WRT_DateTime の 8 バイトを Currency 型として読み出します。
+'---------------------------------------------------------------------------------------------------
+'* 用途　　：DispCallFunc へ DateTime 引数を渡す際、Currency 経由の呼び出しを試すフォールバック用。
+'***************************************************************************************************
 Private Function WRT_DateTimeToCurrency(ByRef dt As WRT_DateTime) As Currency
     Dim v As Currency
     RtlMoveMemory v, dt.dwLowDateTime, 8
     WRT_DateTimeToCurrency = v
 End Function
 
-Private Function WinRT_ResolveScheduleDeliveryLocal(ByRef Config As WinRT_ToastConfig) As Date
-    If Config.Schedule_DeliveryTimeLocal > 0 Then
-        WinRT_ResolveScheduleDeliveryLocal = Config.Schedule_DeliveryTimeLocal
-    ElseIf Config.Schedule_DeliveryTime > 0 Then
-        WinRT_ResolveScheduleDeliveryLocal = Config.Schedule_DeliveryTime
+'---------------------------------------------------------------------------------------------------
+' [ SECTION G-3 ] スケジュール配信時刻の変換（VBA Date → WinRT DateTime）
+'---------------------------------------------------------------------------------------------------
+'***************************************************************************************************
+'* 機能　　：ToastConfig.Schedule_DeliveryTime をローカル日時として取り出します。
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：Schedule_DeliveryTime が設定されていればその Date 値。未設定時は 0（Empty 相当）。
+'***************************************************************************************************
+Private Function WinRT_ResolveScheduleDeliveryLocal() As Date
+    If ToastConfig.Schedule_DeliveryTime > 0 Then
+        WinRT_ResolveScheduleDeliveryLocal = ToastConfig.Schedule_DeliveryTime
     End If
 End Function
 
-Private Sub WinRT_ScheduleDateToWinRTDateTimeFillFromConfig(ByRef Config As WinRT_ToastConfig, ByRef outDt As WRT_DateTime)
+'***************************************************************************************************
+'* 機能　　：ToastConfig のスケジュール配信時刻を WRT_DateTime（UTC FILETIME）に変換します。
+'---------------------------------------------------------------------------------------------------
+'* 呼び出し：WinRT_ShowScheduledToast → ScheduledToastNotificationFactory.Create の引数向け。
+'---------------------------------------------------------------------------------------------------
+'* 変換方針：WRT_USE_TLB_SCHEDULE 時は WinRT TLB の Calendar を使用。
+'            それ以外はローカル wall clock を TzSpecificLocalTimeToSystemTime で UTC 化（誤差なし）。
+'            TZ 変換失敗時のみ「現在 UTC + 分差」でフォールバックします。
+'***************************************************************************************************
+Private Sub WinRT_ScheduleDateToWinRTDateTimeFillFromConfig(outDt As WRT_DateTime)
     Dim deliveryLocal As Date
     Dim minutes As Long
 
     outDt.dwLowDateTime = 0
     outDt.dwHighDateTime = 0
-    deliveryLocal = WinRT_ResolveScheduleDeliveryLocal(Config)
+    deliveryLocal = WinRT_ResolveScheduleDeliveryLocal()
 
     If deliveryLocal <= 0 Then
         Err.Raise 5, "WinRT_ScheduleDateToWinRTDateTimeFillFromConfig", _
-            "Schedule delivery time is empty. Re-import AppNotificationBuilder.cls and modWinRTToast.bas."
+            "Schedule delivery time is empty. Re-import AppNotificationBuilder.cls, ToastCallbackCore.cls, and ToastCallbackHandler.cls."
     End If
 
 #If WRT_USE_TLB_SCHEDULE Then
@@ -2994,13 +3346,19 @@ Private Sub WinRT_ScheduleDateToWinRTDateTimeFillFromConfig(ByRef Config As WinR
     If WRT_DateTimeIsZero(outDt) Then
         Err.Raise 5, "WinRT_ScheduleDateToWinRTDateTimeFillFromConfig", _
             "DeliveryTime is zero. local=" & Format$(deliveryLocal, "yyyy/mm/dd hh:nn:ss") & _
-            " UTC serial=" & CStr(CDbl(Config.Schedule_DeliveryTime)) & _
-            " local serial=" & CStr(CDbl(Config.Schedule_DeliveryTimeLocal)) & _
+            " UTC serial=" & CStr(CDbl(ToastConfig.Schedule_DeliveryTime)) & _
+            " local serial=" & CStr(CDbl(ToastConfig.Schedule_DeliveryTime)) & _
             " ft=0x" & Hex$(outDt.dwHighDateTime) & Right$("00000000" & Hex$(outDt.dwLowDateTime), 8)
     End If
 End Sub
 
-' TLB の SetToNow + AddMinutes と同じ考え方（UTC FILETIME + 分差）
+'***************************************************************************************************
+'* 機能　　：現在 UTC 時刻に指定分数を加算した WRT_DateTime を生成します。
+'---------------------------------------------------------------------------------------------------
+'* 用途　　：スケジュール時刻の TZ 変換フォールバック。TLB の SetToNow + AddMinutes と同じ考え方。
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：秒は丸められます（分精度）。絶対時刻の正確な指定には WinRT_LocalSerialToWinRTDateTimeFill を優先。
+'***************************************************************************************************
 Private Sub WinRT_DateTimeFromMinutesFromNow(ByVal minutesFromNow As Long, ByRef outDt As WRT_DateTime)
     Dim stUtc As WinRT_SYSTEMTIME
     Dim ftUtc As WinRT_FILETIME
@@ -3010,16 +3368,21 @@ Private Sub WinRT_DateTimeFromMinutesFromNow(ByVal minutesFromNow As Long, ByRef
 
     If minutesFromNow < 1 Then Exit Sub
 
-    GetSystemTime stUtc
+    GetSystemTime stUtc                                    ' 現在 UTC
     If SystemTimeToFileTime(stUtc, ftUtc) = 0 Then Exit Sub
 
     RtlMoveMemory ticks, ftUtc.dwLowDateTime, 8
-    addTicks = CLngLng(minutesFromNow) * WRT_FileTimeTicksPerMinute
+    addTicks = CLngLng(minutesFromNow) * WRT_FileTimeTicksPerMinute   ' 分 → 100ns ticks
     ticks = ticks + addTicks
     RtlMoveMemory ftAdd.dwLowDateTime, ticks, 8
     WRT_CopyFileTimeToDateTime ftAdd, outDt
 End Sub
 
+'***************************************************************************************************
+'* 機能　　：任意の VBA Date シリアル値を WRT_DateTime に変換します（汎用版）。
+'---------------------------------------------------------------------------------------------------
+'* 用途　　：外部から渡された deliverySerial を ScheduledToast の配信時刻に使う場合等。
+'***************************************************************************************************
 Private Sub WinRT_ScheduleDateToWinRTDateTimeFill(ByVal deliverySerial As Date, ByRef outDt As WRT_DateTime)
     outDt.dwLowDateTime = 0
     outDt.dwHighDateTime = 0
@@ -3029,6 +3392,7 @@ Private Sub WinRT_ScheduleDateToWinRTDateTimeFill(ByVal deliverySerial As Date, 
 #If WRT_USE_TLB_SCHEDULE Then
     WinRT_ScheduleDateToWinRTDateTimeFillViaTlb deliverySerial, outDt
 #Else
+    ' まず分差フォールバックを試し、ダメなら絶対時刻変換
     WinRT_DateTimeFromMinutesFromNow DateDiff("n", Now, deliverySerial), outDt
     If WRT_DateTimeIsZero(outDt) Then WinRT_DateSerialToWinRTDateTimeFill deliverySerial, outDt
 #End If
@@ -3040,6 +3404,13 @@ Private Sub WinRT_ScheduleDateToWinRTDateTimeFill(ByVal deliverySerial As Date, 
 End Sub
 
 #If WRT_USE_TLB_SCHEDULE Then
+'***************************************************************************************************
+'* 機能　　：WinRT TLB（ICalendar）を使ってスケジュール配信時刻を WRT_DateTime に変換します。
+'---------------------------------------------------------------------------------------------------
+'* 処理概要：RoActivateInstance(Calendar) → SetToNow → AddMinutes(分差) → GetDateTime
+'---------------------------------------------------------------------------------------------------
+'* 条件　　：WRT_USE_TLB_SCHEDULE が True のときのみコンパイルされます。
+'***************************************************************************************************
 Private Sub WinRT_ScheduleDateToWinRTDateTimeFillViaTlb(ByVal deliverySerial As Date, ByRef outDt As WRT_DateTime)
     Dim cal As WinRT.ICalendar
     Dim dt As WinRT.DateTime
@@ -3054,32 +3425,43 @@ Private Sub WinRT_ScheduleDateToWinRTDateTimeFillViaTlb(ByVal deliverySerial As 
     hr = RoActivateInstanceObj(hClass, cal)
     If hr < 0 Then Err.Raise hr, "WinRT_ScheduleDateToWinRTDateTimeFillViaTlb", "RoActivateInstance Calendar failed: 0x" & Hex$(hr)
 
-    hr = cal.SetToNow()
+    hr = cal.SetToNow()          ' 現在 UTC を基準に
     If hr < 0 Then Err.Raise hr, "WinRT_ScheduleDateToWinRTDateTimeFillViaTlb", "ICalendar.SetToNow failed: 0x" & Hex$(hr)
 
-    hr = cal.AddMinutes(minutes)
+    hr = cal.AddMinutes(minutes) ' 配信までの分差を加算
     If hr < 0 Then Err.Raise hr, "WinRT_ScheduleDateToWinRTDateTimeFillViaTlb", "ICalendar.AddMinutes failed: 0x" & Hex$(hr)
 
     dt = cal.GetDateTime()
-    RtlMoveMemory outDt.dwLowDateTime, dt, 8
+    RtlMoveMemory outDt.dwLowDateTime, dt, 8   ' WinRT.DateTime → WRT_DateTime UDT
     Set cal = Nothing
 End Sub
 #End If
 
-' GeneralNotice.cpp SystemTimeToDateTime と同じ（VariantTimeToSystemTime → SystemTimeToFileTime）
-' ExpirationTime など UTC 補正済み serial 向け。スケジュール配信時刻は使わない。
+'***************************************************************************************************
+'* 機能　　：UTC 補正済み VBA Date シリアルを WRT_DateTime（FILETIME）に変換します。
+'---------------------------------------------------------------------------------------------------
+'* 処理概要：VariantTimeToSystemTime → SystemTimeToFileTime（GeneralNotice.cpp と同じ経路）
+'---------------------------------------------------------------------------------------------------
+'* 用途　　：ExpirationTime 等。スケジュール配信時刻には使いません（ローカル時刻向けは別メソッド）。
+'***************************************************************************************************
 Private Sub WinRT_DateSerialToWinRTDateTimeFill(ByVal deliverySerial As Date, ByRef outDt As WRT_DateTime)
     Dim st As WinRT_SYSTEMTIME
     Dim ft As WinRT_FILETIME
 
     If deliverySerial <= 0 Then Exit Sub
 
-    VariantTimeToSystemTime CDbl(deliverySerial), st
+    VariantTimeToSystemTime CDbl(deliverySerial), st       ' VBA Date → SYSTEMTIME（UTC 前提）
     If SystemTimeToFileTime(st, ft) = 0 Then Exit Sub
     WRT_CopyFileTimeToDateTime ft, outDt
 End Sub
 
-' ローカル wall clock → UTC FILETIME（Calendar.Set 系の絶対日時向け）
+'***************************************************************************************************
+'* 機能　　：ローカル wall clock（VBA Date）を UTC FILETIME の WRT_DateTime に変換します。
+'---------------------------------------------------------------------------------------------------
+'* 処理概要：VariantTimeToSystemTime → TzSpecificLocalTimeToSystemTime → SystemTimeToFileTime
+'---------------------------------------------------------------------------------------------------
+'* 用途　　：スケジュール配信の絶対日時指定。秒精度で誤差なく UTC 化できます。
+'***************************************************************************************************
 Private Sub WinRT_LocalSerialToWinRTDateTimeFill(ByVal deliveryLocal As Date, ByRef outDt As WRT_DateTime)
     Dim stLocal As WinRT_SYSTEMTIME
     Dim stUtc As WinRT_SYSTEMTIME
@@ -3087,14 +3469,24 @@ Private Sub WinRT_LocalSerialToWinRTDateTimeFill(ByVal deliveryLocal As Date, By
 
     If deliveryLocal <= 0 Then Exit Sub
 
-    VariantTimeToSystemTime CDbl(deliveryLocal), stLocal
+    VariantTimeToSystemTime CDbl(deliveryLocal), stLocal   ' ローカル日時
     stLocal.wMilliseconds = 0
-    If TzSpecificLocalTimeToSystemTime(0&, stLocal, stUtc) = 0 Then Exit Sub
+    If TzSpecificLocalTimeToSystemTime(0&, stLocal, stUtc) = 0 Then Exit Sub   ' ローカル → UTC
     If SystemTimeToFileTime(stUtc, ft) = 0 Then Exit Sub
     WRT_CopyFileTimeToDateTime ft, outDt
 End Sub
 
-' CreateToastNotification と同じ WinRT_CallComMethod 経路（DispCallFunc 直呼びは使わない）
+'***************************************************************************************************
+'* 機能　　：IScheduledToastNotificationFactory.Create を呼び出し、スケジュールトーストを生成します。
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：pFactory       ScheduledToastNotification の Activation Factory
+'            pXmlDoc        トースト XML の XmlDocument
+'            deliveryTime   配信予定の WRT_DateTime（UTC FILETIME）
+'            pScheduled     出力: IScheduledToastNotification ポインタ
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：DateTime 引数は Currency 渡しと LongLong 渡しの 2 通りを試行します（VBA/DispCallFunc の型差異対策）。
+'            WinRT_CallComMethod 経由で統一呼び出しします。
+'***************************************************************************************************
 Private Sub WinRT_FactoryCreateScheduledToast( _
     ByVal pFactory As LongPtr, _
     ByVal pXmlDoc As LongPtr, _
@@ -3118,6 +3510,7 @@ Private Sub WinRT_FactoryCreateScheduledToast( _
              " ticks=0x" & Hex$(deliveryTicks)
     pScheduled = 0
 
+    ' 第1試行: DateTime を Currency 型として渡す
     On Error Resume Next
     Err.Clear
     WinRT_CallComMethod pFactory, VT_IScheduledToastNotificationFactory_Create, vbLong, _
@@ -3127,6 +3520,7 @@ Private Sub WinRT_FactoryCreateScheduledToast( _
         Exit Sub
     End If
 
+    ' 第2試行: Currency が通らなければ LongLong（FILETIME ticks）で渡す
     errNum = Err.Number
     errDesc = Err.Description
     Err.Clear
@@ -3147,6 +3541,15 @@ Private Sub WinRT_FactoryCreateScheduledToast( _
     Err.Raise errNum, "WinRT_FactoryCreateScheduledToast", errDesc & " " & rawHex
 End Sub
 
+'***************************************************************************************************
+'* 機能　　：PropertyValue.CreateDateTime を呼び出し、IPropertyValue を生成します。
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：pPropertyValueStatics    PropertyValue の Activation Factory
+'            dateTimeValue            WRT_DateTime（UTC FILETIME 8 バイト）
+'            pPropertyValue           出力: IPropertyValue ポインタ
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：Currency 渡し → 失敗時 LongLong 渡しの 2 段階フォールバック（FactoryCreateScheduledToast と同様）。
+'***************************************************************************************************
 Private Sub WinRT_PropertyValueCreateDateTime( _
     ByVal pPropertyValueStatics As LongPtr, _
     ByRef dateTimeValue As WRT_DateTime, _
@@ -3161,6 +3564,7 @@ Private Sub WinRT_PropertyValueCreateDateTime( _
     pPropertyValue = 0
     RtlMoveMemory deliveryCy, dateTimeValue.dwLowDateTime, 8
 
+    ' 第1試行: Currency 経由
     On Error Resume Next
     Err.Clear
     WinRT_CallComMethod pPropertyValueStatics, VT_IPropertyValueStatics_CreateDateTime, vbLong, _
@@ -3170,6 +3574,7 @@ Private Sub WinRT_PropertyValueCreateDateTime( _
         Exit Sub
     End If
 
+    ' 第2試行: LongLong 経由
     errNum = Err.Number
     Err.Clear
     pPropertyValue = 0
@@ -3187,9 +3592,14 @@ Private Sub WinRT_PropertyValueCreateDateTime( _
     Err.Raise errNum, "WinRT_PropertyValueCreateDateTime", "CreateDateTime failed: 0x" & Hex$(errNum)
 End Sub
 
+'***************************************************************************************************
+'* 機能　　：スケジュールトーストの Id を Windows の制約に合わせて正規化します。
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：空文字なら "ExcelSchedule"。16 文字超なら Err.Raise（WPN_E_DEV_ID_SIZE 制限）。
+'***************************************************************************************************
 Private Function WinRT_NormalizeScheduleId(ByVal scheduleId As String) As String
     If Len(scheduleId) = 0 Then
-        WinRT_NormalizeScheduleId = "ExcelSchedule"
+        WinRT_NormalizeScheduleId = "ExcelSchedule"   ' 省略時のデフォルト ID
     ElseIf Len(scheduleId) > WinRT_MaxScheduleIdLen Then
         Err.Raise 5, "WinRT_NormalizeScheduleId", _
             "Schedule_ID must be <= " & WinRT_MaxScheduleIdLen & " chars (WPN_E_DEV_ID_SIZE). Got " & Len(scheduleId) & ": """ & scheduleId & """"
@@ -3198,6 +3608,16 @@ Private Function WinRT_NormalizeScheduleId(ByVal scheduleId As String) As String
     End If
 End Function
 
+'---------------------------------------------------------------------------------------------------
+' [ SECTION I ] 初期化・キャッシュ管理・COM 呼び出し基盤
+'---------------------------------------------------------------------------------------------------
+'***************************************************************************************************
+'* 機能　　：WinRT 利用に必要な GUID・Activation Factory・RoInitialize を一括初期化します。
+'---------------------------------------------------------------------------------------------------
+'* 呼び出し：Class_Initialize 等から使用。WinRT_CacheReady=True になると 2 回目以降はスキップ。
+'---------------------------------------------------------------------------------------------------
+'* キャッシュ内容：各種 IID（GUID）文字列の変換結果、ToastNotificationManager/Toast/ScheduledToast 等の Factory ポインタ
+'***************************************************************************************************
 Private Sub WinRT_InitCache()
     Dim initialized As Boolean
 
@@ -3205,6 +3625,7 @@ Private Sub WinRT_InitCache()
 
     WinRT_EnsureRoInitialized initialized
 
+    ' QueryInterface 用 GUID を文字列からバイナリに変換してメンバ変数へ保持
     IIDFromString StrPtr("{354389C6-7C01-4BD5-9C20-604340CD2B74}"), WinRT_iidNotifier2
     IIDFromString StrPtr("{50AC103F-D235-4598-BBEF-98FE4D1A3AD4}"), WinRT_iidManagerStatics
     IIDFromString StrPtr("{7AB93C52-0E48-4750-BA9D-1A4113981847}"), WinRT_iidManagerStatics2
@@ -3226,6 +3647,7 @@ Private Sub WinRT_InitCache()
     IIDFromString StrPtr("{5541D8A7-497C-5AA4-86FC-7713ADBF2A2C}"), WinRT_iidReferenceDateTime
     IIDFromString StrPtr(WinRT_IID_IAsyncInfo), WinRT_iidAsyncInfo
 
+    ' 各 WinRT クラスの Activation Factory を取得（セッション中は使い回す）
     WinRT_GetActivationFactory "Windows.UI.Notifications.ToastNotificationManager", WinRT_iidManagerStatics, WinRT_pManagerStatics
     WinRT_GetActivationFactory "Windows.UI.Notifications.ToastNotificationManager", WinRT_iidManagerStatics5, WinRT_pManagerStatics5
     WinRT_GetActivationFactory "Windows.UI.Notifications.ToastNotification", WinRT_iidToastFactory, WinRT_pToastFactory
@@ -3234,6 +3656,7 @@ Private Sub WinRT_InitCache()
     WinRT_GetActivationFactory "Windows.Foundation.Uri", WinRT_iidUriFactory, WinRT_pUriFactory
     WinRT_GetActivationFactory "Windows.Foundation.PropertyValue", WinRT_iidPropertyValueStatics, WinRT_pPropertyValueStatics
 
+    ' History 取得用の Statics2 は ManagerStatics から QI で別途取得
     If WinRT_pManagerStatics <> 0 Then
         WinRT_CallComMethod WinRT_pManagerStatics, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidManagerStatics2), WinRT_vbPtr, VarPtr(WinRT_pManagerStatics2)
     End If
@@ -3241,8 +3664,14 @@ Private Sub WinRT_InitCache()
     WinRT_CacheReady = True
 End Sub
 
+'***************************************************************************************************
+'* 機能　　：WinRT_InitCache で取得した Factory ポインタと HSTRING キャッシュを解放します。
+'---------------------------------------------------------------------------------------------------
+'* 呼び出し：WinRT_Shutdown / Class_Terminate から使用。
+'***************************************************************************************************
 Private Sub WinRT_ReleaseCache()
     WinRT_ReleaseHStringCache
+    ' 各 Factory の参照カウントを 1 ずつ戻す
     On Error Resume Next
     If WinRT_pManagerStatics2 <> 0 Then WinRT_CallComMethod WinRT_pManagerStatics2, VT_RELEASE, vbLong: WinRT_pManagerStatics2 = 0
     If WinRT_pManagerStatics <> 0 Then WinRT_CallComMethod WinRT_pManagerStatics, VT_RELEASE, vbLong: WinRT_pManagerStatics = 0
@@ -3256,15 +3685,27 @@ Private Sub WinRT_ReleaseCache()
     On Error GoTo 0
 End Sub
 
+'***************************************************************************************************
+'* 機能　　：RoUninitialize の呼び出しを意図的に行わないスタブです。
+'---------------------------------------------------------------------------------------------------
+'* 理由　　：通知表示→更新の連続呼び出しで WinRT ランタイムを破棄すると、後続の Show/Update が失敗するため。
+'            実際の RoUninitialize は WinRT_Shutdown で行います。
+'***************************************************************************************************
 Private Sub WinRT_FinalizeRo(ByVal initialized As Boolean)
     ' 通知表示→更新の連続呼び出しで WinRT ランタイムを破棄しない
 End Sub
 
+'***************************************************************************************************
+'* 機能　　：WinRT ランタイム（RoInitialize）が初期化済みであることを保証します。
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：RPC_E_CHANGED_MODE（既に別スレッドモデルで初期化済み）は許容します。
+'***************************************************************************************************
 Private Sub WinRT_EnsureRoInitialized(ByRef initialized As Boolean)
     Dim hr As Long
 
     If Not WinRT_RoInitialized Then
         hr = RoInitialize(WinRT_RO_INIT_SINGLETHREADED)
+        ' S_OK(0) / S_FALSE(1) / RPC_E_CHANGED_MODE はいずれも続行可
         If hr <> 0 And hr <> 1 And hr <> WinRT_RPC_E_CHANGED_MODE Then
             Err.Raise hr, "RoInitialize", "RoInitialize failed: 0x" & Hex$(hr)
         End If
@@ -3273,8 +3714,16 @@ Private Sub WinRT_EnsureRoInitialized(ByRef initialized As Boolean)
     initialized = True
 End Sub
 
-' IAsyncOperation / IAsyncAction の完了を待ち、完了後の HRESULT(ErrorCode) を返す。0=成功。
-' WinRT 非同期は QI で IAsyncInfo を取り、Status を Started 以外になるまでポーリングする。
+'***************************************************************************************************
+'* 機能　　：IAsyncOperation / IAsyncAction の完了を待ち、結果の HRESULT を返します。
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：0=成功。キャンセル時 &H800704C7、タイムアウト時 &H8001011F 等。
+'---------------------------------------------------------------------------------------------------
+'* 処理概要：pAsync を IAsyncInfo に QI → GetStatus を Started 以外になるまで DoEvents でポーリング
+'            → 完了なら 0、それ以外は GetErrorCode で HRESULT 取得
+'---------------------------------------------------------------------------------------------------
+'* 用途　　：コレクション用 Notifier/History の非同期取得を VBA から同期的に使うため。
+'***************************************************************************************************
 Private Function WinRT_WaitAsync(ByVal pAsync As LongPtr) As Long
     Dim pAsyncInfo As LongPtr
     Dim status As Long
@@ -3293,13 +3742,14 @@ Private Function WinRT_WaitAsync(ByVal pAsync As LongPtr) As Long
         Exit Function
     End If
 
+    ' Started(0) が終わるまで DoEvents でポーリング（VBA に await がないため）
     Do
         status = WinRT_AsyncStatus_Started
         WinRT_CallComMethod pAsyncInfo, VT_IAsyncInfo_GetStatus, vbLong, WinRT_vbPtr, VarPtr(status)
         If status <> WinRT_AsyncStatus_Started Then Exit Do
         DoEvents
         waitCount = waitCount + 1
-        If waitCount > 50000 Then Exit Do
+        If waitCount > 50000 Then Exit Do   ' 無限ループ防止
     Loop
 
     If status = WinRT_AsyncStatus_Completed Then
@@ -3308,13 +3758,28 @@ Private Function WinRT_WaitAsync(ByVal pAsync As LongPtr) As Long
         errorCode = 0
         WinRT_CallComMethod pAsyncInfo, VT_IAsyncInfo_GetErrorCode, vbLong, WinRT_vbPtr, VarPtr(errorCode)
         If status = WinRT_AsyncStatus_Canceled And errorCode = 0 Then errorCode = &H800704C7
-        If status = WinRT_AsyncStatus_Started And errorCode = 0 Then errorCode = &H8001011F
+        If status = WinRT_AsyncStatus_Started And errorCode = 0 Then errorCode = &H8001011F   ' タイムアウト扱い
     End If
 
     WinRT_CallComMethod pAsyncInfo, VT_RELEASE, vbLong
     WinRT_WaitAsync = errorCode
 End Function
 
+'***************************************************************************************************
+'* 機能　　：COM/WinRT オブジェクトの vtable メソッドを DispCallFunc で呼び出す中核ラッパーです。
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：pUnk          IUnknown ポインタ（COM オブジェクトのアドレス）
+'            vTableIndex   vtable 内のメソッド番号（VT_* 定数。QI=0, RELEASE=2, 以降はインターフェース固有）
+'            retType       戻り値の VBA 型（vbLong 等）
+'            args()        型と値のペアを交互に指定（例: WinRT_vbPtr, VarPtr(x), vbLong, 123）
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：COM メソッドの戻り値（HRESULT または out 引数に書き込まれた値）
+'---------------------------------------------------------------------------------------------------
+'* 実装要点：ReDim を使わない 16 要素固定配列で DispCallFunc の引数配列を構築（パフォーマンス対策）。
+'            負の HRESULT は自動的に Err.Raise します（VT_RELEASE を除く）。
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：このプロジェクトの WinRT 直呼びはすべてこの関数を経由します。vtable 番号の変更は要慎重。
+'***************************************************************************************************
 Private Function WinRT_CallComMethod(ByVal pUnk As LongPtr, ByVal vTableIndex As Long, ByVal retType As Integer, ParamArray args() As Variant) As Variant
     Dim vTableOffset As LongPtr
 
@@ -3329,13 +3794,15 @@ Private Function WinRT_CallComMethod(ByVal pUnk As LongPtr, ByVal vTableIndex As
     Dim vResult As Variant
 
     If pUnk = 0 Then Err.Raise 513, "WinRT_CallComMethod", "COM pointer is null. Index=" & vTableIndex
+
+    ' vtable の N 番目メソッド = オブジェクト先頭からのバイトオフセット
 #If Win64 Then
     vTableOffset = vTableIndex * 8
 #Else
     vTableOffset = vTableIndex * 4
 #End If
 
-    ' 引数の数を計算（(要素数 + 1) / 2）
+    ' ParamArray は [型, 値, 型, 値, ...] のペアなので半分が引数個数
     argCount = (UBound(args) + 1) \ 2
 
     ' 万が一、16個を超える引数が渡されたらエラーにする（普通のAPIならあり得ません）
@@ -3355,8 +3822,9 @@ Private Function WinRT_CallComMethod(ByVal pUnk As LongPtr, ByVal vTableIndex As
         hRes = DispCallFunc(pUnk, vTableOffset, 4, retType, 0, ByVal 0&, ByVal 0&, vResult)
     End If
 
-    ' --- エラー処理とお掃除はそのまま ---
+    ' DispCallFunc 自体の失敗（vtable オフセット不正など）
     If hRes <> 0 Then Err.Raise hRes, "WinRT_CallComMethod", "DispCallFunc failed at vtable index " & vTableIndex & ": 0x" & Hex$(hRes)
+    ' COM メソッドの戻り HRESULT が負ならエラー（Release は HRESULT を返さないので除外）
     If vTableIndex <> VT_RELEASE Then
         Select Case VarType(vResult)
             Case vbLong, vbInteger, vbByte
@@ -3822,6 +4290,7 @@ Private Sub Class_Initialize()
     SubgroupInnerImagesTotal = -1
     SubgroupInnerTotal = -1
 
+    'WinRT-API のインスタンス準備
     Set WinRT_HStringCache = CreateObject("Scripting.Dictionary")
     WinRT_InitCache
 End Sub
