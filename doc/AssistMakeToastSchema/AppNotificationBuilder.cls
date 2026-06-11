@@ -395,17 +395,17 @@ Private Const パラメーター区切り文字    As String = "|"                         
 '---------------------------------------------------------------------------------------------------
 ' [ SECTION ] データバインディング - 最上位テキスト要素
 '---------------------------------------------------------------------------------------------------
-Private Const DataBindingTopText_Title     As String = "{TopTextTitle}"
-Private Const DataBindingTopText_Body      As String = "{TopTextBody}"
-Private Const DataBindingTopText_Attribute As String = "{TopTextAttribution}"
+Private Const DataBindingTopText_Title     As String = "TopTextTitle"
+Private Const DataBindingTopText_Body      As String = "TopTextBody"
+Private Const DataBindingTopText_Attribute As String = "TopTextAttribution"
 
 '---------------------------------------------------------------------------------------------------
 ' [ SECTION ] データバインディング - Progress要素
 '---------------------------------------------------------------------------------------------------
-Private Const DataBindingProgress_Title         As String = "{ProgressTitle}"
-Private Const DataBindingProgress_Status        As String = "{ProgressStatus}"
-Private Const DataBindingProgress_Value         As String = "{ProgressValue}"
-Private Const DataBindingProgress_ValueString   As String = "{ProgressValueString}"
+Private Const DataBindingProgress_Title         As String = "ProgressTitle"
+Private Const DataBindingProgress_Status        As String = "ProgressStatus"
+Private Const DataBindingProgress_Value         As String = "ProgressValue"
+Private Const DataBindingProgress_ValueString   As String = "ProgressValueString"
 
 '---------------------------------------------------------------------------------------------------
 ' [ SECTION ] リマインド用の`arguments`属性の予約語
@@ -1694,7 +1694,7 @@ Public Property Get ToastNotificationContent(DataBindingMode As Boolean) As Stri
             With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_02__text, ""))
                 '先ほどのノード：text  にバインディング名を設定します
                 '※スケジュール通知の場合は、バインディング機能が使えないため、そのまま記入します
-                If DataBindingMode Then .Text = DataBindingTopText_Title Else .Text = ElementsText.Title.Value
+                If DataBindingMode Then .Text = DataBindingForXML(DataBindingTopText_Title) Else .Text = ElementsText.Title.Value
                 
                  '属性ノード：hint-callScenarioCenterAlign  に値を設定してあったら、先ほどのノード：text  の属性に追加します
                 If ElementsText.Title.Attribute.HintCallScenarioCenterAlign Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-callScenarioCenterAlign", "")).NodeValue = LCase(ElementsText.Title.Attribute.HintCallScenarioCenterAlign)
@@ -1706,7 +1706,7 @@ Public Property Get ToastNotificationContent(DataBindingMode As Boolean) As Stri
             With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_02__text, ""))
                 '先ほどのノード：text  にバインディング名を設定します
                 '※スケジュール通知の場合は、バインディング機能が使えないため、そのまま記入します
-                If DataBindingMode Then .Text = DataBindingTopText_Body Else .Text = ElementsText.Body.Value
+                If DataBindingMode Then .Text = DataBindingForXML(DataBindingTopText_Body) Else .Text = ElementsText.Body.Value
 
                  '属性ノード：hint-callScenarioCenterAlign  に値を設定してあったら、先ほどのノード：text  の属性に追加します
                 If ElementsText.Body.Attribute.HintCallScenarioCenterAlign Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-callScenarioCenterAlign", "")).NodeValue = LCase(ElementsText.Body.Attribute.HintCallScenarioCenterAlign)
@@ -1718,7 +1718,7 @@ Public Property Get ToastNotificationContent(DataBindingMode As Boolean) As Stri
             With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_02__text, ""))
                 '先ほどのノード：text  にバインディング名を設定します
                 '※スケジュール通知の場合は、バインディング機能が使えないため、そのまま記入します
-                If DataBindingMode Then .Text = DataBindingTopText_Attribute Else .Text = ElementsText.Attribution.Value
+                If DataBindingMode Then .Text = DataBindingForXML(DataBindingTopText_Attribute) Else .Text = ElementsText.Attribution.Value
 
                 '属性ノード：placement  に値を設定したのを、先ほどのノード：text  の属性に追加します
                 .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "placement", "")).NodeValue = ElementsText.Attribution.Attribute.Placement
@@ -1792,16 +1792,16 @@ Public Property Get ToastNotificationContent(DataBindingMode As Boolean) As Stri
     If StrPtr(ElementProgress.status) And DataBindingMode Then
         With Node01_01__binding.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_03__progress, ""))
             '属性ノード：title  にバインディング設定したのを、先ほどのノード：progress  の属性に追加します
-            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "title", "")).NodeValue = DataBindingProgress_Title
+            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "title", "")).NodeValue = DataBindingForXML(DataBindingProgress_Title)
 
             '属性ノード：status  にバインディング設定したのを、先ほどのノード：progress  の属性に追加します
-            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "status", "")).NodeValue = DataBindingProgress_Status
+            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "status", "")).NodeValue = DataBindingForXML(DataBindingProgress_Status)
 
             '属性ノード：value  にバインディング設定したのを、先ほどのノード：progress  の属性に追加します
-            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "value", "")).NodeValue = DataBindingProgress_Value
+            .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "value", "")).NodeValue = DataBindingForXML(DataBindingProgress_Value)
 
             '属性ノード：valueStringOverride  に値を設定してあったら、先ほどのノード：progress  の属性に追加します
-            If StrPtr(ElementProgress.ValueStringOverride) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "valueStringOverride", "")).NodeValue = DataBindingProgress_ValueString
+            If StrPtr(ElementProgress.ValueStringOverride) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "valueStringOverride", "")).NodeValue = DataBindingForXML(DataBindingProgress_ValueString)
         End With
     End If
 
@@ -3834,6 +3834,17 @@ Private Function WinRT_CallComMethod(ByVal pUnk As LongPtr, ByVal vTableIndex As
         End Select
     End If
     WinRT_CallComMethod = vResult
+End Function
+
+
+
+'***************************************************************************************************
+'                               ■■■ ヘルパーメソッド ■■■
+'***************************************************************************************************
+'* 機能　　：トースト通知のデータバイディング用の目印を付与するフォーマットにします
+'***************************************************************************************************
+Private Function DataBindingForXML(str As String) As String
+    DataBindingForXML = "{" & str & "}"
 End Function
 
 
