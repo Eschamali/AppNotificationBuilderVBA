@@ -340,39 +340,10 @@ Private Type WRT_DateTime
 End Type
 
 #If Win64 Then
-    Private Const WinRT_vbPtr As Integer = 20
+    Private Const WinRT_vbPtr As Integer = vbLongLong
 #Else
-    Private Const WinRT_vbPtr As Integer = 3
+    Private Const WinRT_vbPtr As Integer = vbLong
 #End If
-
-'---------------------------------------------------------------------------------------------------
-' [ SECTION ] 一時的	ToDo：後ほど削除
-'---------------------------------------------------------------------------------------------------
-' WinRT Interfaces x64.tlb 参照時は WinRT_* 型名が TLB の WinRT 名前空間と衝突するため ANB 接頭辞を使う。
-Private Type WinRT_ToastConfig
-    AppUserModelID As String
-    XmlTemplate As String
-    Tag As String
-    Group As String
-    Schedule_ID As String
-    CollectionID As String
-    ExpiresOnReboot As Boolean
-    SuppressPopup As Boolean
-    Schedule_DeliveryTime As Date
-    Schedule_DeliveryTimeLocal As Date
-    ExpirationTime As Date
-End Type
-
-Private Type WinRT_DataBinding
-    TitleText As String
-    ContentsText As String
-    AttributionText As String
-    ProgressTitle As String
-    ProgressValueStringOverride As String
-    ProgressStatus As String
-    progressValue As Double
-    SequenceNumber As Long
-End Type
 
 
 
@@ -558,8 +529,8 @@ Private Const MaxElementSelectionNum    As Integer = 5  '選択肢は最大5つ、入れれ
 '---------------------------------------------------------------------------------------------------
 ' [ SECTION ] プロパティ/メソッド等で、決める設定群
 '---------------------------------------------------------------------------------------------------
-Private ToastConfig As ToastNotification
-Private Type ToastNotification
+Private ToastConfig As WinRT_ToastConfig
+Private Type WinRT_ToastConfig
     '[Windows.UI.Notifications]の挙動を決める設定値
     AppUserModelID              As String   'https://learn.microsoft.com/ja-jp/windows/win32/shell/appids
     Content                     As String   'https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-schema
@@ -579,8 +550,7 @@ End Type
 '---------------------------------------------------------------------------------------------------
 ' [ SECTION ] データバイディング関連の設定
 '---------------------------------------------------------------------------------------------------
-Private ToastDataBinding As NotificationData
-Private Type NotificationData
+Private Type WinRT_DataBinding
     '最上位レベルのテキスト要素の Text
     TitleText As String
     ContentsText As String
@@ -1945,34 +1915,9 @@ End Function
 '***************************************************************************************************
 '                                    ■■■ 変換用 ■■■
 '***************************************************************************************************
-'* 機能    ：WinRT 直呼び出し用の設定構造体へ変換します
-'---------------------------------------------------------------------------------------------------
-'* 機能説明：基本は、As Is ですが日時系は、UTC基準になるため、一部変換が入ります
+'* 機能    ：現在設定中のXMLパラメーターを基に、データバインディング構造体へ適用したものを返します
 '***************************************************************************************************
-Private Function ParamsConvertForWinRT(ToastSetting As ToastNotification) As WinRT_ToastConfig
-    With ParamsConvertForWinRT
-        .AppUserModelID = ToastSetting.AppUserModelID
-        .XmlTemplate = ToastSetting.Content
-        .Tag = ToastSetting.Tag
-        .Group = ToastSetting.Group
-        .Schedule_ID = ToastSetting.Schedule_ID
-        .CollectionID = ToastSetting.CollectionID
-        .ExpiresOnReboot = ToastSetting.ExpiresOnReboot
-        .SuppressPopup = ToastSetting.SuppressPopup
-
-        .Schedule_DeliveryTimeLocal = ToastSetting.Schedule_DeliveryTime
-        .Schedule_DeliveryTime = DateAdd("h", TargetTimeZone.Hour * -1, ToastSetting.Schedule_DeliveryTime)
-        .Schedule_DeliveryTime = DateAdd("n", TargetTimeZone.Minute * -1, .Schedule_DeliveryTime)
-
-        .ExpirationTime = DateAdd("h", TargetTimeZone.Hour * -1, ToastSetting.ExpirationTime)
-        .ExpirationTime = DateAdd("n", TargetTimeZone.Minute * -1, .ExpirationTime)
-    End With
-End Function
-
-'***************************************************************************************************
-'* 機能    ：WinRT 直呼び出し用のデータバインディング構造体へ変換します
-'***************************************************************************************************
-Private Function DataBindingConvertForWinRT() As WinRT_DataBinding
+Private Function DataBindingConvertForWinRT(Optional SequenceNumber As Long) As WinRT_DataBinding
     With DataBindingConvertForWinRT
         '最上位のテキスト要素部分
         .TitleText = ElementsText.Title.Value
@@ -1987,6 +1932,9 @@ Private Function DataBindingConvertForWinRT() As WinRT_DataBinding
             .progressValue = ElementProgress.Value
             .ProgressValueStringOverride = ElementProgress.ValueStringOverride
         End If
+
+        '更新No適用
+        .SequenceNumber = SequenceNumber
     End With
 End Function
 
@@ -2084,25 +2032,32 @@ Public Sub RunToastNotifierShow(ToastTag As String, Optional CollectionID As Str
         Next
     End If
 
-    '--- 2. 設定値をまとめる ---
+    '--- 2. 必要な設定値を更新 ---
     With ToastConfig
+        'トースト通知デザインXML
         .Content = ToastNotificationContent(UseDataBinding)
 
+        '各種特定タグ
         .Tag = ToastTag
         .Group = GetUniqueBookInfo
         .CollectionID = CollectionID
 
+        'トースト通知の挙動設定
         .ExpiresOnReboot = ExpiresOnReboot
         .SuppressPopup = Suppress
 
+        'スケジュール通知用設定
         .Schedule_DeliveryTime = ScheduleDate
-        .ExpirationTime = ExpirationDate
+
+        '有効期限のみ、UTC基準にシフトしておく
+        If ExpirationDate Then
+            .ExpirationTime = DateAdd("h", TargetTimeZone.Hour * -1, ExpirationDate)
+            .ExpirationTime = DateAdd("n", TargetTimeZone.Minute * -1, .ExpirationTime)
+        End If
     End With
 
     '--- 3. データバインディングを設定しつつ、WinRT 直呼び出しで通知を表示します ---
-    Dim WinRTConfig As WinRT_ToastConfig
-    WinRTConfig = ParamsConvertForWinRT(ToastConfig)
-    WinRT_ShowToastNotification WinRTConfig, DataBindingConvertForWinRT()
+    WinRT_ShowToastNotification DataBindingConvertForWinRT
 End Sub
 
 '***************************************************************************************************
@@ -2122,13 +2077,14 @@ End Sub
 Public Function RunToastNotifierUpdate(ToastTag As String, Optional CollectionID As String) As Long
     '--- 1. 必要な設定値をまとめる ---
     With ToastConfig
+        '各種特定タグ
         .Tag = ToastTag
         .Group = GetUniqueBookInfo
         .CollectionID = CollectionID
     End With
 
     '--- 2. WinRT 直呼び出しで通知を更新します ---
-    RunToastNotifierUpdate = WinRT_UpdateToastNotification(ParamsConvertForWinRT(ToastConfig), DataBindingConvertForWinRT())
+    RunToastNotifierUpdate = WinRT_UpdateToastNotification(DataBindingConvertForWinRT)
 End Function
 
 '**************************************************************************************************
@@ -2157,7 +2113,7 @@ Public Sub RunToastNotificationHistoryRemove(Optional ToastTag As String, Option
 
 
     '--- 2. WinRT 直呼び出しで通知を削除します ---
-    WinRT_RemoveToastNotification ParamsConvertForWinRT(ToastConfig)
+    WinRT_RemoveToastNotification
 End Sub
 
 '***************************************************************************************************
@@ -2177,7 +2133,7 @@ Public Function RunToastCollectionManagerSaveToastCollectionAsync(CollectionID A
     ToastConfig.CollectionID = CollectionID
 
     '2. ToastCollectionを作成
-    RunToastCollectionManagerSaveToastCollectionAsync = WinRT_SaveToastCollection(ParamsConvertForWinRT(ToastConfig), displayName, launchArgs, iconUri)
+    RunToastCollectionManagerSaveToastCollectionAsync = WinRT_SaveToastCollection(displayName, launchArgs, iconUri)
 End Function
 
 '***************************************************************************************************
@@ -2193,7 +2149,7 @@ Public Function RunToastCollectionManagerRemoveToastCollectionAsync(Optional Col
     ToastConfig.CollectionID = CollectionID
 
     '2. ToastCollectionを削除
-    RunToastCollectionManagerRemoveToastCollectionAsync = WinRT_RemoveToastCollection(ParamsConvertForWinRT(ToastConfig))
+    RunToastCollectionManagerRemoveToastCollectionAsync = WinRT_RemoveToastCollection
 End Function
 
 '***************************************************************************************************
@@ -2209,7 +2165,7 @@ Public Property Get CheckNotificationSetting(Optional CollectionID As String) As
     ToastConfig.CollectionID = CollectionID
 
     '2. チェック
-    CheckNotificationSetting = WinRT_CheckNotificationSetting(ParamsConvertForWinRT(ToastConfig))
+    CheckNotificationSetting = WinRT_CheckNotificationSetting
 End Property
 
 
@@ -3242,11 +3198,11 @@ End Sub
 Private Function WinRT_CreateHString(ByVal s As String) As LongPtr
     Dim hStr As LongPtr
     Dim hr As Long
-    Dim Length As Long
+    Dim length As Long
 
-    Length = Len(s)
-    If Length > 0 Then
-        hr = WindowsCreateString(StrPtr(s), Length, hStr)
+    length = Len(s)
+    If length > 0 Then
+        hr = WindowsCreateString(StrPtr(s), length, hStr)
     Else
         hr = WindowsCreateString(StrPtr(""), 0, hStr)
     End If
