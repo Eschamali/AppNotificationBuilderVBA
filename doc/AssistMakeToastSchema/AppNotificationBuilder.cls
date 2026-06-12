@@ -2308,16 +2308,9 @@ End Property
 '* 注意事項：デスクトップアプリでは wpndatabase の s:badge 有効化が必要な場合があります（README 参照）
 '* URL     ：https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/badges
 '***************************************************************************************************
-Public Sub SetTaskbarOverlayBadge(badgeValue As Long, Optional AppUserModelID As String)
-    Dim appId As String
-    If Len(AppUserModelID) > 0 Then
-        appId = AppUserModelID
-    Else
-        appId = ToastConfig.AppUserModelID
-    End If
-    If Len(appId) = 0 Then Err.Raise 513, "SetTaskbarOverlayBadge", "AppUserModelID is required."
-    WinRT_SetTaskbarOverlayBadge badgeValue, appId
-End Sub
+Public Property Let RunBadgeUpdate(badgeValue As Long)
+    WinRT_SetTaskbarOverlayBadge badgeValue, ToastConfig.AppUserModelID
+End Property
 
 
 
