@@ -4483,7 +4483,7 @@ Private Property Let RegistryKeyValue(BasePath As String, KeyName As String, Key
             ' 書き込み！
             hr = RegSetValueExW(hKeyResult, StrPtr(KeyName), 0, RegistryType.REG_SZ, StrPtr(strVal), byteSize)
 
-        Case vbLong, vbInteger  ' 【32bit数値（REG_DWORD）の書き込み】
+        Case vbLong, vbInteger, vbDouble ' 【32bit数値（REG_DWORD）の書き込み】
             Dim lngVal As Long
             lngVal = CLng(KeyValue)
 
