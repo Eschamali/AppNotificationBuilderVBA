@@ -76,24 +76,69 @@ Private Declare PtrSafe Function FormatMessageW Lib "kernel32" ( _
     ByVal dwLanguageId As Long, ByVal lpBuffer As LongPtr, ByVal nSize As Long, _
     ByVal Arguments As LongPtr) As Long
 
-
-
 '---------------------------------------------------------------------------------------------------
 ' [ SECTION ] レジストリ操作
 '---------------------------------------------------------------------------------------------------
+'レジストリキーを開く・閉じる
+Private Declare PtrSafe Function RegOpenKeyExW Lib "advapi32.dll" (ByVal hKey As LongPtr, ByVal lpSubKey As LongPtr, ByVal ulOptions As Long, ByVal samDesired As Long, ByRef phkResult As LongPtr) As Long
+Private Declare PtrSafe Function RegCloseKey Lib "advapi32.dll" (ByVal hKey As LongPtr) As Long
 
+'レジストリキーを開く、またはなければ新規追加するAPI（自動判別！）
+Private Declare PtrSafe Function RegCreateKeyExW Lib "advapi32.dll" ( _
+    ByVal hKey As LongPtr, _
+    ByVal lpSubKey As LongPtr, _
+    ByVal Reserved As Long, _
+    ByVal lpClass As LongPtr, _
+    ByVal dwOptions As Long, _
+    ByVal samDesired As Long, _
+    ByVal lpSecurityAttributes As LongPtr, _
+    ByRef phkResult As LongPtr, _
+    ByRef lpdwDisposition As Long) As Long
 
+' レジストリの値を書き込む（上書き）API
+Private Declare PtrSafe Function RegSetValueExW Lib "advapi32.dll" ( _
+    ByVal hKey As LongPtr, _
+    ByVal lpValueName As LongPtr, _
+    ByVal Reserved As Long, _
+    ByVal dwType As Long, _
+    ByVal lpData As LongPtr, _
+    ByVal cbData As Long) As Long
+
+' 特定の「値（データ）」を削除するAPI
+Private Declare PtrSafe Function RegDeleteValueW Lib "advapi32.dll" (ByVal hKey As LongPtr, ByVal lpValueName As LongPtr) As Long
+
+' 【近代API！】指定したキー（フォルダ）を、中のサブキーやデータごと丸ごと一撃で消し去るAPI
+' （古いRegDeleteKeyは中身が空じゃないとエラーになりますが、これは丸ごと消せる最強版です）
+Private Declare PtrSafe Function RegDeleteTreeW Lib "advapi32.dll" (ByVal hKey As LongPtr, ByVal lpSubKey As LongPtr) As Long
+
+'値を読み取る（UTF-16対応版！）
+Private Declare PtrSafe Function RegQueryValueExW Lib "advapi32.dll" (ByVal hKey As LongPtr, ByVal lpValueName As LongPtr, ByVal lpReserved As LongPtr, ByRef lpType As Long, ByVal lpData As LongPtr, ByRef lpcbData As Long) As Long
 
 '---------------------------------------------------------------------------------------------------
-' [ SECTION ] SQLite操作
+' [ SECTION ] SQLite操作　※Windows 10以降に組み込まれている Open Source Software `winsqlite3.dll`
 '---------------------------------------------------------------------------------------------------
+'データベースの接続・切断
+Private Declare PtrSafe Function sqlite3_open16 Lib "winsqlite3.dll" (ByVal filename As LongPtr, ByRef ppDb As LongPtr) As Long
+Private Declare PtrSafe Function sqlite3_close Lib "winsqlite3.dll" (ByVal db As LongPtr) As Long
 
+'SQLのコンパイル（準備）
+Private Declare PtrSafe Function sqlite3_prepare16_v2 Lib "winsqlite3.dll" (ByVal db As LongPtr, ByVal zSql As LongPtr, ByVal nByte As Long, ByRef ppStmt As LongPtr, ByRef pzTail As LongPtr) As Long
 
+'実行と解放
+Private Declare PtrSafe Function sqlite3_step Lib "winsqlite3.dll" (ByVal stmt As LongPtr) As Long
+Private Declare PtrSafe Function sqlite3_finalize Lib "winsqlite3.dll" (ByVal stmt As LongPtr) As Long
 
+'直前の実行で、実際に影響（更新・追加・削除）を受けた行数を取得するAPI
+Private Declare PtrSafe Function sqlite3_changes Lib "winsqlite3.dll" (ByVal db As LongPtr) As Long
 
+'列情報の取得（VBAに優しいUTF-16版！）
+Private Declare PtrSafe Function sqlite3_column_count Lib "winsqlite3.dll" (ByVal stmt As LongPtr) As Long
+Private Declare PtrSafe Function sqlite3_column_name16 Lib "winsqlite3.dll" (ByVal stmt As LongPtr, ByVal iCol As Long) As LongPtr
+Private Declare PtrSafe Function sqlite3_column_text16 Lib "winsqlite3.dll" (ByVal stmt As LongPtr, ByVal iCol As Long) As LongPtr
 
-
-
+'メモリのポインタからVBAのStringへ戻すためのヘルパー
+Private Declare PtrSafe Function lstrlenW Lib "kernel32" (ByVal lpString As LongPtr) As Long
+Private Declare PtrSafe Function lstrcpyW Lib "kernel32" (ByVal lpString1 As LongPtr, ByVal lpString2 As LongPtr) As LongPtr
 
 
 
@@ -101,7 +146,7 @@ Private Declare PtrSafe Function FormatMessageW Lib "kernel32" ( _
 '                           ■■■ ユーザー定義エラー番号文言 ■■■
 '***************************************************************************************************
 Private Const vbObjectErrorID_0001 As String = "設定したスケジュールは、現在のシステム日時に対して過去の日時に設定されてます。" & vbCrLf & "設定したスケジュール通知日時が、未来であることを確認してください。 "
-Private Const vbObjectErrorID_0002 As String = "設定したパラメーターは、定義されていません。"
+Private Const vbObjectErrorID_0002 As String = "設定したパラメーターは、実装されていません。"
 
 
 
@@ -109,21 +154,25 @@ Private Const vbObjectErrorID_0002 As String = "設定したパラメーターは、定義され
 '                         ■■■ "wpndatabase.db"に関する変数/定数一式 ■■■
 '***************************************************************************************************
 '---------------------------------------------------------------------------------------------------
-' [ SECTION ] 最後のSQL実行結果
+' [ SECTION ] SQL実行結果系
 '---------------------------------------------------------------------------------------------------
-Private LatestExecuteSQLiteNum      As Long
+Private LatestExecuteSQLiteNum      As Long         '最後の実行結果件数　※失敗は、`-1`です
+Private Const SQLITE_OK             As Long = 0     '成功コード
+Private Const SQLITE_ROW            As Long = 100   'SELECT後のデータありサイン
+Private Const SQLITE_DONE           As Long = 101   'データ返却がないクエリが「完了」したことを表す
 
 '---------------------------------------------------------------------------------------------------
-' [ SECTION ] 設定保存相対パス
+' [ SECTION ] 設定保存パス
 '---------------------------------------------------------------------------------------------------
-Private Const ToastNotification_SettingPathDB   As String = "\Microsoft\Windows\Notifications\wpndatabase.db"
+Private ToastNotification_SettingPathDB As String
 
 '---------------------------------------------------------------------------------------------------
 ' [ SECTION ] WNSId
 '---------------------------------------------------------------------------------------------------
-'今のところ、システムでは2種類用意されてる
+'今のところ、システムでは3種類用意されてる
 Public Enum Wpndatabase_WNSId
     wsCustom                '好きな文字列指定用
+    wsNull                  'NULL文字指定用
     wsSystem                'システム
     wsNonImmersivePackage   '非パッケージ
 End Enum
@@ -179,35 +228,30 @@ End Enum
 '***************************************************************************************************
 '                         ■■■ レジストリに関する定数/変数一式 ■■■
 '***************************************************************************************************
-Private 最後に実行したレジストリ登録結果    As Long
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] 設定保存パス
+'---------------------------------------------------------------------------------------------------
+Const HKEY_CURRENT_USER As Long = &H80000001    '現在、ログイン中のユーザー領域
+Private LatestExecuteRegistry    As Long        '最後に実行したレジストリ操作結果　※`0`で、成功です
 
-'登録型一覧(ひとまず、3 + 1 用意)
-Enum RegistryType
-    REG_Delete = -1 '削除用
-    REG_DWORD
-    REG_SZ
-    REG_EXPAND_SZ
-End Enum
-
-'通知関連のレジストリパスIDを用意
-Enum ToastRegistryPathMode
-    NotificationsSettings
-    ClassesAppUserModelId
-End Enum
-
-'レジストリで設定できるパラメーターを用意
-Enum RegistrySetting
-    'コンピューター\HKEY_CURRENT_USER\Software\Classes\AppUserModelId
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] 設定先リスト
+'---------------------------------------------------------------------------------------------------
+'コンピューター\HKEY_CURRENT_USER\Software\Classes\AppUserModelId
+Public Enum ClassesAppUserModelId
     ShowInSettings
-    displayName
-    iconUri
+    DisplayName
+    IconUri
     IconBackgroundColor
     CustomActivator
-    
-    'コンピューター\HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings
+End Enum
+
+'コンピューター\HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings
+Public Enum NotificationsSettings
     '--wpndatabase.db 連携必須--
     Enabled
     ShowBanner
+
     '--wpndatabase.db 連携不要--
     SoundFile
     AllowContentAboveLock
@@ -215,6 +259,18 @@ Enum RegistrySetting
     ShowInActionCenter
     AllowUrgentNotifications
 End Enum
+
+'レジストリの登録型一覧　※一旦は2種類で
+Private Enum RegistryType
+    REG_SZ = 1
+    REG_DWORD = 4
+End Enum
+
+'--- 各種アクセス権限 ---
+Private Const KEY_QUERY_VALUE   As Long = &H1       'ReadOnly
+Private Const KEY_WRITE         As Long = &H20006   '書き込み・作成用権限 (STANDARD_RIGHTS_WRITE Or KEY_SET_VALUE Or KEY_CREATE_SUB_KEY)
+Private Const KEY_SET_VALUE     As Long = &H2       'DelOnly
+Private Const REG_OPTION_NON_VOLATILE As Long = 0
 
 
 
@@ -315,9 +371,8 @@ Private WinRT_pBadgeManagerStatics As LongPtr
 Private WinRT_pBadgeNotificationFactory As LongPtr
 Private WinRT_HStringCache As Object
 
-
 '---------------------------------------------------------------------------------------------------
-' [ SECTION ] 主要
+' [ SECTION ] WinRT-APIに関する主要な定義
 '---------------------------------------------------------------------------------------------------
 Private Type WinRT_SYSTEMTIME
     wYear As Integer
@@ -568,7 +623,7 @@ Private Type WinRT_DataBinding
     ProgressTitle As String
     ProgressValueStringOverride As String
     ProgressStatus As String
-    progressValue As Double
+    ProgressValue As Double
 
     '通知データが古いかどうかを判断
     SequenceNumber As Long
@@ -684,7 +739,7 @@ Private Type SubAdaptiveText
     HintMinLines    As Integer  '表示する必要のある、テキスト要素の最小行数です。
     HintAlign       As String   'テキストの水平方向の配置。
     Language        As String   'XML ペイロードの対象ロケールです。
-    
+
     '値
     Value          As String   '表示するテキスト。
 End Type
@@ -728,7 +783,7 @@ End Type
 Private ElementProgress As AdaptiveProgressBar
 Private Type AdaptiveProgressBar
     Title               As String   '省略可能なタイトル文字列。
-    status              As String   '左側の進行状況バーの下に表示されるステータス文字列。 この文字列は、"ダウンロード中..." や "インストール中..." などのように、操作の状態を反映する必要があります。
+    Status              As String   '左側の進行状況バーの下に表示されるステータス文字列。 この文字列は、"ダウンロード中..." や "インストール中..." などのように、操作の状態を反映する必要があります。
     Value               As Double   'プログレスバーの値。 この値には、0.0 ~ 1.0 の浮動小数点数、または読み込みアニメーションを生成する値 "Indeterminate" を指定します。なおVBAの場合、負の場合で"Indeterminate"扱いとします。
     ValueStringOverride As String   '既定のパーセンテージ文字列の代わりに表示される省略可能な文字列。 これを指定しない場合は、"70%" などの文字が表示されます。
 End Type
@@ -877,6 +932,7 @@ Private Function EnumToStringHintButtonStyle(param As EnumHintButtonStyle) As St
     Select Case param
         Case EnumHintButtonStyle.hbsSuccess:    EnumToStringHintButtonStyle = "Success"     'ボタンが緑色です
         Case EnumHintButtonStyle.hbsCritical:   EnumToStringHintButtonStyle = "Critical"    'ボタンが赤です
+        Case Else:  '既定値
     End Select
 End Function
 
@@ -943,7 +999,7 @@ Private Function EnumToStringAdaptiveTextStyle(param As EnumAdaptiveTextStyle) A
 End Function
 
 '---------------------------------------------------------------------------------------------------
-' [ SECTION ] テキストの水平方向の配置を制御するを文字列で返します
+' [ SECTION ] テキストの水平方向の配置の制御を文字列で返します
 '---------------------------------------------------------------------------------------------------
 Private Function EnumToStringAdaptiveTextAlign(param As EnumAdaptiveTextStyle) As String
     Select Case param
@@ -952,6 +1008,73 @@ Private Function EnumToStringAdaptiveTextAlign(param As EnumAdaptiveTextStyle) A
         Case EnumAdaptiveTextAlign.TextAlign_Center:    EnumToStringAdaptiveTextAlign = "center"
         Case EnumAdaptiveTextAlign.TextAlign_Right:     EnumToStringAdaptiveTextAlign = "right"
         Case Else   '既定値
+    End Select
+End Function
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] `wpndatabase.db - SettingKey`のパラメーターを文字列で返します
+'---------------------------------------------------------------------------------------------------
+Private Function EnumToStringWpndatabase_SettingKey(param As Wpndatabase_SettingKey) As String
+    Select Case param
+        Case Wpndatabase_SettingKey.skS_tickle:                         EnumToStringWpndatabase_SettingKey = "s:tickle"
+        Case Wpndatabase_SettingKey.skC_tile:                           EnumToStringWpndatabase_SettingKey = "c:tile"
+        Case Wpndatabase_SettingKey.skR_badge:                          EnumToStringWpndatabase_SettingKey = "r:badge"
+        Case Wpndatabase_SettingKey.skS_lock_toast:                     EnumToStringWpndatabase_SettingKey = "s:lock:toast"
+        Case Wpndatabase_SettingKey.skS_tile:                           EnumToStringWpndatabase_SettingKey = "s:tile"
+        Case Wpndatabase_SettingKey.skS_lock_badge:                     EnumToStringWpndatabase_SettingKey = "s:lock:badge"
+        Case Wpndatabase_SettingKey.skS_banner:                         EnumToStringWpndatabase_SettingKey = "s:banner"
+        Case Wpndatabase_SettingKey.skS_lock_tile:                      EnumToStringWpndatabase_SettingKey = "s:lock:tile"
+        Case Wpndatabase_SettingKey.skR_tile:                           EnumToStringWpndatabase_SettingKey = "r:tile"
+        Case Wpndatabase_SettingKey.skS_badge:                          EnumToStringWpndatabase_SettingKey = "s:badge"
+        Case Wpndatabase_SettingKey.skS_audio:                          EnumToStringWpndatabase_SettingKey = "s:audio"
+        Case Wpndatabase_SettingKey.skS_voip:                           EnumToStringWpndatabase_SettingKey = "s:voip"
+        Case Wpndatabase_SettingKey.skS_stopCloud:                      EnumToStringWpndatabase_SettingKey = "s:stopCloud"
+        Case Wpndatabase_SettingKey.skS_listenerEnabled:                EnumToStringWpndatabase_SettingKey = "s:listenerEnabled"
+        Case Wpndatabase_SettingKey.skC_cloud:                          EnumToStringWpndatabase_SettingKey = "c:cloud"
+        Case Wpndatabase_SettingKey.skC_toast:                          EnumToStringWpndatabase_SettingKey = "c:toast"
+        Case Wpndatabase_SettingKey.skC_internet:                       EnumToStringWpndatabase_SettingKey = "c:internet"
+        Case Wpndatabase_SettingKey.skC_badge:                          EnumToStringWpndatabase_SettingKey = "c:badge"
+        Case Wpndatabase_SettingKey.skC_ringing:                        EnumToStringWpndatabase_SettingKey = "c:ringing"
+        Case Wpndatabase_SettingKey.skC_tickle:                         EnumToStringWpndatabase_SettingKey = "c:tickle"
+        Case Wpndatabase_SettingKey.skC_voip:                           EnumToStringWpndatabase_SettingKey = "c:voip"
+        Case Wpndatabase_SettingKey.skC_storage_toast:                  EnumToStringWpndatabase_SettingKey = "c:storage:toast"
+        Case Wpndatabase_SettingKey.skS_toast:                          EnumToStringWpndatabase_SettingKey = "s:toast"
+        Case Wpndatabase_SettingKey.skC_storage_tile:                   EnumToStringWpndatabase_SettingKey = "c:storage:tile"
+        Case Wpndatabase_SettingKey.skM_SecondaryTileMigrationComplete: EnumToStringWpndatabase_SettingKey = "m:SecondaryTileMigrationComplete"
+        Case Wpndatabase_SettingKey.skS_cycle_medium:                   EnumToStringWpndatabase_SettingKey = "s:cycle:medium"
+        Case Wpndatabase_SettingKey.skS_cycle_wide:                     EnumToStringWpndatabase_SettingKey = "s:cycle:wide"
+        Case Wpndatabase_SettingKey.skS_cycle_large:                    EnumToStringWpndatabase_SettingKey = "s:cycle:large"
+        Case Else:                                                      Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
+    End Select
+End Function
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] レジストリパス：Software\Classes\AppUserModelId\{AppUserModelId} の`KeyName`リスト
+'---------------------------------------------------------------------------------------------------
+Private Function EnumToStringRegistryClassesAppUserModelId(param As ClassesAppUserModelId) As String
+    Select Case param
+        Case ClassesAppUserModelId.ShowInSettings:      EnumToStringRegistryClassesAppUserModelId = "ShowInSettings"
+        Case ClassesAppUserModelId.DisplayName:         EnumToStringRegistryClassesAppUserModelId = "DisplayName"
+        Case ClassesAppUserModelId.IconUri:             EnumToStringRegistryClassesAppUserModelId = "IconUri"
+        Case ClassesAppUserModelId.IconBackgroundColor: EnumToStringRegistryClassesAppUserModelId = "IconBackgroundColor"
+        Case ClassesAppUserModelId.CustomActivator:     EnumToStringRegistryClassesAppUserModelId = "CustomActivator"
+        Case Else:                                      Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
+    End Select
+End Function
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] レジストリパス：Software\Microsoft\Windows\CurrentVersion\Notifications\Settings\{AppUserModelId} の`KeyName`リスト
+'---------------------------------------------------------------------------------------------------
+Private Function EnumToStringRegistryNotificationsSettings(param As NotificationsSettings) As String
+    Select Case param
+        Case NotificationsSettings.Enabled:                     EnumToStringRegistryNotificationsSettings = "Enabled"
+        Case NotificationsSettings.ShowBanner:                  EnumToStringRegistryNotificationsSettings = "ShowBanner"
+        Case NotificationsSettings.SoundFile:                   EnumToStringRegistryNotificationsSettings = "SoundFile"
+        Case NotificationsSettings.AllowContentAboveLock:       EnumToStringRegistryNotificationsSettings = "AllowContentAboveLock"
+        Case NotificationsSettings.Rank:                        EnumToStringRegistryNotificationsSettings = "Rank"
+        Case NotificationsSettings.ShowInActionCenter:          EnumToStringRegistryNotificationsSettings = "ShowInActionCenter"
+        Case NotificationsSettings.AllowUrgentNotifications:    EnumToStringRegistryNotificationsSettings = "AllowUrgentNotifications"
+        Case Else:                                              Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
     End Select
 End Function
 
@@ -1429,10 +1552,10 @@ Public Property Let AddAdaptiveSubgroupText(Optional Style As EnumAdaptiveTextSt
     '加算処理(0基準)
     SubgroupInnerTextsTotal = SubgroupInnerTextsTotal + 1   'テキスト挿入数
     SubgroupInnerTotal = SubgroupInnerTotal + 1             'Subgroup要素内の挿入要素数
-    
+
     '配列を増やします
     ReDim Preserve SubgroupInnerTexts(SubgroupInnerTextsTotal)
-    
+
     '順序データを設定します
     ReDim Preserve SubgroupInnerOrder(SubgroupInnerTotal)
     SubgroupInnerOrder(SubgroupInnerTotal).TargetElementNo = SubgroupInnerTextsTotal
@@ -1467,10 +1590,10 @@ End Property
 '* 詳細説明：`Status`に`vbnullstring`をセットすることで、この要素を削除できます
 '* URL     ：https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-progress-bar
 '***************************************************************************************************
-Public Property Let SetAdaptiveProgressBar(Optional Arg_Value As Double, Optional Title As String, Optional ValueStringOverride As String, status As String)
+Public Property Let SetAdaptiveProgressBar(Optional Arg_Value As Double, Optional Title As String, Optional ValueStringOverride As String, Status As String)
     With ElementProgress
         .Title = Title
-        .status = status
+        .Status = Status
         .Value = Arg_Value
         .ValueStringOverride = ValueStringOverride
     End With
@@ -1549,7 +1672,7 @@ Public Property Get ToastNotificationContent(DataBindingMode As Boolean) As Stri
     Const NameNode01_01_04_01_01__text As String = "text"
     'subgroub用text要素
     Const NameNode01_01_04_01_02__image As String = "image"
-    
+
     '--------------------actions要素内で使える要素関係の宣言--------------------
     'input要素
     Dim Node03_01__input As MSXML2.IXMLDOMNode: Const NameNode03_01__input As String = "input"
@@ -1673,7 +1796,7 @@ Public Property Get ToastNotificationContent(DataBindingMode As Boolean) As Stri
                 '先ほどのノード：text  にバインディング名を設定します
                 '※スケジュール通知の場合は、バインディング機能が使えないため、そのまま記入します
                 If DataBindingMode Then .Text = DataBindingForXML(DataBindingTopText_Title) Else .Text = ElementsText.Title.Value
-                
+
                  '属性ノード：hint-callScenarioCenterAlign  に値を設定してあったら、先ほどのノード：text  の属性に追加します
                 If ElementsText.Title.Attribute.HintCallScenarioCenterAlign Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-callScenarioCenterAlign", "")).NodeValue = LCase(ElementsText.Title.Attribute.HintCallScenarioCenterAlign)
             End With
@@ -1716,15 +1839,15 @@ Public Property Get ToastNotificationContent(DataBindingMode As Boolean) As Stri
         With Node01_01__binding.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_04__group, ""))
             '要素位置格納用
             Dim GetPos As Long
-        
+
             'subgroup要素が定義されている分、ノード：subgroup  を作成して「group」ノードの子ノードとして追加します。
             For i = 0 To SubgroupTotal
                 With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_04_01__subgroup, ""))
                     '各属性
                     If StrPtr(ElementsSubgroup(i).HintWeight) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-weight", "")).NodeValue = ElementsSubgroup(i).HintWeight
                     If StrPtr(ElementsSubgroup(i).HintTextStacking) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-textStacking", "")).NodeValue = ElementsSubgroup(i).HintTextStacking
-                
-                
+
+
                     '「text」、「image」を「subgroup」ノードの子ノードとして順番に追加します。
                     For j = 0 To UBound(ElementsSubgroup(i).QueueOrder)
                         '現在の順番での要素位置を取得
@@ -1736,7 +1859,7 @@ Public Property Get ToastNotificationContent(DataBindingMode As Boolean) As Stri
                             With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_04_01_01__text, ""))
                                 '値
                                 .Text = ElementsSubgroup(i).QueueText(GetPos).Value
-                            
+
                                 '各属性
                                 If StrPtr(ElementsSubgroup(i).QueueText(GetPos).HintStyle) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-style", "")).NodeValue = ElementsSubgroup(i).QueueText(GetPos).HintStyle
                                 If ElementsSubgroup(i).QueueText(GetPos).HintWrap Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-wrap", "")).NodeValue = LCase(ElementsSubgroup(i).QueueText(GetPos).HintWrap)
@@ -1750,7 +1873,7 @@ Public Property Get ToastNotificationContent(DataBindingMode As Boolean) As Stri
                             With .appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_04_01_02__image, ""))
                                 '各属性
                                 .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "src", "")).NodeValue = ElementsSubgroup(i).QueueImage(GetPos).src
-                                
+
                                 If StrPtr(ElementsSubgroup(i).QueueImage(GetPos).HintCrop) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-crop", "")).NodeValue = ElementsSubgroup(i).QueueImage(GetPos).HintCrop
                                 If ElementsSubgroup(i).QueueImage(GetPos).HintRemoveMargin Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-removeMargin", "")).NodeValue = LCase(ElementsSubgroup(i).QueueImage(GetPos).HintRemoveMargin)
                                 If StrPtr(ElementsSubgroup(i).QueueImage(GetPos).HintAlign) Then .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "hint-align", "")).NodeValue = ElementsSubgroup(i).QueueImage(GetPos).HintAlign
@@ -1767,7 +1890,7 @@ Public Property Get ToastNotificationContent(DataBindingMode As Boolean) As Stri
 
     '-------------------------------------------------------progress要素関係の設定-------------------------------------------------------
     'スケジュール通知じゃないかつ、属性ノード：status  に値を設定してあったら「progress」ノードを追加します(Microsoft ドキュメント準拠)
-    If StrPtr(ElementProgress.status) And DataBindingMode Then
+    If StrPtr(ElementProgress.Status) And DataBindingMode Then
         With Node01_01__binding.appendChild(ToastContents.createNode(NODE_ELEMENT, NameNode01_01_03__progress, ""))
             '属性ノード：title  にバインディング設定したのを、先ほどのノード：progress  の属性に追加します
             .Attributes.setNamedItem(ToastContents.createNode(NODE_ATTRIBUTE, "title", "")).NodeValue = DataBindingForXML(DataBindingProgress_Title)
@@ -1934,10 +2057,10 @@ Private Function DataBindingConvertForWinRT(Optional SequenceNumber As Long) As 
 
         'プログレスバー
         '※必須項目が入ってたら、他の項目も適用させます
-        If StrPtr(ElementProgress.status) Then
+        If StrPtr(ElementProgress.Status) Then
             .ProgressTitle = ElementProgress.Title
-            .ProgressStatus = ElementProgress.status
-            .progressValue = ElementProgress.Value
+            .ProgressStatus = ElementProgress.Status
+            .ProgressValue = ElementProgress.Value
             .ProgressValueStringOverride = ElementProgress.ValueStringOverride
         End If
 
@@ -2136,12 +2259,12 @@ End Sub
 '* 注意事項：Desktopアプリだと、「CollectionId」が「displayName」になる問題があるため、Storeアプリでの使用を推奨します。
 '* URL     ：https://learn.microsoft.com/ja-jp/windows/apps/design/shell/tiles-and-notifications/toast-collections
 '***************************************************************************************************
-Public Function RunToastCollectionManagerSaveToastCollectionAsync(CollectionID As String, displayName As String, launchArgs As String, iconUri As String) As Long
+Public Function RunToastCollectionManagerSaveToastCollectionAsync(CollectionID As String, DisplayName As String, LaunchArgs As String, IconUri As String) As Long
     '1. 必要な設定値をまとめる
     ToastConfig.CollectionID = CollectionID
 
     '2. ToastCollectionを作成
-    RunToastCollectionManagerSaveToastCollectionAsync = WinRT_SaveToastCollection(displayName, launchArgs, iconUri)
+    RunToastCollectionManagerSaveToastCollectionAsync = WinRT_SaveToastCollection(DisplayName, LaunchArgs, IconUri)
 End Function
 
 '***************************************************************************************************
@@ -2364,11 +2487,11 @@ Private Sub WinRT_RemoveToastNotification()
     With ToastConfig
         If Len(.AppUserModelID) = 0 Then Err.Raise 513, "WinRT_RemoveToastNotification", "AppUserModelID is required."
         If Len(.Tag) > 0 And Len(.Group) = 0 Then Err.Raise 513, "WinRT_RemoveToastNotification", "Group is required when Tag is specified."
-    
+
         ' コレクション指定時はコレクション用 History、なければデフォルト
         pHistory = WinRT_GetToastHistory(.CollectionID)
         If pHistory = 0 Then Err.Raise 513, , "GetToastHistory failed."
-    
+
         hStrTag = WinRT_CachedHString(.Tag)
         hStrGroup = WinRT_CachedHString(.Group)
         hStrAppId = WinRT_CachedHString(.AppUserModelID)
@@ -2438,7 +2561,7 @@ End Function
 '* 前提　　：ToastConfig.AppUserModelID / CollectionID が設定済みであること。
 '* 参考　　：CollectionNotice.cpp CreateToastCollection と同等（WinRT 直呼び）。
 '***************************************************************************************************
-Private Function WinRT_SaveToastCollection(displayName As String, launchArgs As String, iconUri As String) As Long
+Private Function WinRT_SaveToastCollection(DisplayName As String, LaunchArgs As String, IconUri As String) As Long
     Dim pManager As LongPtr
     Dim pCollection As LongPtr
     Dim pAsync As LongPtr
@@ -2448,12 +2571,12 @@ Private Function WinRT_SaveToastCollection(displayName As String, launchArgs As 
     With ToastConfig
         If Len(.AppUserModelID) = 0 Then Err.Raise 513, "WinRT_SaveToastCollection", "AppUserModelID is required."
         If Len(.CollectionID) = 0 Then Err.Raise 513, "WinRT_SaveToastCollection", "CollectionID is required."
-    
+
         pManager = WinRT_GetToastCollectionManager(.AppUserModelID)
         If pManager = 0 Then Err.Raise 513, , "GetToastCollectionManager failed."
-    
+
         ' コレクションオブジェクトを組み立て（この時点ではまだ OS 未登録）
-        pCollection = WinRT_CreateToastCollection(.CollectionID, displayName, launchArgs, iconUri)
+        pCollection = WinRT_CreateToastCollection(.CollectionID, DisplayName, LaunchArgs, IconUri)
         If pCollection = 0 Then Err.Raise 513, , "CreateToastCollection failed."
     End With
 
@@ -2489,10 +2612,10 @@ Private Function WinRT_RemoveToastCollection() As Long
 
     With ToastConfig
         If Len(.AppUserModelID) = 0 Then Err.Raise 513, "WinRT_RemoveToastCollection", "AppUserModelID is required."
-    
+
         pManager = WinRT_GetToastCollectionManager(.AppUserModelID)
         If pManager = 0 Then Err.Raise 513, , "GetToastCollectionManager failed."
-    
+
         pAsync = 0
         If Len(.CollectionID) > 0 Then
             ' 指定 ID のコレクションのみ削除
@@ -2556,20 +2679,20 @@ End Function
 '---------------------------------------------------------------------------------------------------
 '* 対応 API：ToastCollection(collectionId, displayName, launchArgs, iconUri)
 '***************************************************************************************************
-Private Function WinRT_CreateToastCollection(ByVal CollectionID As String, ByVal displayName As String, ByVal launchArgs As String, ByVal iconUri As String) As LongPtr
+Private Function WinRT_CreateToastCollection(ByVal CollectionID As String, ByVal DisplayName As String, ByVal LaunchArgs As String, ByVal IconUri As String) As LongPtr
     Dim pFactory As LongPtr
     Dim pUri As LongPtr
     Dim pCollection As LongPtr
     Dim hStrCollectionId As LongPtr
     Dim hStrDisplayName As LongPtr
     Dim hStrLaunchArgs As LongPtr
-    pUri = WinRT_CreateUri(iconUri)   ' 空文字なら 0（アイコンなし）
+    pUri = WinRT_CreateUri(IconUri)   ' 空文字なら 0（アイコンなし）
 
     pFactory = WinRT_pToastCollectionFactory
     If pFactory <> 0 Then
         hStrCollectionId = WinRT_CachedHString(CollectionID)
-        hStrDisplayName = WinRT_CachedHString(displayName)
-        hStrLaunchArgs = WinRT_CachedHString(launchArgs)
+        hStrDisplayName = WinRT_CachedHString(DisplayName)
+        hStrLaunchArgs = WinRT_CachedHString(LaunchArgs)
 
         WinRT_CallComMethod pFactory, VT_IToastCollectionFactory_CreateInstance, vbLong, _
             WinRT_vbPtr, hStrCollectionId, WinRT_vbPtr, hStrDisplayName, WinRT_vbPtr, hStrLaunchArgs, WinRT_vbPtr, pUri, WinRT_vbPtr, VarPtr(pCollection)
@@ -2657,7 +2780,7 @@ Private Sub WinRT_ShowImmediateToast(Binding As WinRT_DataBinding)
             WinRT_CallComMethod pToast2, VT_RELEASE, vbLong
             pToast2 = 0
         End If
-    
+
         ' 再起動時に消えるフラグ（IToastNotification6）
         If .ExpiresOnReboot Then
             WinRT_CallComMethod pToast, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidToast6), WinRT_vbPtr, VarPtr(pToast6)
@@ -2667,14 +2790,14 @@ Private Sub WinRT_ShowImmediateToast(Binding As WinRT_DataBinding)
                 pToast6 = 0
             End If
         End If
-    
+
         WinRT_ApplyExpirationTime pToast, VT_IToastNotification_SetExpirationTime
-    
+
         '--- 4. クリック/ボタン押下のイベントハンドラ登録 ---
         ' Activated / Dismissed / Failed を登録（DLL 版 GeneralNotice.cpp と同等）。
         ' トーストクリック・ボタン押下で launch / action arguments のマクロを実行する。
         ToastCallbackCore.RegisterToastHandlers pToast
-    
+
         '--- 5. Notifier 取得 → Show で画面に出す ---
         pNotifier = WinRT_CreateToastNotifier(.AppUserModelID, .CollectionID)
         If pNotifier = 0 Then Err.Raise 513, , "CreateToastNotifier failed."
@@ -2750,7 +2873,7 @@ Private Sub WinRT_ShowScheduledToast()
             WinRT_CallComMethod pScheduled2, VT_RELEASE, vbLong
             pScheduled2 = 0
         End If
-    
+
         '--- 3. 有効期限（IScheduledToastNotification4 が必要） ---
         If .ExpirationTime > 0 Then
             ' IScheduledToastNotification4（1D4761FD...）。98429E8B... は v3 で ExpirationTime は存在しない
@@ -2761,7 +2884,7 @@ Private Sub WinRT_ShowScheduledToast()
                 pScheduled4 = 0
             End If
         End If
-    
+
         '--- 4. スケジュールに登録（即時表示ではなく AddToSchedule） ---
         pNotifier = WinRT_CreateToastNotifier(.AppUserModelID, .CollectionID)
         If pNotifier = 0 Then Err.Raise 513, , "CreateToastNotifier failed."
@@ -3093,7 +3216,7 @@ Private Function WinRT_CreateNotificationData(ByRef Binding As WinRT_DataBinding
 
     'トースト通知のプログレスバー使用判定
     hasProgress = (StrPtr(Binding.ProgressStatus) > 0)
-    
+
     ' Values プロパティ（IMap）を取得してキー/値を詰めていく
     WinRT_CallComMethod pData, 6, vbLong, WinRT_vbPtr, VarPtr(pMap)
     If pMap = 0 Then
@@ -3117,12 +3240,12 @@ Private Function WinRT_CreateNotificationData(ByRef Binding As WinRT_DataBinding
             WinRT_InsertMapValue pMap, DataBindingProgress_Status, .ProgressStatus
 
             '純粋な進捗値
-            If Binding.progressValue < 0 Then
+            If Binding.ProgressValue < 0 Then
                 '負の場合は、不確定進捗(マーキー)として設定
                 WinRT_InsertMapValue pMap, DataBindingProgress_Value, "Indeterminate"
             Else
                 '進捗値(0~1.0)
-                WinRT_InsertMapValue pMap, DataBindingProgress_Value, .progressValue
+                WinRT_InsertMapValue pMap, DataBindingProgress_Value, .ProgressValue
             End If
 
             '進捗値の代替表現
@@ -3808,7 +3931,7 @@ End Sub
 '***************************************************************************************************
 Private Function WinRT_WaitAsync(ByVal pAsync As LongPtr) As Long
     Dim pAsyncInfo As LongPtr
-    Dim status As Long
+    Dim Status As Long
     Dim errorCode As Long
     Dim waitCount As Long
 
@@ -3826,21 +3949,21 @@ Private Function WinRT_WaitAsync(ByVal pAsync As LongPtr) As Long
 
     ' Started(0) が終わるまで DoEvents でポーリング（VBA に await がないため）
     Do
-        status = WinRT_AsyncStatus_Started
-        WinRT_CallComMethod pAsyncInfo, VT_IAsyncInfo_GetStatus, vbLong, WinRT_vbPtr, VarPtr(status)
-        If status <> WinRT_AsyncStatus_Started Then Exit Do
+        Status = WinRT_AsyncStatus_Started
+        WinRT_CallComMethod pAsyncInfo, VT_IAsyncInfo_GetStatus, vbLong, WinRT_vbPtr, VarPtr(Status)
+        If Status <> WinRT_AsyncStatus_Started Then Exit Do
         DoEvents
         waitCount = waitCount + 1
         If waitCount > 50000 Then Exit Do   ' 無限ループ防止
     Loop
 
-    If status = WinRT_AsyncStatus_Completed Then
+    If Status = WinRT_AsyncStatus_Completed Then
         errorCode = 0
     Else
         errorCode = 0
         WinRT_CallComMethod pAsyncInfo, VT_IAsyncInfo_GetErrorCode, vbLong, WinRT_vbPtr, VarPtr(errorCode)
-        If status = WinRT_AsyncStatus_Canceled And errorCode = 0 Then errorCode = &H800704C7
-        If status = WinRT_AsyncStatus_Started And errorCode = 0 Then errorCode = &H8001011F   ' タイムアウト扱い
+        If Status = WinRT_AsyncStatus_Canceled And errorCode = 0 Then errorCode = &H800704C7
+        If Status = WinRT_AsyncStatus_Started And errorCode = 0 Then errorCode = &H8001011F   ' タイムアウト扱い
     End If
 
     WinRT_CallComMethod pAsyncInfo, VT_RELEASE, vbLong
@@ -3929,12 +4052,132 @@ Private Function DataBindingForXML(str As String) As String
     DataBindingForXML = "{" & str & "}"
 End Function
 
+'***************************************************************************************************
+'* 機能　　：`SQLite`操作結果の際に得れる文字列ポインターから、VBAで扱える`String`に変換します
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：引数に対する`String`
+'* 引数　　：strPtr   `SQLite`操作結果の際に得れる文字列ポインター
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：事前に、`UTF-16`として、`SQLite`に接続するようにすること
+'***************************************************************************************************
+Private Function PtrToString(stringPtr As LongPtr) As String
+    ' 1. まず、ポインタ先の文字列の長さを測る
+    Dim lngLen As Long: lngLen = lstrlenW(stringPtr)
+
+    ' 2. 空の場合は、即抜け　※返り値は、`vbnullstring`となります
+    If lngLen = 0 Then Exit Function
+
+    ' 3. 必要な長さ分だけバッファを確保
+    PtrToString = String$(lngLen, vbNullChar)
+
+    ' 4. コピー実行
+    lstrcpyW StrPtr(PtrToString), stringPtr
+End Function
+
 
 
 '***************************************************************************************************
 '                               ■■■ wpndatabase.db 操作関連 ■■■
 '***************************************************************************************************
-'* 機能　　：簡単な引数で、SELECT文を作成します
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] 実際に実行するコア部分
+'---------------------------------------------------------------------------------------------------
+'***************************************************************************************************
+'* 機能　　：実際にSQL文を実行します
+'---------------------------------------------------------------------------------------------------
+'* 返り値   :・【SELECT時】             : 辞書が入った Collection オブジェクト（全行取得）
+'            ・【UPDATE/INSERT/DELETE】 : 更新された件数を示す Long 数値
+'* 引数　　 ：sql   実行するSQL文そのまんま
+'***************************************************************************************************
+Private Function ExecuteSQLite(sql As String) As Variant
+    Dim db As LongPtr
+    Dim stmt As LongPtr
+    Dim hr As Long
+    Dim sqlUpper As String
+
+    ' SQLの種類を判別するために、大文字に揃えて空白をトリムする
+    sqlUpper = UCase(Trim(sql))
+
+    ' --- [1] データベースを開く ---
+    ' VBAの文字は元からUTF-16なので、StrPtrで直接渡すだけで動きます！
+    hr = sqlite3_open16(StrPtr(ToastNotification_SettingPathDB), db)
+    If hr <> SQLITE_OK Then GoTo ErrExit
+
+    ' --- [2] PROCESS: SQLステートメントのコンパイル (sqlite3_prepare16_v2) ---
+    hr = sqlite3_prepare16_v2(db, StrPtr(sql), -1, stmt, 0)
+    If hr <> SQLITE_OK Then sqlite3_close db: GoTo ErrExit
+
+    ' --- [3] クエリの種類によって処理を「完全自動分岐」させる ---
+    If Left(sqlUpper, 6) = "SELECT" Then
+        ' === 【SELECT パイプライン】 ===
+        Set ExecuteSQLite = New Collection
+        LatestExecuteSQLiteNum = 0
+
+        Dim dict        As Object
+        Dim colCount    As Long
+        Dim i           As Long
+
+        ' 安全な「同期ループ（sqlite3_step）」で、マッチするデータを全行ひっこぬく！ [2]
+        Do While sqlite3_step(stmt) = SQLITE_ROW
+            '各データごとに、Dictionaryを初期化
+            Set dict = CreateObject("Scripting.Dictionary")
+
+            '列数check
+            colCount = sqlite3_column_count(stmt)
+
+            ' 各列に対して、Dictionaryに「列名 ＝ 値」として格納！
+            For i = 0 To colCount - 1: dict.Add PtrToString(sqlite3_column_name16(stmt, i)), PtrToString(sqlite3_column_text16(stmt, i)): Next
+
+            ' Collectionに1行分のDictionaryを格納していく
+            ExecuteSQLite.Add dict
+
+            '件数をカウント
+            LatestExecuteSQLiteNum = LatestExecuteSQLiteNum + 1
+        Loop
+    Else
+        ' === 【更新（UPDATE/INSERT/DELETE/CREATE） パイプライン】 ===
+        ExecuteSQLite = -1
+
+        ' 更新件数をcheck
+        hr = sqlite3_step(stmt)
+
+        ' 数値（Long）を返すので、Setなしで普通に代入する！
+        If hr = SQLITE_DONE Then ExecuteSQLite = sqlite3_changes(db)
+    End If
+
+    ' --- [4] CLEANUP: 丁寧なお片付け ---
+    sqlite3_finalize stmt
+    sqlite3_close db
+    Exit Function
+
+
+' 例外的なエラー時の安全なフォールバック
+ErrExit:
+    LatestExecuteSQLiteNum = -1
+
+    If Left(sqlUpper, 6) = "SELECT" Then
+        Set ExecuteSQLite = New Collection ' 空のコレクションを返す（オブジェクト用）
+    Else
+        ExecuteSQLite = -1 ' エラー数値を返す（数値用）
+    End If
+End Function
+
+'***************************************************************************************************
+'* 機能　　：最後に実行した`SQLite`の結果を返します
+'---------------------------------------------------------------------------------------------------
+'* 返り値　：・【SELECT時】             : SELECT結果件数
+'            ・【UPDATE/INSERT/DELETE】 : 更新された件数
+'            ・エラー                   ：-1
+'***************************************************************************************************
+Public Property Get LastestRunSQLiteResultCode() As Long
+    LastestRunSQLiteResultCode = LatestExecuteSQLiteNum
+End Property
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] 簡易SQL文生成
+'---------------------------------------------------------------------------------------------------
+'***************************************************************************************************
+'* 機能　　：簡単な引数で、SELECT文を作成し、実行します
 '---------------------------------------------------------------------------------------------------
 '* 返り値　：SELECT文
 '* 引数　　：※日本語名まんまのため省略します
@@ -3965,7 +4208,7 @@ Private Function UPDATE文生成(設定したい列 As String, ByVal 設定したい値 As Stri
     Else
         UPDATE文生成 = WorksheetFunction.TextJoin(" ", False, "UPDATE", 対象テーブル, "SET", 設定したい列 & "='" & 設定したい値 & "'", "WHERE", 条件列1 & "='" & 条件値1 & "';")
     End If
-    
+
     'NULLモードなら空文字時、NULLとして扱います。
     If NullMode Then UPDATE文生成 = Replace(UPDATE文生成, "''", "NULL", , 1)
 End Function
@@ -3983,67 +4226,23 @@ Private Function INSERT文生成_HandlerSettings(HandlerId As Long, SettingKey As S
     INSERT文生成_HandlerSettings = WorksheetFunction.TextJoin(" ", False, "INSERT", "INTO", "HandlerSettings", "VALUES('" & HandlerId & "',", "'" & SettingKey & "',", "'" & flag * -1 & "');")
 End Function
 
-'***************************************************************************************************
-'* 機能　　：数値指定で、対応の[SettingKey]の名称を返します
 '---------------------------------------------------------------------------------------------------
-'* 返り値　：対応する[SettingKey]の名称
-'* 引数　　：列挙型（列挙体）Enum：Wpndatabase_SettingKey
-'***************************************************************************************************
-Private Function 対応表_Wpndatabase_SettingKey(Parameter As Wpndatabase_SettingKey) As String
-    Dim ResultString As String
-    Select Case Parameter
-        Case skS_tickle: ResultString = "s:tickle"
-        Case skC_tile: ResultString = "c:tile"
-        Case skR_badge: ResultString = "r:badge"
-        Case skS_lock_toast: ResultString = "s:lock:toast"
-        Case skS_tile: ResultString = "s:tile"
-        Case skS_lock_badge: ResultString = "s:lock:badge"
-        Case skS_banner: ResultString = "s:banner"
-        Case skS_lock_tile: ResultString = "s:lock:tile"
-        Case skR_tile: ResultString = "r:tile"
-        Case skS_badge: ResultString = "s:badge"
-        Case skS_audio: ResultString = "s:audio"
-        Case skS_voip: ResultString = "s:voip"
-        Case skS_stopCloud: ResultString = "s:stopCloud"
-        Case skS_listenerEnabled: ResultString = "s:listenerEnabled"
-        Case skC_cloud: ResultString = "c:cloud"
-        Case skC_toast: ResultString = "c:toast"
-        Case skC_internet: ResultString = "c:internet"
-        Case skC_badge: ResultString = "c:badge"
-        Case skC_ringing: ResultString = "c:ringing"
-        Case skC_tickle: ResultString = "c:tickle"
-        Case skC_voip: ResultString = "c:voip"
-        Case skC_storage_toast: ResultString = "c:storage:toast"
-        Case skS_toast: ResultString = "s:toast"
-        Case skC_storage_tile: ResultString = "c:storage:tile"
-        Case skM_SecondaryTileMigrationComplete: ResultString = "m:SecondaryTileMigrationComplete"
-        Case skS_cycle_medium: ResultString = "s:cycle:medium"
-        Case skS_cycle_wide: ResultString = "s:cycle:wide"
-        Case skS_cycle_large: ResultString = "s:cycle:large"
-        Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
-    End Select
-
-    '結果を返す
-    対応表_Wpndatabase_SettingKey = ResultString
-End Function
-
+' [ SECTION ] SQL操作 - SELECT編
+'---------------------------------------------------------------------------------------------------
 '***************************************************************************************************
 '* 機能　　："AppUserModelID"を基に、[RecordId]を取得します。
 '---------------------------------------------------------------------------------------------------
 '* 返り値　："AppUserModelID"に基づく、[RecordId]
 '---------------------------------------------------------------------------------------------------
-'* 詳細説明：・同梱のDLLを経由して、"wpndatabase.db"を SQLite を使って取得します
+'* 詳細説明：・Windows10から標準搭載された`winsqlite3.dll`を経由して、"wpndatabase.db"を SQLite を使って取得します
 '            ・HandlerSettings の設定に必要です
 '***************************************************************************************************
 Private Function GetWpndatabase_HandlerID() As Long
-    'wpndatabase.db の絶対パスを取得
-    Dim TargetPath As String: TargetPath = Environ("LOCALAPPDATA") & 設定DB保存相対パス
-
     '[RecordId]を取得する SELECT 文を組む
-    Dim SQL_SELECT As String: SQL_SELECT = SELECT文生成("RecordId", "NotificationHandler", "PrimaryId", DecisionAppUserModelID(True))
+    Dim SQL_SELECT As String: SQL_SELECT = SELECT文生成("RecordId", "NotificationHandler", "PrimaryId", ToastConfig.AppUserModelID)
 
-    '実行して、RecordId を取得する(整数を前提)
-    GetWpndatabase_HandlerID = CLng(ExecuteSQLite(StrPtr(TargetPath), StrPtr(SQL_SELECT)))
+    '実行して、`RecordId`を取得する(整数を前提)
+    GetWpndatabase_HandlerID = ExecuteSQLite(SQL_SELECT)(1)("RecordId")
 End Function
 
 '***************************************************************************************************
@@ -4052,16 +4251,29 @@ End Function
 '* 返り値　："AppUserModelID"に基づく、[WNSID]
 '***************************************************************************************************
 Public Property Get GetWpndatabase_WNSId() As String
-    'wpndatabase.db の絶対パスを取得
-    Dim TargetPath As String: TargetPath = Environ("LOCALAPPDATA") & 設定DB保存相対パス
-
     '[WNSID]を取得する SELECT 文を組む
-    Dim SQL_SELECT As String: SQL_SELECT = SELECT文生成("WNSId", "NotificationHandler", "PrimaryId", DecisionAppUserModelID(True))
+    Dim SQL_SELECT As String: SQL_SELECT = SELECT文生成("WNSId", "NotificationHandler", "PrimaryId", ToastConfig.AppUserModelID)
 
-    '実行して、WNSID を取得する
-    GetWpndatabase_WNSId = ExecuteSQLite(StrPtr(TargetPath), StrPtr(SQL_SELECT))
+    '実行して、`WNSID`を取得する
+    GetWpndatabase_WNSId = ExecuteSQLite(SQL_SELECT)(1)("WNSId")
 End Property
 
+'***************************************************************************************************
+'* 機能　　："AppUserModelID"を基に、[HandlerType]を取得します。
+'---------------------------------------------------------------------------------------------------
+'* 返り値　："AppUserModelID"に基づく、[HandlerType]
+'***************************************************************************************************
+Public Property Get GetWpndatabase_HandlerType() As String
+    '"HandlerType"を取得する SELECT 文を組む
+    Dim SQL_SELECT As String: SQL_SELECT = SELECT文生成("HandlerType", "NotificationHandler", "PrimaryId", ToastConfig.AppUserModelID)
+
+    '実行して、`HandlerType`を取得する
+    GetWpndatabase_HandlerType = ExecuteSQLite(SQL_SELECT)(1)("HandlerType")
+End Property
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] 各種SQL操作 - UPDATE編
+'---------------------------------------------------------------------------------------------------
 '***************************************************************************************************
 '* 機能　　："AppUserModelID"を基に、[WNSId]を更新します。
 '---------------------------------------------------------------------------------------------------
@@ -4071,38 +4283,20 @@ End Property
 '* 詳細説明：カスタムな WNSId を指定する際は、({任意のWNSId}) = wsCustom と記述します
 '***************************************************************************************************
 Public Property Let SetWpndatabase_WNSId(Optional Custom_WNSId As String, WNSId As Wpndatabase_WNSId)
-    'wpndatabase.db の絶対パスを取得
-    Dim TargetPath As String: TargetPath = Environ("LOCALAPPDATA") & 設定DB保存相対パス
-
     'ID に紐づくParameterを設定
     Dim WNSId_string As String
     Select Case WNSId
-        Case wsSystem: WNSId_string = "System"
+        Case wsSystem:              WNSId_string = "System"
         Case wsNonImmersivePackage: WNSId_string = "NonImmersivePackage"
-        Case Else: WNSId_string = Custom_WNSId
+        Case wsNull:                WNSId_string = vbNullString
+        Case Else:                  WNSId_string = Custom_WNSId
     End Select
 
     '"WNSID"を設定する UPDATE 文を組む(空文字の場合は、NULL)
-    Dim SQL_UPDATE As String: SQL_UPDATE = UPDATE文生成("WNSId", WNSId_string, "NotificationHandler", "PrimaryId", DecisionAppUserModelID(True), , , True)
+    Dim SQL_UPDATE As String: SQL_UPDATE = UPDATE文生成("WNSId", WNSId_string, "NotificationHandler", "PrimaryId", ToastConfig.AppUserModelID, , , (WNSId = wsNull))
 
-    '実行して、WNSID を設定する
-    LatestExecuteSQLiteNum = ExecuteSQLite(StrPtr(TargetPath), StrPtr(SQL_UPDATE))
-End Property
-
-'***************************************************************************************************
-'* 機能　　："AppUserModelID"を基に、[HandlerType]を取得します。
-'---------------------------------------------------------------------------------------------------
-'* 返り値　："AppUserModelID"に基づく、[HandlerType]
-'***************************************************************************************************
-Public Property Get GetWpndatabase_HandlerType() As String
-    'wpndatabase.db の絶対パスを取得
-    Dim TargetPath As String: TargetPath = Environ("LOCALAPPDATA") & 設定DB保存相対パス
-
-    '"HandlerType"を取得する SELECT 文を組む
-    Dim SQL_SELECT As String: SQL_SELECT = SELECT文生成("HandlerType", "NotificationHandler", "PrimaryId", DecisionAppUserModelID(True))
-
-    '実行して、HandlerType を取得する
-    GetWpndatabase_HandlerType = ExecuteSQLite(StrPtr(TargetPath), StrPtr(SQL_SELECT))
+    '実行して、`WNSID`を設定し、更新件数を反映
+    LatestExecuteSQLiteNum = ExecuteSQLite(SQL_UPDATE)
 End Property
 
 '***************************************************************************************************
@@ -4111,56 +4305,50 @@ End Property
 '* 引数　  ：Wpndatabase_HandlerType  列挙型（列挙体）Enum：Wpndatabase_HandlerType
 '***************************************************************************************************
 Public Property Let SetWpndatabase_HandlerType(HandlerTypeMode As Wpndatabase_HandlerType)
-    'wpndatabase.db の絶対パスを取得
-    Dim TargetPath As String: TargetPath = Environ("LOCALAPPDATA") & 設定DB保存相対パス
-    
     '接頭辞
     Const HandlerType接頭辞 As String = "app:"
 
     'ID に紐づくParameterを設定
     Dim HandlerType_string As String
     Select Case HandlerTypeMode
-        Case htDesktop: HandlerType_string = HandlerType接頭辞 & "desktop"
-        Case htImmersive: HandlerType_string = HandlerType接頭辞 & "immersive"
-        Case htSystem: HandlerType_string = HandlerType接頭辞 & "system"
-        Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
+        Case htDesktop:     HandlerType_string = HandlerType接頭辞 & "desktop"
+        Case htImmersive:   HandlerType_string = HandlerType接頭辞 & "immersive"
+        Case htSystem:      HandlerType_string = HandlerType接頭辞 & "system"
+        Case Else:          Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
     End Select
 
     '"HandlerType"を設定する UPDATE 文を組む
-    Dim SQL_UPDATE As String: SQL_UPDATE = UPDATE文生成("HandlerType", HandlerType_string, "NotificationHandler", "PrimaryId", DecisionAppUserModelID(True))
+    Dim SQL_UPDATE As String: SQL_UPDATE = UPDATE文生成("HandlerType", HandlerType_string, "NotificationHandler", "PrimaryId", ToastConfig.AppUserModelID)
 
-    '実行して、HandlerType を設定する
-    LatestExecuteSQLiteNum = ExecuteSQLite(StrPtr(TargetPath), StrPtr(SQL_UPDATE))
+    '実行して、`HandlerType`を設定し、更新件数を反映
+    LatestExecuteSQLiteNum = ExecuteSQLite(SQL_UPDATE)
 End Property
 
 '***************************************************************************************************
 '* 機能　　：[HandlerId](NotificationHandler-[AppUserModelID]に紐づくやつ)から、[SettingKey]を基に、[Value]を取得します。
 '---------------------------------------------------------------------------------------------------
-'* 返り値　：論理値
+'* 返り値　：論理値 ※0=false,1=true
 '* 引数　  ：SettingKey     列挙型（列挙体）Enum：Wpndatabase_SettingKey
 '---------------------------------------------------------------------------------------------------
-'* 注意事項：SettingKey は、動的生成なので、存在しない SettingKey が来たら、False で INSERT文を実行します
+'* 注意事項：一部`SettingKey`は、動的生成なので、存在しない SettingKey が来たら、False で INSERT文を実行します
 '***************************************************************************************************
 Public Property Get Wpndatabase_SettingKeyValue(SettingKeyID As Wpndatabase_SettingKey) As Boolean
-    'wpndatabase.db の絶対パスを取得
-    Dim TargetPath As String: TargetPath = Environ("LOCALAPPDATA") & 設定DB保存相対パス
-    
-    '現在のこの Class で設定中の AppUserModelID を基に、HandlerId を特定します
+    '現在のこの Class で設定中の`AppUserModelID`を基に、`HandlerId`を特定します
     Dim TargetHandlerId As Long: TargetHandlerId = GetWpndatabase_HandlerID
 
     '[HandlerId]と[SettingKey]を基に、[Value]を取得する SELECT 文を組む
-    Dim SettingKeyName As String: SettingKeyName = 対応表_Wpndatabase_SettingKey(SettingKeyID)
+    Dim SettingKeyName As String: SettingKeyName = EnumToStringWpndatabase_SettingKey(SettingKeyID)
     Dim SQL_SELECT As String: SQL_SELECT = SELECT文生成("Value", "HandlerSettings", "HandlerId", CStr(TargetHandlerId), "SettingKey", SettingKeyName)
 
     '実行して、Value を取得
-    Dim SELECT結果 As String: SELECT結果 = ExecuteSQLite(StrPtr(TargetPath), StrPtr(SQL_SELECT))
-    
+    Dim SELECT結果 As Collection: Set SELECT結果 = ExecuteSQLite(SQL_SELECT)
+
     'もし何も得られない場合、そもそもdbにないので、INSERTで設定する。デフォルトは、false とします
-    If SELECT結果 = "" Then
-        LatestExecuteSQLiteNum = ExecuteSQLite(StrPtr(TargetPath), StrPtr(INSERT文生成_HandlerSettings(TargetHandlerId, SettingKeyName, False)))
+    If SELECT結果.Count = 0 Then
+        LatestExecuteSQLiteNum = ExecuteSQLite(INSERT文生成_HandlerSettings(TargetHandlerId, SettingKeyName, False))
         Wpndatabase_SettingKeyValue = False
     Else
-       Wpndatabase_SettingKeyValue = CBool(SELECT結果)
+       Wpndatabase_SettingKeyValue = CBool(SELECT結果(1)("Value"))
     End If
 End Property
 
@@ -4170,25 +4358,22 @@ End Property
 '* 引数　  ：SettingKey     列挙型（列挙体）Enum：Wpndatabase_SettingKey
 '            SetFlag        論理値
 '---------------------------------------------------------------------------------------------------
-'* 注意事項：SettingKey は、動的生成なので、存在しない SettingKey が来たら、SetFlag で INSERT文を実行します
+'* 注意事項：SettingKey は、動的生成なので、存在しない`SettingKey`が来たら、`SetFlag`で INSERT文を実行します
 '***************************************************************************************************
 Public Property Let Wpndatabase_SettingKeyValue(SettingKeyID As Wpndatabase_SettingKey, SetFlag As Boolean)
-    'wpndatabase.db の絶対パスを取得
-    Dim TargetPath As String: TargetPath = Environ("LOCALAPPDATA") & 設定DB保存相対パス
-    
     '現在のこの Class で設定中の AppUserModelID を基に、HandlerId を特定します
     Dim TargetHandlerId As Long: TargetHandlerId = GetWpndatabase_HandlerID
 
     '[HandlerId]と[SettingKey]を基に、[Value]を設定する UPDATE 文を組む
-    Dim SettingKeyName As String: SettingKeyName = 対応表_Wpndatabase_SettingKey(SettingKeyID)
+    Dim SettingKeyName As String: SettingKeyName = EnumToStringWpndatabase_SettingKey(SettingKeyID)
     Dim SQL_UPDATE As String: SQL_UPDATE = UPDATE文生成("Value", SetFlag * -1, "HandlerSettings", "HandlerId", CStr(TargetHandlerId), "SettingKey", SettingKeyName)
 
     '実行して、Value を設定する
-    LatestExecuteSQLiteNum = ExecuteSQLite(StrPtr(TargetPath), StrPtr(SQL_UPDATE))
-    
+    LatestExecuteSQLiteNum = ExecuteSQLite(SQL_UPDATE)
+
     'もし0件の場合、そもそもdbにないので、INSERTで設定する
     If LatestExecuteSQLiteNum = 0 Then
-        LatestExecuteSQLiteNum = ExecuteSQLite(StrPtr(TargetPath), StrPtr(INSERT文生成_HandlerSettings(TargetHandlerId, SettingKeyName, SetFlag)))
+        LatestExecuteSQLiteNum = ExecuteSQLite(INSERT文生成_HandlerSettings(TargetHandlerId, SettingKeyName, SetFlag))
     End If
 End Property
 
@@ -4197,149 +4382,232 @@ End Property
 '***************************************************************************************************
 '                               ■■■ レジストリ操作関連 ■■■
 '***************************************************************************************************
-'* 機能　　：一般権限領域のレジストリパスへパラメーターを登録します
 '---------------------------------------------------------------------------------------------------
-'* 引数　  ：aumid      AppUserModelID
-'            valueName  値の名称
-'            valueType  登録の型 (列挙型（列挙体）Enum：RegistryType)
-'            valueData  登録値
-'
-'* 返り値  ：結果コード
-'               0   成功
-'               2   見つかりません(削除の時に表れることがある)
-'              他   失敗
+' [ SECTION ] 実際にレジストリ操作します
 '---------------------------------------------------------------------------------------------------
-'* 詳細説明：こちらは、HKEY_CURRENT_USER 領域のため、VBA標準の機能で実装します。
 '***************************************************************************************************
-Private Function CurrentUserRegistryValue(ByVal 書き込み先 As ToastRegistryPathMode, ByVal AppUserModelID As String, ByVal valueName As String, ByVal valueType As RegistryType, ByVal valueData As String) As Long
-    ' レジストリハイブの定数
-    Const HKEY_CURRENT_USER As Long = &H80000001
+'* 機能　　：一般権限領域のレジストリパスのKeyValueを取得します
+'---------------------------------------------------------------------------------------------------
+'* 引数　  ：BasePath   レジストリのベースパス
+'            KeyName    値の名称
+'
+'* 返り値  ：引数に紐づく中身の値　※存在しない場合は、`Null`で返します
+'---------------------------------------------------------------------------------------------------
+'* 詳細説明：`HKEY_CURRENT_USER` 領域のため、VBA標準の機能で実装します。
+'***************************************************************************************************
+Private Property Get RegistryKeyValue(BasePath As String, KeyName As String) As Variant
+    Dim hKeyResult As LongPtr
+    Dim hr As Long
+    Dim dataSize As Long
+    Dim KeyType As Long
 
-    '必要な変数を用意
-    Dim wmiService As Object
-    Dim regProvider As Object
-    Dim strKeyPath As String
-    Dim lResult As Long
-    
-    ' 1. WMIサービスに接続
-    Set wmiService = GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\default")
-    Set regProvider = wmiService.Get("StdRegProv")
-    
-    ' 2. 一般権限で扱えるHKCU配下のフルパスを組み立てる
-    Select Case 書き込み先
-        Case ToastRegistryPathMode.NotificationsSettings: strKeyPath = "Software\Microsoft\Windows\CurrentVersion\Notifications\Settings\" & AppUserModelID
-        Case ToastRegistryPathMode.ClassesAppUserModelId: strKeyPath = "Software\Classes\AppUserModelId\" & AppUserModelID
-        Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
-    End Select
-    
-    ' 3. キーが存在しなければ作成する(※削除モードはしない)
-    If valueType > REG_Delete Then
-        lResult = regProvider.CreateKey(HKEY_CURRENT_USER, strKeyPath)
-        If lResult <> 0 Then
-            Debug.Print "キーの作成/オープンに失敗: " & strKeyPath
-    
-            CurrentUserRegistryValue = lResult
-            Exit Function
-        End If
+
+    ' --- [1] キーを開く（RegOpenKeyExW） ---
+    ' UTF-16版なので StrPtr でパスを直接渡します
+    hr = RegOpenKeyExW(HKEY_CURRENT_USER, StrPtr(BasePath), 0, KEY_QUERY_VALUE, hKeyResult)
+    If hr Then RegistryKeyValue = Null: LatestExecuteRegistry = hr: Exit Property
+
+    ' --- [2] データの「型」と「サイズ（バイト数）」を調べる ---
+    ' 第5引数に 0 を渡すことで、データ本体は読まずに、サイズ（dataSize）だけを調べます
+    hr = RegQueryValueExW(hKeyResult, StrPtr(KeyName), 0, KeyType, 0, dataSize)
+    If hr = 0 Then
+        ' --- [3] データ型に応じてメモリを確保し、本番の読み込みを実行 ---
+        Select Case KeyType
+            Case RegistryType.REG_SZ ' 【文字列（REG_SZ）の場合】
+                ' dataSizeはバイト数なので、2で割って「文字数分」のバッファを確保
+                Dim strBuf As String
+                strBuf = String$(dataSize \ 2, vbNullChar)
+
+                ' 本番の読み込み！
+                hr = RegQueryValueExW(hKeyResult, StrPtr(KeyName), 0, KeyType, StrPtr(strBuf), dataSize)
+                If hr = 0 Then
+                    ' 末尾のヌル文字（vbNullChar）を取り除いて変数に格納
+                    Dim nullPos As Long
+                    nullPos = InStr(strBuf, vbNullChar)
+                    If nullPos > 0 Then
+                        RegistryKeyValue = Left$(strBuf, nullPos - 1)
+                    Else
+                        RegistryKeyValue = strBuf
+                    End If
+                End If
+
+            Case RegistryType.REG_DWORD ' 【32bit数値（REG_DWORD）の場合】
+                Dim lngBuf As Long
+                ' 本番の読み込み！（Long変数の番地 VarPtr を渡して直接数字を書き込んでもらいます）
+                hr = RegQueryValueExW(hKeyResult, StrPtr(KeyName), 0, KeyType, VarPtr(lngBuf), dataSize)
+                If hr = 0 Then RegistryKeyValue = lngBuf
+
+            Case Else
+                ' バイナリなどの他の型は、今回の自動化では使わないのでNullにしておく
+                RegistryKeyValue = Null
+        End Select
+    Else
+        'Key自体がないときも`Null`
+        RegistryKeyValue = Null
     End If
 
-    ' 4. 値の型に応じて、適切なWMIメソッドを呼び出す
-    Select Case valueType
-        Case REG_DWORD: lResult = regProvider.SetDWORDValue(HKEY_CURRENT_USER, strKeyPath, valueName, CLng(valueData))
-        Case REG_SZ: lResult = regProvider.SetStringValue(HKEY_CURRENT_USER, strKeyPath, valueName, valueData)
-        Case REG_EXPAND_SZ: lResult = regProvider.SetExpandedStringValue(HKEY_CURRENT_USER, strKeyPath, valueName, valueData)
-        Case REG_Delete: lResult = regProvider.DeleteValue(HKEY_CURRENT_USER, strKeyPath, valueName)
-        Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
-    End Select
+    ' --- [4] キーを閉じる（お片付け） ---
+    RegCloseKey hKeyResult
 
-    '結果コードを返す
-    CurrentUserRegistryValue = lResult
-End Function
 
-'***************************************************************************************************
-'* 機能　　：レジストリ登録への簡単なプリセットを提供します
-'---------------------------------------------------------------------------------------------------
-'* 引数　  ：PresetID   列挙型（列挙体）Enum：RegistrySetting   ここで、登録したいIDを指定します。
-'            valueData  登録値
-'***************************************************************************************************
- Public Property Let PresetRegistry(PresetID As RegistrySetting, ByVal valueData As String)
-    Select Case PresetID
-        'コンピューター\HKEY_CURRENT_USER\Software\Classes\AppUserModelId 用
-        Case RegistrySetting.ShowInSettings: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "ShowInSettings", REG_DWORD, valueData)
-        Case RegistrySetting.DisplayName: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "DisplayName", REG_SZ, valueData)
-        Case RegistrySetting.IconUri: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "IconUri", REG_SZ, valueData)
-        Case RegistrySetting.IconBackgroundColor: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "IconBackgroundColor", REG_SZ, valueData)
-        Case RegistrySetting.CustomActivator: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "CustomActivator", REG_SZ, valueData)
-        
-        'コンピューター\HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings 用
-        '--wpndatabase.db 連携必須--
-        Case RegistrySetting.Enabled: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "Enabled", REG_DWORD, valueData)
-        Case RegistrySetting.ShowBanner: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "ShowBanner", REG_DWORD, valueData) '値0で、効果発揮
-        '--wpndatabase.db 連携不要--
-        Case RegistrySetting.SoundFile: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "SoundFile", REG_SZ, valueData) '値は空文字で、効果発揮
-        Case RegistrySetting.AllowContentAboveLock: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "AllowContentAboveLock", REG_DWORD, valueData)
-        Case RegistrySetting.Rank: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "Rank", REG_DWORD, valueData)
-        Case RegistrySetting.ShowInActionCenter: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "ShowInActionCenter", REG_DWORD, valueData) '値0で、効果発揮
-        Case RegistrySetting.AllowUrgentNotifications: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "AllowUrgentNotifications", REG_DWORD, valueData)
-
-        '未定義
-        Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
-    End Select
- End Property
-
-'***************************************************************************************************
-'* 機能　　：レジストリ削除の簡単なプリセットを提供します
-'---------------------------------------------------------------------------------------------------
-'* 引数　  ：PresetID   列挙型（列挙体）Enum：RegistrySetting   ここで、削除したいIDを指定します。
-'---------------------------------------------------------------------------------------------------
-'* 注意事項：この"hoge"に、意味はありません。何も使いません。インデックス不足エラー回避用です。
-'***************************************************************************************************
-Public Property Let PresetDelRegistry(PresetID As RegistrySetting)
-    'ダミー値
-    Const DummyValue As String = "hoge"
-
-    Select Case PresetID
-        'コンピューター\HKEY_CURRENT_USER\Software\Classes\AppUserModelId 用
-        Case RegistrySetting.ShowInSettings: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "ShowInSettings", REG_Delete, DummyValue)
-        Case RegistrySetting.DisplayName: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "DisplayName", REG_Delete, DummyValue)
-        Case RegistrySetting.IconUri: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "IconUri", REG_Delete, DummyValue)
-        Case RegistrySetting.IconBackgroundColor: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "IconBackgroundColor", REG_Delete, DummyValue)
-        Case RegistrySetting.CustomActivator: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.ClassesAppUserModelId, DecisionAppUserModelID(True), "CustomActivator", REG_Delete, DummyValue)
-        
-        'コンピューター\HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Notifications\Settings 用
-        '--wpndatabase.db 連携必須--
-        Case RegistrySetting.Enabled: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "Enabled", REG_Delete, DummyValue)
-        Case RegistrySetting.ShowBanner: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "ShowBanner", REG_Delete, DummyValue)
-        '--wpndatabase.db 連携不要--
-        Case RegistrySetting.SoundFile: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "SoundFile", REG_Delete, DummyValue)
-        Case RegistrySetting.AllowContentAboveLock: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "AllowContentAboveLock", REG_Delete, DummyValue)
-        Case RegistrySetting.Rank: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "Rank", REG_Delete, "hoge")
-        Case RegistrySetting.ShowInActionCenter: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "ShowInActionCenter", REG_Delete, DummyValue)
-        Case RegistrySetting.AllowUrgentNotifications: 最後に実行したレジストリ登録結果 = CurrentUserRegistryValue(ToastRegistryPathMode.NotificationsSettings, DecisionAppUserModelID(True), "AllowUrgentNotifications", REG_Delete, DummyValue)
-
-        '未定義
-        Case Else: Err.Raise Number:=vbObjectError + 2, Description:=vbObjectErrorID_0002
-    End Select
+    '実行結果を記録
+    LatestExecuteRegistry = hr
 End Property
 
 '***************************************************************************************************
-'* 機能　　：最後のレジストリ操作にて、ユーザーアカウント制御の反応を返します
+'* 機能　　：一般権限領域のレジストリパスのKeyValueを登録します
+'---------------------------------------------------------------------------------------------------
+'* 引数　  ：BasePath   レジストリのベースパス
+'            KeyName    値の名称
+'            KeyValue   書き込む値
+'---------------------------------------------------------------------------------------------------
+'* 詳細説明：・`HKEY_CURRENT_USER` 領域のため、VBA標準の機能で実装します
+'            ・`VarType`による動的判定を行ってます
+'* 注意事項：文字型だけど、数字で書き込む場合は、`KeyValue:=Cstr(123)`としてください
+'***************************************************************************************************
+Private Property Let RegistryKeyValue(BasePath As String, KeyName As String, KeyValue As Variant)
+    Dim hKeyResult As LongPtr
+    Dim hr As Long
+    Dim disposition As Long
+
+
+    ' --- [1] キーを開く、またはなければ新規追加（RegCreateKeyExW） ---
+    ' KEY_WRITE（書き込み・作成）権限で安全に開きます
+    hr = RegCreateKeyExW(HKEY_CURRENT_USER, StrPtr(BasePath), 0, 0, REG_OPTION_NON_VOLATILE, KEY_WRITE, 0, hKeyResult, disposition)
+    If hr Then LatestExecuteRegistry = hr: Exit Property
+
+    ' --- [2] データ型に応じて書き込みを実行（RegSetValueExW） ---
+    Select Case VarType(KeyValue)
+        Case vbString           ' 【文字列（REG_SZ）の書き込み】
+            Dim strVal As String
+            strVal = CStr(KeyValue)
+
+            ' 文字列の「バイト数」を計算する
+            ' (文字数 ＋ 末尾のヌル文字分1) × 2 ＝ バイト数（UTF-16形式）
+            Dim byteSize As Long
+            byteSize = (Len(strVal) + 1) * 2
+
+            ' 書き込み！
+            hr = RegSetValueExW(hKeyResult, StrPtr(KeyName), 0, RegistryType.REG_SZ, StrPtr(strVal), byteSize)
+
+        Case vbLong, vbInteger  ' 【32bit数値（REG_DWORD）の書き込み】
+            Dim lngVal As Long
+            lngVal = CLng(KeyValue)
+
+            ' 書き込み！（VarPtrで数値のメモリ番地を渡し、直に書き込んでもらいます）
+            hr = RegSetValueExW(hKeyResult, StrPtr(KeyName), 0, RegistryType.REG_DWORD, VarPtr(lngVal), 4)
+
+        Case Else
+            Err.Raise vbObjectError + 2, , vbObjectErrorID_0002
+    End Select
+
+    ' --- [3] キーを閉じる（お片付け） ---
+    RegCloseKey hKeyResult
+
+
+    '実行結果を記録
+    LatestExecuteRegistry = hr
+End Property
+
+'***************************************************************************************************
+'* 機能　　：一般権限領域のレジストリパスのKeyNameを削除します
+'---------------------------------------------------------------------------------------------------
+'* 引数　  ：BasePath   レジストリのベースパス
+'            KeyName    値の名称
+'---------------------------------------------------------------------------------------------------
+'* 詳細説明：`HKEY_CURRENT_USER` 領域のため、VBA標準の機能で実装します
+'* 注意事項：`KeyName`を省略すると、`BasePath`の中身ごと一瞬で丸ごと削除します
+'***************************************************************************************************
+Private Sub DelRegistryKey(BasePath As String, Optional KeyName As String)
+    Dim hKeyResult As LongPtr
+    Dim hr As Long
+
+    If StrPtr(KeyName) Then
+        ' --- [1] キーを開く ---
+        ' ※値を削除（変更）するには KEY_SET_VALUE 権限が必要です
+        hr = RegOpenKeyExW(HKEY_CURRENT_USER, StrPtr(BasePath), 0, KEY_SET_VALUE, hKeyResult)
+        If hr Then LatestExecuteRegistry = hr: Exit Sub
+
+        ' --- [2] 値を削除する（RegDeleteValueW） ---
+        hr = RegDeleteValueW(hKeyResult, StrPtr(KeyName))
+
+        ' --- [3] キーを閉じる（お片付け） ---
+        RegCloseKey hKeyResult
+    Else
+        ' RegDeleteTreeWを使えば、ハンドルを開く必要すらなく、一撃でフォルダごと消去できます！
+        hr = RegDeleteTreeW(HKEY_CURRENT_USER, StrPtr(BasePath))
+    End If
+
+
+    '実行結果を記録
+    LatestExecuteRegistry = hr
+End Sub
+
+'---------------------------------------------------------------------------------------------------
+' [ SECTION ] 設定値変更
+'---------------------------------------------------------------------------------------------------
+'***************************************************************************************************
+'* 機能　　：`Software\Classes\AppUserModelId\{AppUserModelId}`領域への登録/更新/削除を行います
+'---------------------------------------------------------------------------------------------------
+'* 引数　  ：PresetID   列挙型（列挙体）Enum：ClassesAppUserModelId ここで、登録したいIDを指定します。
+'            valueData  登録値
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：・変更スコープは、ログイン中のユーザーのみです
+'            ・`Null`指定で、削除とします
+'***************************************************************************************************
+Public Property Let ChangeSetting_ClassesAppUserModelId(KeyID As ClassesAppUserModelId, valueData As Variant)
+    'KeyNameを取得
+    Dim KeyName As String: KeyName = EnumToStringRegistryClassesAppUserModelId(KeyID)
+
+    '操作モード判定
+    If IsNull(valueData) Then
+        '削除
+        DelRegistryKey "Software\Classes\AppUserModelId\" & ToastConfig.AppUserModelID, KeyName
+    Else
+        '登録
+        RegistryKeyValue("Software\Classes\AppUserModelId\" & ToastConfig.AppUserModelID, KeyName) = valueData
+    End If
+End Property
+
+'***************************************************************************************************
+'* 機能　　：`Software\Microsoft\Windows\CurrentVersion\Notifications\Settings\{AppUserModelId}`領域への登録/更新/削除を行います
+'---------------------------------------------------------------------------------------------------
+'* 引数　  ：PresetID   列挙型（列挙体）Enum：NotificationsSettings ここで、登録したいIDを指定します。
+'            valueData  登録値
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：・変更スコープは、ログイン中のユーザーのみです
+'            ・`Null`指定で、削除とします
+'***************************************************************************************************
+Public Property Let ChangeSetting_NotificationsSettings(KeyID As NotificationsSettings, valueData As Variant)
+    'KeyNameを取得
+    Dim KeyName As String: KeyName = EnumToStringRegistryNotificationsSettings(KeyID)
+
+    '操作モード判定
+    If IsNull(valueData) Then
+        '削除
+        DelRegistryKey "Software\Microsoft\Windows\CurrentVersion\Notifications\Settings\" & ToastConfig.AppUserModelID, KeyName
+    Else
+        '登録
+        RegistryKeyValue("Software\Microsoft\Windows\CurrentVersion\Notifications\Settings\" & ToastConfig.AppUserModelID, KeyName) = valueData
+    End If
+End Property
+
+'***************************************************************************************************
+'* 機能　　：最後のレジストリ操作の、実行結果を返します
 '---------------------------------------------------------------------------------------------------
 '* 返り値  ：結果コード
 '                2：キーが見つかりません
 '                0：成功
-'               -1：ユーザーアカウント制御にて許可しました。または、既に管理者権限状態で実行されたがうまく行ってない
-'               -2：ユーザーアカウント制御にて拒否しました
 '               他：エラーコード
 '***************************************************************************************************
 Public Property Get LatestRegistryCode() As Long
-    LatestRegistryCode = 最後に実行したレジストリ登録結果
+    LatestRegistryCode = LatestExecuteRegistry
 End Property
 
 
 
 '***************************************************************************************************
-'                       ■■■ インスタンス生成時に自動で設定する内容 ■■■
+'                       ■■■ インスタンス生成/破棄時に自動で設定する内容 ■■■
 '***************************************************************************************************
 '* 機能　　：・トーストのヘッダー情報を設定します。不要ならコメントアウトしてください。デフォルトで以下にしています
 '               Header_ID           このExcelのファイルフルパス
@@ -4386,8 +4654,12 @@ Private Sub Class_Initialize()
     'WinRT-API のインスタンス準備
     Set WinRT_HStringCache = CreateObject("Scripting.Dictionary")
     WinRT_InitCache
+
+    '`wpndatabase.db`の絶対パスを取得
+    ToastNotification_SettingPathDB = Environ("LOCALAPPDATA") & "\Microsoft\Windows\Notifications\wpndatabase.db"
 End Sub
 
 Private Sub Class_Terminate()
+    'WinRT-API のインスタンス破棄
     WinRT_ReleaseCache
 End Sub
