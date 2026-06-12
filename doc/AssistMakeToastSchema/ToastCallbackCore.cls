@@ -28,9 +28,9 @@ Private Declare PtrSafe Function DispCallFunc Lib "oleaut32.dll" ( _
     ByVal cActuals As Long, ByRef prgvt As Any, _
     ByRef prgpvarg As Any, ByRef pvargResult As Any) As Long
 Private Declare PtrSafe Sub RtlMoveMemory Lib "kernel32" ( _
-    ByVal dest As LongPtr, ByVal src As LongPtr, ByVal Length As LongPtr)
+    ByVal dest As LongPtr, ByVal src As LongPtr, ByVal length As LongPtr)
 Private Declare PtrSafe Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" ( _
-    ByRef dest As Any, ByRef src As Any, ByVal Length As LongPtr)
+    ByRef dest As Any, ByRef src As Any, ByVal length As LongPtr)
 Private Declare PtrSafe Function VirtualAlloc Lib "kernel32" ( _
     ByVal lpAddress As LongPtr, ByVal dwSize As LongPtr, _
     ByVal flAllocationType As Long, ByVal flProtect As Long) As LongPtr

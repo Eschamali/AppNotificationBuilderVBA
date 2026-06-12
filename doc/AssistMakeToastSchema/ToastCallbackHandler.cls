@@ -27,12 +27,12 @@ Private Declare PtrSafe Function DispCallFunc Lib "oleaut32.dll" ( _
 Private Declare PtrSafe Function IIDFromString Lib "ole32.dll" ( _
     ByVal lpsz As LongPtr, ByRef lpiid As Any) As Long
 Private Declare PtrSafe Function WindowsGetStringRawBuffer Lib "combase.dll" ( _
-    ByVal hstring As LongPtr, ByRef Length As Long) As LongPtr
+    ByVal hstring As LongPtr, ByRef length As Long) As LongPtr
 Private Declare PtrSafe Function WindowsDeleteString Lib "combase.dll" ( _
     ByVal hstring As LongPtr) As Long
 Private Declare PtrSafe Function GetCurrentProcessId Lib "kernel32" () As Long
 Private Declare PtrSafe Sub RtlMoveMemory Lib "kernel32" ( _
-    Destination As Any, Source As Any, ByVal Length As LongPtr)
+    Destination As Any, Source As Any, ByVal length As LongPtr)
 
 #If Win64 Then
     Private Const WinRT_vbPtr As Integer = 20
