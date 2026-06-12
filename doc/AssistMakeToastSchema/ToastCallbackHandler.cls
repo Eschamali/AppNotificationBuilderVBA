@@ -320,11 +320,8 @@ Private Sub RunExcelMacro(ByVal groupInfo As String, ByVal macroName As String, 
         qualifiedName = macroName
     End If
 
-    If userInputs Is Nothing Then
-        Application.Run qualifiedName
-    Else
-        Application.Run qualifiedName, userInputs
-    End If
+
+    Application.Run qualifiedName, userInputs
 End Sub
 
 Private Sub ParseGroupInfo(ByVal groupInfo As String, ByRef bookName As String, ByRef targetPid As Long)
