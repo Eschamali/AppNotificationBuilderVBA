@@ -379,6 +379,8 @@ Private WinRT_CachedNotifierCollectionId As String
 Private WinRT_pCachedNotificationData As LongPtr
 Private WinRT_CachedDataTag As String
 Private WinRT_CachedDataGroup As String
+Private WinRT_LastAppliedBinding As WinRT_DataBinding
+Private WinRT_LastAppliedBindingReady As Boolean
 
 '---------------------------------------------------------------------------------------------------
 ' [ SECTION ] WinRT-APIに関する主要な定義
@@ -2418,16 +2420,65 @@ Private Sub WinRT_ApplyFullBindingToMap(ByVal pMap As LongPtr, ByRef Binding As 
         If StrPtr(.TitleText) Then WinRT_InsertMapValue pMap, DataBindingTopText_Title, .TitleText
         If StrPtr(.ContentsText) Then WinRT_InsertMapValue pMap, DataBindingTopText_Body, .ContentsText
         If StrPtr(.AttributionText) Then WinRT_InsertMapValue pMap, DataBindingTopText_Attribute, .AttributionText
-        hasProgress = (StrPtr(.ProgressStatus) > 0)
+        hasProgress = WinRT_DataBindingHasProgress(Binding)
         If hasProgress Then
             If StrPtr(.ProgressTitle) Then WinRT_InsertMapValue pMap, DataBindingProgress_Title, .ProgressTitle
             WinRT_InsertMapValue pMap, DataBindingProgress_Status, .ProgressStatus
-            If .ProgressValue < 0 Then
-                WinRT_InsertMapValue pMap, DataBindingProgress_Value, "Indeterminate"
-            Else
-                WinRT_InsertMapValue pMap, DataBindingProgress_Value, .ProgressValue
-            End If
+            WinRT_InsertMapValue pMap, DataBindingProgress_Value, WinRT_ProgressValueAsMapString(.ProgressValue)
             If StrPtr(.ProgressValueStringOverride) Then WinRT_InsertMapValue pMap, DataBindingProgress_ValueString, .ProgressValueStringOverride
+        End If
+    End With
+End Sub
+
+Private Function WinRT_DataBindingHasProgress(ByRef Binding As WinRT_DataBinding) As Boolean
+    WinRT_DataBindingHasProgress = (StrPtr(Binding.ProgressStatus) > 0)
+End Function
+
+Private Function WinRT_ProgressValueAsMapString(ByVal ProgressValue As Double) As String
+    If ProgressValue < 0 Then
+        WinRT_ProgressValueAsMapString = "Indeterminate"
+    Else
+        WinRT_ProgressValueAsMapString = CStr(ProgressValue)
+    End If
+End Function
+
+Private Sub WinRT_ClearLastAppliedBinding()
+    WinRT_LastAppliedBindingReady = False
+End Sub
+
+Private Sub WinRT_SaveLastAppliedBinding(ByRef Binding As WinRT_DataBinding)
+    WinRT_LastAppliedBinding = Binding
+    WinRT_LastAppliedBindingReady = True
+End Sub
+
+Private Function WinRT_BindingProgressModeChanged(ByRef Binding As WinRT_DataBinding, ByRef LastBinding As WinRT_DataBinding) As Boolean
+    WinRT_BindingProgressModeChanged = (WinRT_DataBindingHasProgress(Binding) <> WinRT_DataBindingHasProgress(LastBinding))
+End Function
+
+Private Sub WinRT_InsertMapValueIfChanged(ByVal pMap As LongPtr, ByVal key As String, ByVal newVal As String, ByVal oldVal As String)
+    If StrComp(newVal, oldVal, vbBinaryCompare) <> 0 Then
+        WinRT_InsertMapValue pMap, key, newVal
+    End If
+End Sub
+
+Private Sub WinRT_ApplyDeltaBindingToMap(ByVal pMap As LongPtr, ByRef Binding As WinRT_DataBinding, ByRef LastBinding As WinRT_DataBinding)
+    Dim progressValueText As String
+    Dim lastProgressValueText As String
+
+    With Binding
+        WinRT_InsertMapValueIfChanged pMap, DataBindingTopText_Title, .TitleText, LastBinding.TitleText
+        WinRT_InsertMapValueIfChanged pMap, DataBindingTopText_Body, .ContentsText, LastBinding.ContentsText
+        WinRT_InsertMapValueIfChanged pMap, DataBindingTopText_Attribute, .AttributionText, LastBinding.AttributionText
+
+        If WinRT_DataBindingHasProgress(Binding) Then
+            WinRT_InsertMapValueIfChanged pMap, DataBindingProgress_Title, .ProgressTitle, LastBinding.ProgressTitle
+            WinRT_InsertMapValueIfChanged pMap, DataBindingProgress_Status, .ProgressStatus, LastBinding.ProgressStatus
+
+            progressValueText = WinRT_ProgressValueAsMapString(.ProgressValue)
+            lastProgressValueText = WinRT_ProgressValueAsMapString(LastBinding.ProgressValue)
+            WinRT_InsertMapValueIfChanged pMap, DataBindingProgress_Value, progressValueText, lastProgressValueText
+
+            WinRT_InsertMapValueIfChanged pMap, DataBindingProgress_ValueString, .ProgressValueStringOverride, LastBinding.ProgressValueStringOverride
         End If
     End With
 End Sub
@@ -2440,6 +2491,7 @@ Private Sub WinRT_ReleaseCachedNotificationData()
     End If
     WinRT_CachedDataTag = vbNullString
     WinRT_CachedDataGroup = vbNullString
+    WinRT_ClearLastAppliedBinding
     On Error GoTo 0
 End Sub
 
@@ -2450,11 +2502,16 @@ Private Function WinRT_NotificationDataCacheMatches(ByVal Tag As String, ByVal G
 End Function
 
 Private Sub WinRT_StoreCachedNotificationData(ByVal pData As LongPtr, ByVal Tag As String, ByVal Group As String)
-    WinRT_ReleaseCachedNotificationData
+    On Error Resume Next
     If pData = 0 Then Exit Sub
+    If WinRT_pCachedNotificationData <> 0 And WinRT_pCachedNotificationData <> pData Then
+        WinRT_CallComMethod WinRT_pCachedNotificationData, VT_RELEASE, vbLong
+        WinRT_ClearLastAppliedBinding
+    End If
     WinRT_pCachedNotificationData = pData
     WinRT_CachedDataTag = Tag
     WinRT_CachedDataGroup = Group
+    On Error GoTo 0
 End Sub
 
 Private Sub WinRT_ReleaseCachedUpdateObjects()
@@ -2478,6 +2535,7 @@ End Sub
 '---------------------------------------------------------------------------------------------------
 '* 処理概要：キャッシュ済み NotificationData があれば RoActivateInstance を省略し、
 '            SequenceNumber と Values マップのみ更新して UpdateWithTagAndGroup を呼び出します。
+'            Update 時は前回値と比較し、変化したキーのみ IMap.Insert します。
 '***************************************************************************************************
 Private Function WinRT_UpdateToastNotification(Binding As WinRT_DataBinding) As Long
     Dim pNotifier2 As LongPtr
@@ -2499,7 +2557,7 @@ Private Function WinRT_UpdateToastNotification(Binding As WinRT_DataBinding) As 
 
     If WinRT_NotificationDataCacheMatches(ToastConfig.Tag, ToastConfig.Group) Then
         pData = WinRT_pCachedNotificationData
-        WinRT_ApplyBindingToNotificationData pData, Binding
+        WinRT_ApplyBindingToNotificationData pData, Binding, True
     Else
         pData = WinRT_CreateNotificationData(Binding)
         If pData = 0 Then Err.Raise 513, , "CreateNotificationData failed."
@@ -3272,9 +3330,12 @@ End Function
 '---------------------------------------------------------------------------------------------------
 '***************************************************************************************************
 '* 機能　　：既存 NotificationData にバインディング値を反映します（RoActivateInstance は呼びません）。
+'---------------------------------------------------------------------------------------------------
+'* 引数　　：useDelta    True のとき前回反映値と比較し、変化したキーのみ Insert します。
 '***************************************************************************************************
-Private Sub WinRT_ApplyBindingToNotificationData(ByVal pData As LongPtr, ByRef Binding As WinRT_DataBinding)
+Private Sub WinRT_ApplyBindingToNotificationData(ByVal pData As LongPtr, ByRef Binding As WinRT_DataBinding, Optional ByVal useDelta As Boolean = False)
     Dim pMap As LongPtr
+    Dim applyFull As Boolean
 
     If pData = 0 Then Exit Sub
     If Not WinRT_DataBindingHasContent(Binding) Then Exit Sub
@@ -3286,7 +3347,19 @@ Private Sub WinRT_ApplyBindingToNotificationData(ByVal pData As LongPtr, ByRef B
     WinRT_CallComMethod pData, 6, vbLong, WinRT_vbPtr, VarPtr(pMap)
     If pMap = 0 Then Exit Sub
 
-    WinRT_ApplyFullBindingToMap pMap, Binding
+    applyFull = True
+    If useDelta And WinRT_LastAppliedBindingReady Then
+        If Not WinRT_BindingProgressModeChanged(Binding, WinRT_LastAppliedBinding) Then
+            applyFull = False
+            WinRT_ApplyDeltaBindingToMap pMap, Binding, WinRT_LastAppliedBinding
+        End If
+    End If
+
+    If applyFull Then
+        WinRT_ApplyFullBindingToMap pMap, Binding
+    End If
+
+    WinRT_SaveLastAppliedBinding Binding
     WinRT_CallComMethod pMap, VT_RELEASE, vbLong
 End Sub
 
