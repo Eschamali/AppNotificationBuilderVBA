@@ -371,6 +371,11 @@ Private WinRT_pBadgeManagerStatics As LongPtr
 Private WinRT_pBadgeNotificationFactory As LongPtr
 Private WinRT_HStringCache As Object
 
+' Update ホットパス用セッションキャッシュ（Defender 対策: COM オブジェクト再生成を抑制）
+Private WinRT_pCachedNotifier2 As LongPtr
+Private WinRT_CachedNotifierAppId As String
+Private WinRT_CachedNotifierCollectionId As String
+
 '---------------------------------------------------------------------------------------------------
 ' [ SECTION ] WinRT-APIに関する主要な定義
 '---------------------------------------------------------------------------------------------------
@@ -2373,6 +2378,67 @@ Cleanup:
 End Sub
 
 '***************************************************************************************************
+'* 機能　　：Update ホットパス用 IToastNotifier2 をセッションキャッシュから取得します。
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：AppUserModelID / CollectionID が変わった場合はキャッシュを破棄して再取得します。
+'***************************************************************************************************
+Private Function WinRT_GetCachedNotifier2(ByVal AppUserModelID As String, ByVal CollectionID As String) As LongPtr
+    Dim pNotifier As LongPtr
+
+    If WinRT_pCachedNotifier2 <> 0 Then
+        If StrComp(WinRT_CachedNotifierAppId, AppUserModelID, vbBinaryCompare) = 0 _
+            And StrComp(WinRT_CachedNotifierCollectionId, CollectionID, vbBinaryCompare) = 0 Then
+            WinRT_GetCachedNotifier2 = WinRT_pCachedNotifier2
+            Exit Function
+        End If
+        WinRT_ReleaseCachedUpdateObjects
+    End If
+
+    pNotifier = WinRT_CreateToastNotifier(AppUserModelID, CollectionID)
+    If pNotifier = 0 Then Exit Function
+
+    WinRT_CallComMethod pNotifier, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidNotifier2), WinRT_vbPtr, VarPtr(WinRT_pCachedNotifier2)
+    WinRT_CallComMethod pNotifier, VT_RELEASE, vbLong
+
+    If WinRT_pCachedNotifier2 <> 0 Then
+        WinRT_CachedNotifierAppId = AppUserModelID
+        WinRT_CachedNotifierCollectionId = CollectionID
+    End If
+    WinRT_GetCachedNotifier2 = WinRT_pCachedNotifier2
+End Function
+
+Private Sub WinRT_ApplyFullBindingToMap(ByVal pMap As LongPtr, ByRef Binding As WinRT_DataBinding)
+    Dim hasProgress As Boolean
+    With Binding
+        If StrPtr(.TitleText) Then WinRT_InsertMapValue pMap, DataBindingTopText_Title, .TitleText
+        If StrPtr(.ContentsText) Then WinRT_InsertMapValue pMap, DataBindingTopText_Body, .ContentsText
+        If StrPtr(.AttributionText) Then WinRT_InsertMapValue pMap, DataBindingTopText_Attribute, .AttributionText
+        hasProgress = (StrPtr(.ProgressStatus) > 0)
+        If hasProgress Then
+            If StrPtr(.ProgressTitle) Then WinRT_InsertMapValue pMap, DataBindingProgress_Title, .ProgressTitle
+            WinRT_InsertMapValue pMap, DataBindingProgress_Status, .ProgressStatus
+            If .ProgressValue < 0 Then
+                WinRT_InsertMapValue pMap, DataBindingProgress_Value, "Indeterminate"
+            Else
+                WinRT_InsertMapValue pMap, DataBindingProgress_Value, .ProgressValue
+            End If
+            If StrPtr(.ProgressValueStringOverride) Then WinRT_InsertMapValue pMap, DataBindingProgress_ValueString, .ProgressValueStringOverride
+        End If
+    End With
+End Sub
+
+Private Sub WinRT_ReleaseCachedUpdateObjects()
+    On Error Resume Next
+    If WinRT_pCachedNotifier2 <> 0 Then
+        WinRT_CallComMethod WinRT_pCachedNotifier2, VT_RELEASE, vbLong
+        WinRT_pCachedNotifier2 = 0
+    End If
+    WinRT_CachedNotifierAppId = vbNullString
+    WinRT_CachedNotifierCollectionId = vbNullString
+    On Error GoTo 0
+End Sub
+
+'***************************************************************************************************
 '* 機能　　：表示中のトーストを Tag + Group で特定し、NotificationData で内容を更新します。
 '---------------------------------------------------------------------------------------------------
 '* 返り値　：NotificationUpdateResult（0=Succeeded, 1=Failed, 2=NotificationNotFound）
@@ -2383,7 +2449,6 @@ End Sub
 '            事前に同じ Tag/Group で Show した通知が存在しないと NotificationNotFound になります。
 '***************************************************************************************************
 Private Function WinRT_UpdateToastNotification(Binding As WinRT_DataBinding) As Long
-    Dim pNotifier As LongPtr
     Dim pNotifier2 As LongPtr
     Dim pData As LongPtr
     Dim hStrTag As LongPtr
@@ -2398,34 +2463,28 @@ Private Function WinRT_UpdateToastNotification(Binding As WinRT_DataBinding) As 
         Binding.SequenceNumber = WinRT_NextToastDataSequence()
     End If
 
-    ' IToastNotifier → IToastNotifier2（UpdateWithTagAndGroup は v2 専用）
-    pNotifier = WinRT_CreateToastNotifier(ToastConfig.AppUserModelID, ToastConfig.CollectionID)
-    If pNotifier = 0 Then Err.Raise 513, , "CreateToastNotifier failed."
-
-    WinRT_CallComMethod pNotifier, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidNotifier2), WinRT_vbPtr, VarPtr(pNotifier2)
-    If pNotifier2 = 0 Then Err.Raise 513, , "QueryInterface IToastNotifier2 failed."
+    pNotifier2 = WinRT_GetCachedNotifier2(ToastConfig.AppUserModelID, ToastConfig.CollectionID)
+    If pNotifier2 = 0 Then Err.Raise 513, , "CreateToastNotifier failed."
 
     pData = WinRT_CreateNotificationData(Binding)
     If pData = 0 Then Err.Raise 513, , "CreateNotificationData failed."
 
-    ' Tag + Group で既存通知を特定して中身だけ差し替え
     hStrTag = WinRT_CachedHString(ToastConfig.Tag)
     hStrGroup = WinRT_CachedHString(ToastConfig.Group)
     updateResult = 0
     WinRT_CallComMethod pNotifier2, VT_IToastNotifier2_UpdateWithTagAndGroup, vbLong, WinRT_vbPtr, pData, WinRT_vbPtr, hStrTag, WinRT_vbPtr, hStrGroup, WinRT_vbPtr, VarPtr(updateResult)
 
     WinRT_UpdateToastNotification = updateResult
+    WinRT_CallComMethod pData, VT_RELEASE, vbLong
+    Exit Function
 
 Cleanup:
     If Err.Number <> 0 Then
         If Err.Source = "" Then Err.Raise Err.Number, "WinRT_UpdateToastNotification", Err.Description
         WinRT_UpdateToastNotification = Err.Number
     End If
-    ' COM 参照カウントを戻す（メモリリーク防止）
     On Error Resume Next
     If pData <> 0 Then WinRT_CallComMethod pData, VT_RELEASE, vbLong
-    If pNotifier2 <> 0 Then WinRT_CallComMethod pNotifier2, VT_RELEASE, vbLong
-    If pNotifier <> 0 Then WinRT_CallComMethod pNotifier, VT_RELEASE, vbLong
     On Error GoTo 0
 End Function
 
@@ -3217,35 +3276,7 @@ Private Function WinRT_CreateNotificationData(ByRef Binding As WinRT_DataBinding
         Exit Function
     End If
 
-    'データバイディング設定
-    With Binding
-        '---- 最上位テキスト要素 ----
-        If StrPtr(.TitleText) Then WinRT_InsertMapValue pMap, DataBindingTopText_Title, .TitleText
-        If StrPtr(.ContentsText) Then WinRT_InsertMapValue pMap, DataBindingTopText_Body, .ContentsText
-        If StrPtr(.AttributionText) Then WinRT_InsertMapValue pMap, DataBindingTopText_Attribute, .AttributionText
-
-        '---- プログレス要素 ----
-        If hasProgress Then
-            'タイトル属性
-            If StrPtr(.ProgressTitle) Then WinRT_InsertMapValue pMap, DataBindingProgress_Title, .ProgressTitle
-
-            '進捗ステータス属性　※ドキュメント上、必須項目
-            WinRT_InsertMapValue pMap, DataBindingProgress_Status, .ProgressStatus
-
-            '純粋な進捗値
-            If Binding.ProgressValue < 0 Then
-                '負の場合は、不確定進捗(マーキー)として設定
-                WinRT_InsertMapValue pMap, DataBindingProgress_Value, "Indeterminate"
-            Else
-                '進捗値(0~1.0)
-                WinRT_InsertMapValue pMap, DataBindingProgress_Value, .ProgressValue
-            End If
-
-            '進捗値の代替表現
-            '※未指定の場合は、Windows側の既定書式に委ねます。現時点では、「70%」といったパーセント表記になります
-            If StrPtr(.ProgressValueStringOverride) Then WinRT_InsertMapValue pMap, DataBindingProgress_ValueString, .ProgressValueStringOverride
-        End If
-    End With
+    WinRT_ApplyFullBindingToMap pMap, Binding
 
     WinRT_CallComMethod pMap, VT_RELEASE, vbLong   ' マップだけ解放（pData は呼び出し側が Release）
 
@@ -3866,6 +3897,7 @@ End Sub
 '* 呼び出し：WinRT_Shutdown / Class_Terminate から使用。
 '***************************************************************************************************
 Private Sub WinRT_ReleaseCache()
+    WinRT_ReleaseCachedUpdateObjects
     WinRT_ReleaseHStringCache
     ' 各 Factory の参照カウントを 1 ずつ戻す
     On Error Resume Next
@@ -4647,6 +4679,9 @@ Private Sub Class_Initialize()
     'WinRT-API のインスタンス準備
     Set WinRT_HStringCache = CreateObject("Scripting.Dictionary")
     WinRT_InitCache
+
+    ' COM デリゲートを事前構築（初回 Show の EnsureDelegates 遅延を分散）
+    ToastCallbackCore.PrewarmDelegates
 
     '`wpndatabase.db`の絶対パスを取得
     ToastNotification_SettingPathDB = Environ("LOCALAPPDATA") & "\Microsoft\Windows\Notifications\wpndatabase.db"

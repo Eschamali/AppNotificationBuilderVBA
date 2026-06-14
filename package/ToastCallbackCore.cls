@@ -12,14 +12,17 @@ Option Explicit
 ' =============================================================================
 ' ToastCallbackCore.cls
 ' トースト COM デリゲートの vtable / x64 サンク管理
+' 関数アドレスは ITypeInfo (BuildFuncPtrCache) で取得（固定 slot より安全）
+' VirtualAlloc 領域への書込は MemLongPtr（起動時のみ・Defender 対策）
+' COM コールバック内の GUID 読取は CopyMemory（PointerAccessor は VBE 非安全）
 ' =============================================================================
 #If Win64 Then
     Private Const WinRT_vbPtr As Integer = vbLongLong
-    Private Const vbLongPtr   As Integer = vbLongLong
+    Private Const vbLongPtr As Integer = vbLongLong
+    Private Const NullPtr As LongLong = 0^
+    Private Const PtrSize As Long = 8
 #Else
     #Error "64 ビット VBA 専用"
-    Private Const WinRT_vbPtr As Integer = vbLong
-    Private Const vbLongPtr   As Integer = vbLong
 #End If
 
 Private Declare PtrSafe Function DispCallFunc Lib "oleaut32.dll" ( _
@@ -57,6 +60,11 @@ Private Const WRT_DELEGATE_DISMISSED As Long = 1
 Private Const WRT_DELEGATE_FAILED As Long = 2
 Private Const WRT_DELEGATE_COUNT As Long = 3
 
+Private Const THUNK_SIZE As Long = 56
+Private Const DELEGATE_BLK_SIZE As Long = 96
+Private Const FAKE_OBJ_SIZE As Long = 8
+Private Const MEM_POOL_SIZE As Long = 512
+
 Private Const WinRT_IID_IUnknown As String = "{00000000-0000-0000-C000-000000000046}"
 Private Const WinRT_IID_TypedEventHandler_Activated As String = "{AB54DE2D-97D9-5528-B6AD-105AFE156530}"
 Private Const WinRT_IID_TypedEventHandler_Dismissed As String = "{61C2402F-0ED0-5A18-AB69-59F4AA99A368}"
@@ -65,6 +73,29 @@ Private Const WinRT_IID_TypedEventHandler_Failed As String = "{95E3E803-C969-5E3
 Private Const WRT_S_OK As Long = 0
 Private Const WRT_E_NOINTERFACE As Long = &H80004002
 
+Private Enum SAFEARRAY_FEATURES
+    FADF_AUTO = &H1
+    FADF_FIXEDSIZE = &H10
+End Enum
+
+Private Type SAFEARRAYBOUND
+    cElements As Long
+    lLbound As Long
+End Type
+
+Private Type SAFEARRAY_1D
+    cDims As Integer
+    fFeatures As Integer
+    cbElements As Long
+    cLocks As Long
+    pvData As LongPtr
+    rgsabound0 As SAFEARRAYBOUND
+End Type
+
+Private Type PointerAccessor
+    arr() As LongPtr
+    sa As SAFEARRAY_1D
+End Type
 
 Private Type WinRT_GUID
     Data1 As Long
@@ -124,11 +155,11 @@ Private Type FUNCDESC
     padding3 As Long
 End Type
 
-
 Private m_Handler As ToastCallbackHandler
 Private m_funcPtrsCore As Object
 Private m_funcPtrsHandler As Object
 
+Private m_pMemPool As LongPtr
 Private m_pThunkQI As LongPtr
 Private m_pThunkAR As LongPtr
 Private m_pThunkRelease As LongPtr
@@ -141,10 +172,6 @@ Private m_iidUnknown As WinRT_GUID
 Private m_DelegatesReady As Boolean
 
 
-' =============================================================================
-' ライフサイクル
-' =============================================================================
-
 Private Sub Class_Initialize()
     Set m_Handler = New ToastCallbackHandler
     Set m_funcPtrsCore = CreateObject("Scripting.Dictionary")
@@ -154,23 +181,27 @@ Private Sub Class_Initialize()
 End Sub
 
 Private Sub Class_Terminate()
+    If m_pMemPool <> 0 Then
+        VirtualFree m_pMemPool, 0, MEM_RELEASE
+        m_pMemPool = 0
+    End If
+    m_pThunkQI = 0
+    m_pThunkAR = 0
+    m_pThunkRelease = 0
     Dim i As Long
     For i = 0 To WRT_DELEGATE_COUNT - 1
-        If m_pObject(i) <> 0 Then VirtualFree m_pObject(i), 0, MEM_RELEASE: m_pObject(i) = 0
-        If m_pVtblBlock(i) <> 0 Then VirtualFree m_pVtblBlock(i), 0, MEM_RELEASE: m_pVtblBlock(i) = 0
+        m_pObject(i) = 0
+        m_pVtblBlock(i) = 0
     Next i
-    If m_pThunkQI <> 0 Then VirtualFree m_pThunkQI, 0, MEM_RELEASE: m_pThunkQI = 0
-    If m_pThunkAR <> 0 Then VirtualFree m_pThunkAR, 0, MEM_RELEASE: m_pThunkAR = 0
-    If m_pThunkRelease <> 0 Then VirtualFree m_pThunkRelease, 0, MEM_RELEASE: m_pThunkRelease = 0
     Set m_Handler = Nothing
     Set m_funcPtrsCore = Nothing
     Set m_funcPtrsHandler = Nothing
 End Sub
 
 
-' =============================================================================
-' 公開 API
-' =============================================================================
+Public Sub PrewarmDelegates()
+    EnsureDelegates
+End Sub
 
 Public Sub RegisterToastHandlers(ByVal pToast As LongPtr)
     Dim token As LongLong
@@ -199,10 +230,6 @@ Public Sub RegisterToastHandlers(ByVal pToast As LongPtr)
     On Error GoTo 0
 End Sub
 
-
-' =============================================================================
-' IUnknown（サンク先・Public）
-' =============================================================================
 
 Public Function Com_QueryInterface( _
     ByVal pThis As LongPtr, ByVal riid As LongPtr, ByRef ppvObject As LongPtr) As Long
@@ -256,13 +283,11 @@ Public Function Com_Release(ByVal pThis As LongPtr) As Long
 End Function
 
 
-' =============================================================================
-' デリゲート構築
-' =============================================================================
-
 Private Sub EnsureDelegates()
     Dim i As Long
     Dim invokeName As String
+    Dim poolBase As LongPtr
+    Dim off As LongPtr
 
     If m_DelegatesReady Then Exit Sub
 
@@ -275,11 +300,22 @@ Private Sub EnsureDelegates()
     IIDFromString StrPtr(WinRT_IID_TypedEventHandler_Dismissed), m_iidDelegate(WRT_DELEGATE_DISMISSED)
     IIDFromString StrPtr(WinRT_IID_TypedEventHandler_Failed), m_iidDelegate(WRT_DELEGATE_FAILED)
 
-    ' QI / Invoke は COM 引数 3 個。AddRef / Release は COM 引数 1 個のみ。
-    m_pThunkQI = MakeThunkCall3(ObjPtr(Me), m_funcPtrsCore("Com_QueryInterface"))
-    m_pThunkAR = MakeThunkCall1(ObjPtr(Me), m_funcPtrsCore("Com_AddRef"))
-    m_pThunkRelease = MakeThunkCall1(ObjPtr(Me), m_funcPtrsCore("Com_Release"))
-    If m_pThunkQI = 0 Or m_pThunkAR = 0 Or m_pThunkRelease = 0 Then Exit Sub
+    poolBase = VirtualAlloc(0, MEM_POOL_SIZE, MEM_COMMIT Or MEM_RESERVE, PAGE_EXECUTE_READWRITE)
+    If poolBase = 0 Then Exit Sub
+    m_pMemPool = poolBase
+
+    off = poolBase
+    m_pThunkQI = off
+    If Not WriteThunkCall3At(m_pThunkQI, ObjPtr(Me), m_funcPtrsCore("Com_QueryInterface")) Then GoTo Fail
+    off = off + THUNK_SIZE
+
+    m_pThunkAR = off
+    If Not WriteThunkCall1At(m_pThunkAR, ObjPtr(Me), m_funcPtrsCore("Com_AddRef")) Then GoTo Fail
+    off = off + THUNK_SIZE
+
+    m_pThunkRelease = off
+    If Not WriteThunkCall1At(m_pThunkRelease, ObjPtr(Me), m_funcPtrsCore("Com_Release")) Then GoTo Fail
+    off = off + THUNK_SIZE
 
     For i = 0 To WRT_DELEGATE_COUNT - 1
         Select Case i
@@ -287,48 +323,48 @@ Private Sub EnsureDelegates()
             Case WRT_DELEGATE_DISMISSED: invokeName = "Invoke_Dismissed"
             Case WRT_DELEGATE_FAILED:    invokeName = "Invoke_Failed"
         End Select
-        If Not m_funcPtrsHandler.Exists(invokeName) Then Exit Sub
-        If Not BuildDelegateBlock(i, m_funcPtrsHandler(invokeName)) Then Exit Sub
+        If Not m_funcPtrsHandler.Exists(invokeName) Then GoTo Fail
+
+        m_pVtblBlock(i) = off
+        If Not BuildDelegateBlockAt(m_pVtblBlock(i), off + DELEGATE_BLK_SIZE, m_funcPtrsHandler(invokeName)) Then GoTo Fail
+        m_pObject(i) = off + DELEGATE_BLK_SIZE
+        off = off + DELEGATE_BLK_SIZE + FAKE_OBJ_SIZE
         m_RefCount(i) = 1
     Next i
 
     m_DelegatesReady = True
+    Exit Sub
+
+Fail:
+    If m_pMemPool <> 0 Then
+        VirtualFree m_pMemPool, 0, MEM_RELEASE
+        m_pMemPool = 0
+    End If
+    m_pThunkQI = 0
+    m_pThunkAR = 0
+    m_pThunkRelease = 0
 End Sub
 
-Private Function BuildDelegateBlock(ByVal idx As Long, ByVal pInvokeFunc As LongPtr) As Boolean
-    Dim blk As LongPtr
-    Dim vtbl As LongPtr
+Private Function BuildDelegateBlockAt( _
+    ByVal blk As LongPtr, ByVal fakeObj As LongPtr, ByVal pInvokeFunc As LongPtr) As Boolean
+
     Dim thkInvoke As LongPtr
     Dim slot(3) As LongPtr
 
-    blk = VirtualAlloc(0, 96, MEM_COMMIT Or MEM_RESERVE, PAGE_EXECUTE_READWRITE)
-    If blk = 0 Then Exit Function
-
-    vtbl = blk
     thkInvoke = blk + 32
-
-    If MakeThunkCall3At(thkInvoke, ObjPtr(m_Handler), pInvokeFunc) = 0 Then
-        VirtualFree blk, 0, MEM_RELEASE
-        Exit Function
-    End If
+    If Not WriteThunkCall3At(thkInvoke, ObjPtr(m_Handler), pInvokeFunc) Then Exit Function
 
     slot(0) = m_pThunkQI
     slot(1) = m_pThunkAR
     slot(2) = m_pThunkRelease
     slot(3) = thkInvoke
-    RtlMoveMemory vtbl, VarPtr(slot(0)), 32
+    MemLongPtr(blk + 0) = slot(0)
+    MemLongPtr(blk + 8) = slot(1)
+    MemLongPtr(blk + 16) = slot(2)
+    MemLongPtr(blk + 24) = slot(3)
+    MemLongPtr(fakeObj) = blk
 
-    m_pVtblBlock(idx) = blk
-    m_pObject(idx) = MakeFakeObj(vtbl)
-    BuildDelegateBlock = (m_pObject(idx) <> 0)
-End Function
-
-Private Function MakeFakeObj(ByVal vtbl As LongPtr) As LongPtr
-    Dim p As LongPtr
-    p = VirtualAlloc(0, 8, MEM_COMMIT Or MEM_RESERVE, PAGE_EXECUTE_READWRITE)
-    If p = 0 Then Exit Function
-    RtlMoveMemory p, VarPtr(vtbl), 8
-    MakeFakeObj = p
+    BuildDelegateBlockAt = True
 End Function
 
 Private Function DelegateIndexFromThis(ByVal this As LongPtr) As Long
@@ -343,66 +379,42 @@ Private Function DelegateIndexFromThis(ByVal this As LongPtr) As Long
 End Function
 
 
-' =============================================================================
-' x64 サンク（第五段階: Function As Long / HRESULT 対応）
-' =============================================================================
+Private Function WriteThunkCall1At( _
+    ByVal addr As LongPtr, ByVal pOwner As LongPtr, ByVal pFunc As LongPtr) As Boolean
 
-' COM(this) → Class(Me, this, pRetVal*)
-Private Function MakeThunkCall1(ByVal pOwner As LongPtr, ByVal pFunc As LongPtr) As LongPtr
-    Dim addr As LongPtr
-    If pFunc = 0 Then Exit Function
-    addr = VirtualAlloc(0, 64, MEM_COMMIT Or MEM_RESERVE, PAGE_EXECUTE_READWRITE)
-    If addr = 0 Then Exit Function
-    If MakeThunkCall1At(addr, pOwner, pFunc) = 0 Then
-        VirtualFree addr, 0, MEM_RELEASE
-        Exit Function
-    End If
-    MakeThunkCall1 = addr
-End Function
-
-Private Function MakeThunkCall1At( _
-    ByVal addr As LongPtr, ByVal pOwner As LongPtr, ByVal pFunc As LongPtr) As Long
-
-    Dim b(63) As Byte
+    Dim b(0 To THUNK_SIZE - 1) As Byte
     Dim i As Long
+    Dim k As Long
 
     If addr = 0 Or pFunc = 0 Then Exit Function
 
     i = 0
-    b(i) = &H48: b(i + 1) = &H83: b(i + 2) = &HEC: b(i + 3) = &H28: i = i + 4   ' sub rsp, 0x28
-    b(i) = &H4C: b(i + 1) = &H8D: b(i + 2) = &H44: b(i + 3) = &H24: b(i + 4) = &H10: i = i + 5   ' lea r8, [rsp+0x10]
-    b(i) = &H48: b(i + 1) = &H89: b(i + 2) = &HCA: i = i + 3                     ' mov rdx, rcx
-    b(i) = &H48: b(i + 1) = &HB9: i = i + 2                                       ' mov rcx, imm64
-    CopyMemory b(i), pOwner, 8: i = i + 8
-    b(i) = &H48: b(i + 1) = &HB8: i = i + 2                                       ' mov rax, imm64
-    CopyMemory b(i), pFunc, 8: i = i + 8
-    b(i) = &HFF: b(i + 1) = &HD0: i = i + 2                                       ' call rax
-    b(i) = &H8B: b(i + 1) = &H44: b(i + 2) = &H24: b(i + 3) = &H10: i = i + 4   ' mov eax, [rsp+0x10]
-    b(i) = &H48: b(i + 1) = &H83: b(i + 2) = &HC4: b(i + 3) = &H28: i = i + 4   ' add rsp, 0x28
-    b(i) = &HC3: i = i + 1                                                        ' ret
+    b(i) = &H48: b(i + 1) = &H83: b(i + 2) = &HEC: b(i + 3) = &H28: i = i + 4
+    b(i) = &H4C: b(i + 1) = &H8D: b(i + 2) = &H44: b(i + 3) = &H24: b(i + 4) = &H10: i = i + 5
+    b(i) = &H48: b(i + 1) = &H89: b(i + 2) = &HCA: i = i + 3
+    b(i) = &H48: b(i + 1) = &HB9: i = i + 2
+    MemLongPtr(VarPtr(b(i))) = pOwner: i = i + 8
+    b(i) = &H48: b(i + 1) = &HB8: i = i + 2
+    MemLongPtr(VarPtr(b(i))) = pFunc: i = i + 8
+    b(i) = &HFF: b(i + 1) = &HD0: i = i + 2
+    b(i) = &H8B: b(i + 1) = &H44: b(i + 2) = &H24: b(i + 3) = &H10: i = i + 4
+    b(i) = &H48: b(i + 1) = &H83: b(i + 2) = &HC4: b(i + 3) = &H28: i = i + 4
+    b(i) = &HC3: i = i + 1
+    b(i) = &HCC: i = i + 1
+    b(i) = &HCC: i = i + 1
 
-    RtlMoveMemory addr, VarPtr(b(0)), CLngPtr(i)
-    MakeThunkCall1At = 1
+    For k = 0 To THUNK_SIZE - 1 Step 8
+        MemLongPtr(addr + k) = ReadLongPtrFromBytes(b, k)
+    Next k
+    WriteThunkCall1At = True
 End Function
 
-' COM(this, arg1, arg2) → Class(Me, this, arg1, arg2, pRetVal*)
-Private Function MakeThunkCall3(ByVal pOwner As LongPtr, ByVal pFunc As LongPtr) As LongPtr
-    Dim addr As LongPtr
-    If pFunc = 0 Then Exit Function
-    addr = VirtualAlloc(0, 64, MEM_COMMIT Or MEM_RESERVE, PAGE_EXECUTE_READWRITE)
-    If addr = 0 Then Exit Function
-    If MakeThunkCall3At(addr, pOwner, pFunc) = 0 Then
-        VirtualFree addr, 0, MEM_RELEASE
-        Exit Function
-    End If
-    MakeThunkCall3 = addr
-End Function
+Private Function WriteThunkCall3At( _
+    ByVal addr As LongPtr, ByVal pOwner As LongPtr, ByVal pFunc As LongPtr) As Boolean
 
-Private Function MakeThunkCall3At( _
-    ByVal addr As LongPtr, ByVal pOwner As LongPtr, ByVal pFunc As LongPtr) As Long
-
-    Dim b(63) As Byte
+    Dim b(0 To THUNK_SIZE - 1) As Byte
     Dim i As Long
+    Dim k As Long
 
     If addr = 0 Or pFunc = 0 Then Exit Function
 
@@ -412,24 +424,65 @@ Private Function MakeThunkCall3At( _
     b(i) = &H49: b(i + 1) = &H89: b(i + 2) = &HD0: i = i + 3
     b(i) = &H48: b(i + 1) = &H89: b(i + 2) = &HCA: i = i + 3
     b(i) = &H48: b(i + 1) = &HB9: i = i + 2
-    CopyMemory b(i), pOwner, 8: i = i + 8
+    MemLongPtr(VarPtr(b(i))) = pOwner: i = i + 8
     b(i) = &H48: b(i + 1) = &H8D: b(i + 2) = &H44: b(i + 3) = &H24: b(i + 4) = &H28: i = i + 5
     b(i) = &H48: b(i + 1) = &H89: b(i + 2) = &H44: b(i + 3) = &H24: b(i + 4) = &H20: i = i + 5
     b(i) = &H48: b(i + 1) = &HB8: i = i + 2
-    CopyMemory b(i), pFunc, 8: i = i + 8
+    MemLongPtr(VarPtr(b(i))) = pFunc: i = i + 8
     b(i) = &HFF: b(i + 1) = &HD0: i = i + 2
     b(i) = &H8B: b(i + 1) = &H44: b(i + 2) = &H24: b(i + 3) = &H28: i = i + 4
     b(i) = &H48: b(i + 1) = &H83: b(i + 2) = &HC4: b(i + 3) = &H38: i = i + 4
     b(i) = &HC3: i = i + 1
+    b(i) = &HCC: i = i + 1
+    b(i) = &HCC: i = i + 1
 
-    RtlMoveMemory addr, VarPtr(b(0)), CLngPtr(i)
-    MakeThunkCall3At = 1
+    For k = 0 To THUNK_SIZE - 1 Step 8
+        MemLongPtr(addr + k) = ReadLongPtrFromBytes(b, k)
+    Next k
+    WriteThunkCall3At = True
 End Function
 
 
-' =============================================================================
-' BuildFuncPtrCache（ITypeInfo）
-' =============================================================================
+Private Function ReadLongPtrFromBytes(ByRef b() As Byte, ByVal offset As Long) As LongPtr
+    ReadLongPtrFromBytes = ReadLongPtr(VarPtr(b(offset)))
+End Function
+
+Private Property Let MemLongPtr(ByVal addr As LongPtr, ByVal newValue As LongPtr)
+    Dim pA(0 To 0) As PointerAccessor
+    With pA(0)
+        .sa.cDims = 1
+        .sa.cLocks = 1
+        .sa.fFeatures = FADF_AUTO Or FADF_FIXEDSIZE
+        .sa.cbElements = PtrSize
+        .sa.pvData = addr
+        .sa.rgsabound0.cElements = 1
+        WritePtrNatively pA, VarPtr(.sa)
+        .arr(0) = newValue
+        .sa.rgsabound0.cElements = 0
+        .sa.pvData = NullPtr
+    End With
+End Property
+
+Private Function ReadLongPtr(ByVal addr As LongPtr) As LongPtr
+    Dim pA(0 To 0) As PointerAccessor
+    With pA(0)
+        .sa.cDims = 1
+        .sa.cLocks = 1
+        .sa.fFeatures = FADF_AUTO Or FADF_FIXEDSIZE
+        .sa.cbElements = PtrSize
+        .sa.pvData = addr
+        .sa.rgsabound0.cElements = 1
+        WritePtrNatively pA, VarPtr(.sa)
+        ReadLongPtr = .arr(0)
+        .sa.rgsabound0.cElements = 0
+        .sa.pvData = NullPtr
+    End With
+End Function
+
+Private Sub WritePtrNatively(ByRef ptrs() As LONG_PTR, ByVal ptr As LongPtr)
+    ptrs(0) = ptr
+End Sub
+
 
 Private Sub BuildFuncPtrCache(ByVal pObj As LongPtr, ByVal dict As Object)
     dict.RemoveAll
@@ -484,10 +537,6 @@ Private Function PtrToStrW(ByVal p As LongPtr) As String
 End Function
 
 
-' =============================================================================
-' ヘルパー
-' =============================================================================
-
 Private Function GuidEqual(ByRef a As WinRT_GUID, ByRef b As WinRT_GUID) As Boolean
     Dim i As Long
     If a.Data1 <> b.Data1 Then Exit Function
@@ -533,10 +582,6 @@ Private Function CallComMethod( _
     If hRes = 0 Then CallComMethod = vResult
 End Function
 
-
-' =============================================================================
-' ITypeInfo 用 DispCallFunc ラッパー
-' =============================================================================
 
 Private Function CallCOM0V(ByVal p As LongPtr, ByVal idx As Long) As Long
     Dim r As Variant
