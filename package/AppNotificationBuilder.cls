@@ -281,6 +281,7 @@ Private Const REG_OPTION_NON_VOLATILE As Long = 0
 ' [ SECTION ] Vtable一覧
 '---------------------------------------------------------------------------------------------------
 Private Const VT_QI As Long = 0
+Private Const VT_ADDREF As Long = 1
 Private Const VT_RELEASE As Long = 2
 Private Const VT_IToastNotifier_Show As Long = 6
 Private Const VT_IToastNotifier_GetSetting As Long = 8
@@ -375,6 +376,9 @@ Private WinRT_HStringCache As Object
 Private WinRT_pCachedNotifier2 As LongPtr
 Private WinRT_CachedNotifierAppId As String
 Private WinRT_CachedNotifierCollectionId As String
+Private WinRT_pCachedNotificationData As LongPtr
+Private WinRT_CachedDataTag As String
+Private WinRT_CachedDataGroup As String
 
 '---------------------------------------------------------------------------------------------------
 ' [ SECTION ] WinRT-APIに関する主要な定義
@@ -2368,6 +2372,7 @@ Private Sub WinRT_ShowToastNotification(Binding As WinRT_DataBinding)
 
     ' 配信日時が指定されていればスケジュール登録、なければ即時表示
     If ToastConfig.Schedule_DeliveryTime Then
+        WinRT_ReleaseCachedNotificationData
         WinRT_ShowScheduledToast
     Else
         WinRT_ShowImmediateToast Binding
@@ -2427,8 +2432,34 @@ Private Sub WinRT_ApplyFullBindingToMap(ByVal pMap As LongPtr, ByRef Binding As 
     End With
 End Sub
 
+Private Sub WinRT_ReleaseCachedNotificationData()
+    On Error Resume Next
+    If WinRT_pCachedNotificationData <> 0 Then
+        WinRT_CallComMethod WinRT_pCachedNotificationData, VT_RELEASE, vbLong
+        WinRT_pCachedNotificationData = 0
+    End If
+    WinRT_CachedDataTag = vbNullString
+    WinRT_CachedDataGroup = vbNullString
+    On Error GoTo 0
+End Sub
+
+Private Function WinRT_NotificationDataCacheMatches(ByVal Tag As String, ByVal Group As String) As Boolean
+    WinRT_NotificationDataCacheMatches = (WinRT_pCachedNotificationData <> 0) _
+        And (StrComp(WinRT_CachedDataTag, Tag, vbBinaryCompare) = 0) _
+        And (StrComp(WinRT_CachedDataGroup, Group, vbBinaryCompare) = 0)
+End Function
+
+Private Sub WinRT_StoreCachedNotificationData(ByVal pData As LongPtr, ByVal Tag As String, ByVal Group As String)
+    WinRT_ReleaseCachedNotificationData
+    If pData = 0 Then Exit Sub
+    WinRT_pCachedNotificationData = pData
+    WinRT_CachedDataTag = Tag
+    WinRT_CachedDataGroup = Group
+End Sub
+
 Private Sub WinRT_ReleaseCachedUpdateObjects()
     On Error Resume Next
+    WinRT_ReleaseCachedNotificationData
     If WinRT_pCachedNotifier2 <> 0 Then
         WinRT_CallComMethod WinRT_pCachedNotifier2, VT_RELEASE, vbLong
         WinRT_pCachedNotifier2 = 0
@@ -2445,8 +2476,8 @@ End Sub
 '            エラー時は Err.Number を返します（Err.Source が空の場合は Raise しません）。
 '* 引数　　：Binding    更新後のデータバインディング値
 '---------------------------------------------------------------------------------------------------
-'* 処理概要：IToastNotifier2.UpdateWithTagAndGroup を呼び出します。
-'            事前に同じ Tag/Group で Show した通知が存在しないと NotificationNotFound になります。
+'* 処理概要：キャッシュ済み NotificationData があれば RoActivateInstance を省略し、
+'            SequenceNumber と Values マップのみ更新して UpdateWithTagAndGroup を呼び出します。
 '***************************************************************************************************
 Private Function WinRT_UpdateToastNotification(Binding As WinRT_DataBinding) As Long
     Dim pNotifier2 As LongPtr
@@ -2466,8 +2497,14 @@ Private Function WinRT_UpdateToastNotification(Binding As WinRT_DataBinding) As 
     pNotifier2 = WinRT_GetCachedNotifier2(ToastConfig.AppUserModelID, ToastConfig.CollectionID)
     If pNotifier2 = 0 Then Err.Raise 513, , "CreateToastNotifier failed."
 
-    pData = WinRT_CreateNotificationData(Binding)
-    If pData = 0 Then Err.Raise 513, , "CreateNotificationData failed."
+    If WinRT_NotificationDataCacheMatches(ToastConfig.Tag, ToastConfig.Group) Then
+        pData = WinRT_pCachedNotificationData
+        WinRT_ApplyBindingToNotificationData pData, Binding
+    Else
+        pData = WinRT_CreateNotificationData(Binding)
+        If pData = 0 Then Err.Raise 513, , "CreateNotificationData failed."
+        WinRT_StoreCachedNotificationData pData, ToastConfig.Tag, ToastConfig.Group
+    End If
 
     hStrTag = WinRT_CachedHString(ToastConfig.Tag)
     hStrGroup = WinRT_CachedHString(ToastConfig.Group)
@@ -2475,7 +2512,6 @@ Private Function WinRT_UpdateToastNotification(Binding As WinRT_DataBinding) As 
     WinRT_CallComMethod pNotifier2, VT_IToastNotifier2_UpdateWithTagAndGroup, vbLong, WinRT_vbPtr, pData, WinRT_vbPtr, hStrTag, WinRT_vbPtr, hStrGroup, WinRT_vbPtr, VarPtr(updateResult)
 
     WinRT_UpdateToastNotification = updateResult
-    WinRT_CallComMethod pData, VT_RELEASE, vbLong
     Exit Function
 
 Cleanup:
@@ -2483,8 +2519,6 @@ Cleanup:
         If Err.Source = "" Then Err.Raise Err.Number, "WinRT_UpdateToastNotification", Err.Description
         WinRT_UpdateToastNotification = Err.Number
     End If
-    On Error Resume Next
-    If pData <> 0 Then WinRT_CallComMethod pData, VT_RELEASE, vbLong
     On Error GoTo 0
 End Function
 
@@ -2563,6 +2597,7 @@ Private Sub WinRT_RemoveToastNotification()
 
 Cleanup:
     If Err.Number <> 0 Then Err.Raise Err.Number, "WinRT_RemoveToastNotification", Err.Description
+    WinRT_ReleaseCachedNotificationData
     On Error Resume Next
     If pHistory <> 0 Then WinRT_CallComMethod pHistory, VT_RELEASE, vbLong
     On Error GoTo 0
@@ -2807,6 +2842,7 @@ Private Sub WinRT_ShowImmediateToast(Binding As WinRT_DataBinding)
     pXmlDoc = 0
 
     '--- 2. データバインディング（NotificationData）を載せる ---
+    WinRT_ReleaseCachedNotificationData
     pData = WinRT_CreateNotificationData(Binding)
     If pData <> 0 Then
         WinRT_CallComMethod pToast, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidToast4), WinRT_vbPtr, VarPtr(pToast4)
@@ -2815,8 +2851,7 @@ Private Sub WinRT_ShowImmediateToast(Binding As WinRT_DataBinding)
             WinRT_CallComMethod pToast4, VT_RELEASE, vbLong
             pToast4 = 0
         End If
-        WinRT_CallComMethod pData, VT_RELEASE, vbLong
-        pData = 0
+        WinRT_StoreCachedNotificationData pData, ToastConfig.Tag, ToastConfig.Group
     End If
 
     '--- 3. Tag / Group / 表示オプションを設定 ---
@@ -3236,6 +3271,43 @@ End Function
 ' [ SECTION F ] データバインディング（NotificationData マップ構築）
 '---------------------------------------------------------------------------------------------------
 '***************************************************************************************************
+'* 機能　　：既存 NotificationData にバインディング値を反映します（RoActivateInstance は呼びません）。
+'***************************************************************************************************
+Private Sub WinRT_ApplyBindingToNotificationData(ByVal pData As LongPtr, ByRef Binding As WinRT_DataBinding)
+    Dim pMap As LongPtr
+
+    If pData = 0 Then Exit Sub
+    If Not WinRT_DataBindingHasContent(Binding) Then Exit Sub
+
+    If Binding.SequenceNumber > 0 Then
+        WinRT_CallComMethod pData, VT_INotificationData_SetSequenceNumber, vbLong, vbLong, Binding.SequenceNumber
+    End If
+
+    WinRT_CallComMethod pData, 6, vbLong, WinRT_vbPtr, VarPtr(pMap)
+    If pMap = 0 Then Exit Sub
+
+    WinRT_ApplyFullBindingToMap pMap, Binding
+    WinRT_CallComMethod pMap, VT_RELEASE, vbLong
+End Sub
+
+'***************************************************************************************************
+'* 機能　　：NotificationData インスタンスを RoActivateInstance で生成します。
+'***************************************************************************************************
+Private Function WinRT_ActivateNotificationDataInstance() As LongPtr
+    Dim hStrClass As LongPtr
+    Dim pInspectable As LongPtr
+    Dim pData As LongPtr
+
+    hStrClass = WinRT_CachedHString("Windows.UI.Notifications.NotificationData")
+    RoActivateInstance hStrClass, pInspectable
+    If pInspectable = 0 Then Exit Function
+
+    WinRT_CallComMethod pInspectable, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidNotificationData), WinRT_vbPtr, VarPtr(pData)
+    WinRT_CallComMethod pInspectable, VT_RELEASE, vbLong
+    WinRT_ActivateNotificationDataInstance = pData
+End Function
+
+'***************************************************************************************************
 '* 機能　　：WinRT_DataBinding の値から NotificationData オブジェクトを構築します。
 '---------------------------------------------------------------------------------------------------
 '* 返り値　：INotificationData ポインタ。バインディング内容が空の場合は 0。
@@ -3243,43 +3315,18 @@ End Function
 '* 処理概要：RoActivateInstance("Windows.UI.Notifications.NotificationData")
 '            → SequenceNumber 設定 → Values マップ取得 → 各キーにテキスト/進捗値を Insert
 '            キー名は DataBindingTopText_* / DataBindingProgress_* 定数に対応（XML の {token} と一致）。
+'---------------------------------------------------------------------------------------------------
+'* 注意事項：呼び出し側が Release するか、WinRT_StoreCachedNotificationData でキャッシュします。
 '***************************************************************************************************
 Private Function WinRT_CreateNotificationData(ByRef Binding As WinRT_DataBinding) As LongPtr
-    Dim hStrClass As LongPtr
-    Dim pInspectable As LongPtr
     Dim pData As LongPtr
-    Dim pMap As LongPtr
-    Dim hasProgress As Boolean
 
     If Not WinRT_DataBindingHasContent(Binding) Then Exit Function
 
-    ' NotificationData インスタンスを RoActivateInstance で生成
-    hStrClass = WinRT_CachedHString("Windows.UI.Notifications.NotificationData")
-    RoActivateInstance hStrClass, pInspectable
-    If pInspectable = 0 Then Exit Function
-
-    WinRT_CallComMethod pInspectable, VT_QI, vbLong, WinRT_vbPtr, VarPtr(WinRT_iidNotificationData), WinRT_vbPtr, VarPtr(pData)
-    WinRT_CallComMethod pInspectable, VT_RELEASE, vbLong
+    pData = WinRT_ActivateNotificationDataInstance()
     If pData = 0 Then Exit Function
 
-    If Binding.SequenceNumber > 0 Then
-        WinRT_CallComMethod pData, VT_INotificationData_SetSequenceNumber, vbLong, vbLong, Binding.SequenceNumber
-    End If
-
-    'トースト通知のプログレスバー使用判定
-    hasProgress = (StrPtr(Binding.ProgressStatus) > 0)
-
-    ' Values プロパティ（IMap）を取得してキー/値を詰めていく
-    WinRT_CallComMethod pData, 6, vbLong, WinRT_vbPtr, VarPtr(pMap)
-    If pMap = 0 Then
-        WinRT_CallComMethod pData, VT_RELEASE, vbLong
-        Exit Function
-    End If
-
-    WinRT_ApplyFullBindingToMap pMap, Binding
-
-    WinRT_CallComMethod pMap, VT_RELEASE, vbLong   ' マップだけ解放（pData は呼び出し側が Release）
-
+    WinRT_ApplyBindingToNotificationData pData, Binding
     WinRT_CreateNotificationData = pData
 End Function
 
