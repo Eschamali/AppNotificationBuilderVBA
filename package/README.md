@@ -83,20 +83,20 @@ End Sub
 ```
 
 実行すると、下記の順で通知が出ると思います。  
-![alt text](../Special001.png)  
+![alt text](../doc/Special001.png)  
 ↓  
-![alt text](../Special002.png)  
+![alt text](../doc/Special002.png)  
 ↓  
-![alt text](../Special001.png)  
+![alt text](../doc/Special001.png)  
 
 2枚目の画像を見ていただくとわかるように、**アイコン**と**アプリ名**が、レジストリの登録内容に沿った表示になっているのがわかると思います。  
 特にアプリ名を変えれるのはきっと嬉しい方もいるのではないでしょうか？  
 なお、`IconBackgroundColor`の部分は、設定→システム→通知 で意味がわかります。  
-![alt text](../Special004.png)
+![alt text](../doc/Special004.png)
 
 ただ欠点として、`DisplayName`を設定すると、デフォルトアイコン(今回だと、Excelアイコン)が使えなくなってしまいます😣  
 試しに、`.ChangeSetting_ClassesAppUserModelId(IconUri)`部分をコメントアウトして実行すると…  
-![alt text](../Special007.png)  
+![alt text](../doc/Special007.png)  
 と、別のアイコンになってしまいます。自前でアイコン画像を用意する必要があります。
 
 #### ShowInSettings のサンプルコード
@@ -135,14 +135,14 @@ End Sub
 ```
 
 実行して、右側の「...」ボタンを押下してメニューの状態を確認すると…  
-![alt text](../Special005.png)  
+![alt text](../doc/Special005.png)  
 ↓  
-![alt text](../Special006.png)  
+![alt text](../doc/Special006.png)  
 ↓  
-![alt text](../Special005.png)  
+![alt text](../doc/Special005.png)  
 なんと！Excelからの通知をOFF にできなくなっちゃう設定になりました！  
 そうこれは、Windows セキュリティアプリのような挙動を再現できちゃう設定となります。  
-![alt text](../Special008.png)  
+![alt text](../doc/Special008.png)  
 Windows セキュリティアプリの場合は、システム領域のレジストリとなりますが、同じ名称のレジストリがあるのが確認できます。
 
 ### Notifications\Settings 配下
@@ -527,7 +527,7 @@ UPDATE NotificationHandler SET WNSId='System' WHERE PrimaryId='Microsoft.Office.
 
 そして、イミディエイトに`書き換え後:System`と出てきて、書き換わったのが確認できます。  
 もちろん、実際のSQLiteのビュアーを見ても変わっております。  
-![alt text](../Special009.png)
+![alt text](../doc/Special009.png)
 
 > [!TIP]
 > もとに戻す場合は、`.SetWpndatabase_WNSId = wsNonImmersivePackage`にすればOKです。
@@ -606,7 +606,7 @@ UPDATE NotificationHandler SET HandlerType='app:system' WHERE PrimaryId='Microso
 
 そして、イミディエイトに`書き換え後:app:system`と出てきて、書き換わったのが確認できます。  
 もちろん、実際のSQLiteのビュアーを見ても変わっております。  
-![alt text](../Special010.png)
+![alt text](../doc/Special010.png)
 
 > [!TIP]
 > もとに戻す場合は、`.SetWpndatabase_HandlerType = htDesktop`にすればOKです。
@@ -750,10 +750,10 @@ End Sub
 ```
 
 これで、お分かりだろう。変更前は、バッジ通知が何も起こさなかったのを。(1つ目の`Stop`)  
-![alt text](../Special012.png)
+![alt text](../doc/Special012.png)
 
 しかし、`s:badge` フラグが `1` に反転された後、それが生命を吹き込まれたのが分かっただろうか？🙂(2つ目の`Stop`)  
-![alt text](../Special013.png)
+![alt text](../doc/Special013.png)
 
 そのたった1ビットのデータが、標準的なデスクトップアプリと、このモダンなUI機能とを隔てる、唯一のものなのだ。それは、能力そのものは既にそこにあり、ただ我々がそれを解き放つのを待っているだけだったことの証明だ。
 
@@ -846,7 +846,7 @@ End Sub
 - 貫通： 通知OFFやユーザーによる無効化設定を突破する😮
 - 不可視： Excelは設定リストから消え去り、ユーザーは手出しできなくなる😣（通知メニューから抜け出して再度通知メニューに入ると消えます）
 - 無敵： トースト自体をミュートしたり、設定変更したりすることができなくなる😫（完全に反映するにはExplorer.exeの再起動が必要な場合がある）
-![alt text](../Special011.png)
+![alt text](../doc/Special011.png)
 
 その仕組みはシンプルだが強力だ。  
 我々はドキュメント化されていないメカニズムを利用し、ExcelをWindowsセキュリティのような重要システムコンポーネントに偽装しているのだ。この「システムステータス」を獲得することで、通常のアプリケーションのルールを超越した特権――ブロック不可能な通知の配信を含む――を手に入れる。  
