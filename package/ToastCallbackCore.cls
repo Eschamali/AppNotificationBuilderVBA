@@ -54,6 +54,10 @@ Private Const CC_STDCALL As Long = 4
 Private Const VT_IToastNotification_AddActivated As Long = 11
 Private Const VT_IToastNotification_AddDismissed As Long = 9
 Private Const VT_IToastNotification_AddFailed As Long = 13
+' ★WinRTのadd_X/remove_Xは常に連番のペアで宣言されるため、remove_Xはadd_Xの直後のスロットになる
+Private Const VT_IToastNotification_RemoveActivated As Long = 12
+Private Const VT_IToastNotification_RemoveDismissed As Long = 10
+Private Const VT_IToastNotification_RemoveFailed As Long = 14
 
 Private Const WRT_DELEGATE_ACTIVATED As Long = 0
 Private Const WRT_DELEGATE_DISMISSED As Long = 1
@@ -171,6 +175,13 @@ Private m_iidDelegate(0 To 2) As WinRT_GUID
 Private m_iidUnknown As WinRT_GUID
 Private m_DelegatesReady As Boolean
 
+' ★use-after-free対策: `Class_Terminate`(=VBEのリセット時も含む)でネイティブメモリを
+'   解放する前に、OS側(Windows Notification Platform)が握っている参照を必ず断ち切るために
+'   `RegisterToastHandlers`で受け取った`pToast`と、各`AddXxx`が返す購読解除用トークンを保持しておく
+Private m_pToast As LongPtr
+Private m_Tokens(0 To 2) As LongLong
+Private m_IsRegistered As Boolean
+
 
 Private Sub Class_Initialize()
     Set m_Handler = New ToastCallbackHandler
@@ -181,6 +192,14 @@ Private Sub Class_Initialize()
 End Sub
 
 Private Sub Class_Terminate()
+    '★あくまで保険: 通常のオブジェクト破棄(参照カウントが0になる等)経路では、ここで
+    '  `UnregisterToastHandlers`が働く。
+    '  ただし実機検証の結果、VBEの`Reset`操作ではこの`Class_Terminate`自体が
+    '  確実には呼ばれない(=Resetの前に手動で`UnregisterToastHandlers`しておかないと、
+    '  ここに賭けても間に合わない)ことを確認済み。Reset前の手動解除については
+    '  `UnregisterToastHandlers`のコメントを参照
+    UnregisterToastHandlers
+
     If m_pMemPool <> 0 Then
         VirtualFree m_pMemPool, 0, MEM_RELEASE
         m_pMemPool = 0
@@ -209,6 +228,9 @@ Public Sub RegisterToastHandlers(ByVal pToast As LongPtr)
 
     If pToast = 0 Then Exit Sub
 
+    '既に別のトーストへ登録済みなら、まずそちらを解除しておく(取り違え防止)
+    If m_IsRegistered Then UnregisterToastHandlers
+
     On Error Resume Next
     EnsureDelegates
     If Not m_DelegatesReady Then Exit Sub
@@ -226,8 +248,52 @@ Public Sub RegisterToastHandlers(ByVal pToast As LongPtr)
                 CallComMethod pToast, VT_IToastNotification_AddFailed, vbLong, _
                     WinRT_vbPtr, m_pObject(i), WinRT_vbPtr, VarPtr(token)
         End Select
+        '★解除用トークンを必ず保存する(以前は捨てていたため、解除が不可能だった)
+        m_Tokens(i) = token
     Next i
     On Error GoTo 0
+
+    '★解除対象のトースト自体も保存しておく(以前はどこにも保持していなかった)
+    m_pToast = pToast
+    m_IsRegistered = True
+End Sub
+
+'***************************************************************************************************
+' 機能：登録済みのActivated/Dismissed/Failedを、OS(Windows Notification Platform)側から解除する
+'---------------------------------------------------------------------------------------------------
+' 注意事項：★重要★ VBEで`Reset`する場合は、Resetを押す**前**に、イミディエイトウィンドウ等から
+'           `ToastCallbackCore.UnregisterToastHandlers`を手動実行してから行ってください。
+'           実機検証の結果、`Reset`操作は`Class_Terminate`を確実には呼ばないため、
+'           「Resetすれば自動的にここが呼ばれるはず」という期待は成立しません(=手動解除が必須)。
+'           解除せずにResetすると、ネイティブメモリ解放後にOS側がまだ握っている生ポインタへ
+'           後からコールバックしようとしてクラッシュします(use-after-free)。
+'           `Class_Terminate`からも呼ばれますが、これは通常のオブジェクト破棄(参照カウントが
+'           0になる等)経路での保険に過ぎません
+'***************************************************************************************************
+Public Sub UnregisterToastHandlers()
+    Dim i As Long
+
+    If Not m_IsRegistered Then Exit Sub
+    If m_pToast = 0 Then Exit Sub
+
+    On Error Resume Next
+    For i = 0 To WRT_DELEGATE_COUNT - 1
+        Select Case i
+            Case WRT_DELEGATE_ACTIVATED
+                CallComMethod m_pToast, VT_IToastNotification_RemoveActivated, vbLong, _
+                    WinRT_vbPtr, m_Tokens(i)
+            Case WRT_DELEGATE_DISMISSED
+                CallComMethod m_pToast, VT_IToastNotification_RemoveDismissed, vbLong, _
+                    WinRT_vbPtr, m_Tokens(i)
+            Case WRT_DELEGATE_FAILED
+                CallComMethod m_pToast, VT_IToastNotification_RemoveFailed, vbLong, _
+                    WinRT_vbPtr, m_Tokens(i)
+        End Select
+    Next i
+    On Error GoTo 0
+
+    m_pToast = 0
+    m_IsRegistered = False
 End Sub
 
 
